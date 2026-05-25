@@ -255,15 +255,15 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     filename = args.get("filename", "")
     expression = args.get("expression", "")
 
-    file_path = await _get_file_path(filename, user_id, data_space_id)
-    if not file_path or not file_path.exists():
-        return f"文件 '{filename}' 不存在或无权访问"
-
-    # 安全检查：禁止危险操作
+    # 安全检查：禁止危险操作（在访问数据库之前）
     dangerous_keywords = ["import os", "import sys", "subprocess", "exec(", "eval(", "__", "open("]
     for kw in dangerous_keywords:
         if kw in expression:
             return f"安全限制：表达式中不允许使用 '{kw}'"
+
+    file_path = await _get_file_path(filename, user_id, data_space_id)
+    if not file_path or not file_path.exists():
+        return f"文件 '{filename}' 不存在或无权访问"
 
     ext = filename.rsplit(".", 1)[-1].lower()
 
