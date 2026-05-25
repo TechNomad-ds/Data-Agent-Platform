@@ -1,6 +1,6 @@
 """额度路由"""
 import uuid
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ async def _ensure_daily_credits(user_id: uuid.UUID, db: AsyncSession) -> None:
     if not account:
         return
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     last_reset = account.last_daily_reset.date() if account.last_daily_reset else None
 
     if last_reset != today:

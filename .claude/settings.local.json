@@ -57,7 +57,18 @@
       "Bash(nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload)",
       "Bash(echo \"Backend PID: $!\")",
       "Read(//tmp/**)",
-      "Bash(pip uninstall *)"
+      "Bash(pip uninstall *)",
+      "Bash(docker run *)",
+      "Bash(systemctl status *)",
+      "Bash(apt list *)",
+      "Bash(pg_ctlcluster 14 main start)",
+      "Bash(redis-server --daemonize yes --logfile /tmp/redis.log)",
+      "Bash(pg_ctlcluster 14 main status)",
+      "Bash(nohup npm run dev -- --host 0.0.0.0 --port 5173)",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Bash(pkill -f \"uvicorn app.main\")",
+      "Bash(psql *)",
+      "Bash(kill 25808)"
     ]
   }
 }

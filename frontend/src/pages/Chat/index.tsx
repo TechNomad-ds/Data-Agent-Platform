@@ -4,13 +4,15 @@ import { Layout, List, Button, Input, Select, Space, Typography, Card, Spin, mes
 import {
   PlusOutlined, SendOutlined, RobotOutlined,
   DatabaseOutlined, DeleteOutlined, StopOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
 import { modelsApi, ModelInfo } from '@/api/models'
 import { useChatStore } from '@/stores/chatStore'
-import ToolCard from '@/components/Chat/ToolCard'
+import { useAuthStore } from '@/stores/authStore'
+import ThinkingBlock from '@/components/Chat/ThinkingBlock'
 import MessageContent from '@/components/Chat/MessageContent'
 
 const { Sider, Content } = Layout
@@ -23,7 +25,7 @@ export default function Chat() {
 
   const {
     conversations, setConversations, currentConversation, setCurrentConversation,
-    messages, setMessages, streamingContent, toolEvents, thinkingText,
+    messages, setMessages, segments, thinkingText,
     isStreaming, setIsStreaming, appendStreamDelta, addToolEvent,
     setThinkingText, resetStream, setAbortController, stopStreaming,
   } = useChatStore()
@@ -48,7 +50,7 @@ export default function Chat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent, toolEvents])
+  }, [messages, segments])
 
   const loadConversations = async () => {
     try {
@@ -183,6 +185,7 @@ export default function Chat() {
       if (!response.ok) {
         if (response.status === 401) {
           message.error('登录已过期，请重新登录')
+          useAuthStore.getState().logout()
           return
         }
         throw new Error('请求失败')
@@ -200,7 +203,6 @@ export default function Chat() {
 
         sseBufferRef.current += decoder.decode(value, { stream: true })
         const lines = sseBufferRef.current.split('\n\n')
-        // Keep the last potentially incomplete chunk
         sseBufferRef.current = lines.pop() || ''
 
         for (const block of lines) {
@@ -211,6 +213,9 @@ export default function Chat() {
         }
       }
 
+      // Flush decoder
+      sseBufferRef.current += decoder.decode()
+
       // Process any remaining buffer
       if (sseBufferRef.current.trim()) {
         const remaining = sseBufferRef.current.split('\n')
@@ -219,15 +224,16 @@ export default function Chat() {
         }
       }
 
-      // Stream ended, add assistant message
-      const finalContent = useChatStore.getState().streamingContent
-      const finalToolEvents = useChatStore.getState().toolEvents
+      // Stream ended, add assistant message with segments
+      const state = useChatStore.getState()
+      const finalSegments = state.segments
+      const finalContent = finalSegments.filter(s => s.type === 'text').map(s => s.content || '').join('')
       if (finalContent) {
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: finalContent,
-          tool_calls: finalToolEvents.length > 0 ? finalToolEvents : null,
+          tool_calls: finalSegments,
           token_usage: null,
           credits_used: null,
           created_at: new Date().toISOString(),
@@ -241,6 +247,7 @@ export default function Chat() {
     } finally {
       setIsStreaming(false)
       setAbortController(null)
+      resetStream()
       loadConversations()
     }
   }
@@ -388,45 +395,44 @@ export default function Chat() {
 
               {/* 流式内容 */}
               {isStreaming && (
-                <div style={{ marginBottom: 16 }}>
-                  {thinkingText && (
-                    <div style={{
-                      padding: '8px 12px',
-                      background: '#f6f8fa',
-                      borderRadius: 8,
-                      marginBottom: 12,
-                      borderLeft: '3px solid #1677ff',
-                    }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        <ThunderboltOutlined style={{ marginRight: 6 }} />
-                        {thinkingText}
-                      </Text>
-                    </div>
-                  )}
-                  {toolEvents.map((event, i) => (
-                    <ToolCard key={i} event={event} />
-                  ))}
-                  {streamingContent && (
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <RobotOutlined style={{ color: '#fff', fontSize: 14 }} />
+                <div style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <RobotOutlined style={{ color: '#fff', fontSize: 14 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {segments.length === 0 && !thinkingText && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0' }}>
+                        <Spin size="small" />
+                        <Text type="secondary" style={{ fontSize: 13 }}>思考中...</Text>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <MessageContent message={{ id: 'streaming', role: 'assistant', content: streamingContent, tool_calls: null, token_usage: null, credits_used: null, created_at: '' }} />
+                    )}
+                    {thinkingText && segments.length === 0 && (
+                      <div style={{ padding: '6px 0', marginBottom: 6 }}>
+                        <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>{thinkingText}</Text>
                       </div>
-                    </div>
-                  )}
-                  {!streamingContent && toolEvents.length === 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0' }}>
-                      <Spin size="small" />
-                      <Text type="secondary" style={{ fontSize: 13 }}>思考中...</Text>
-                    </div>
-                  )}
+                    )}
+                    {segments.map((seg, i) => (
+                      seg.type === 'text' ? (
+                        <div key={i} className="markdown-body" style={{
+                          fontSize: 14, lineHeight: 1.7, marginBottom: 8,
+                          padding: '12px 16px', borderRadius: 12,
+                          background: '#f8f9fa', color: '#1f2937',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{seg.content || ''}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <ThinkingBlock toolEvents={seg.events || []} defaultExpanded={true} />
+                        </div>
+                      )
+                    ))}
+                  </div>
                 </div>
               )}
             </>

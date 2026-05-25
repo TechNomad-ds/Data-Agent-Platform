@@ -27,20 +27,16 @@ export default function Dashboard() {
   }, [])
 
   const loadData = async () => {
-    try {
-      const [spacesRes, convsRes, creditsRes, filesRes] = await Promise.all([
-        dataSpacesApi.list(),
-        chatApi.listConversations(),
-        api.get('/credits/balance'),
-        api.get('/files', { params: { page: 1, page_size: 1 } }),
-      ])
-      setSpaces(spacesRes.data)
-      setConversations(convsRes.data)
-      setBalance(creditsRes.data.balance)
-      setFileCount(filesRes.data.total)
-    } catch {
-      // 静默处理
-    }
+    const results = await Promise.allSettled([
+      dataSpacesApi.list(),
+      chatApi.listConversations(),
+      api.get('/credits/balance'),
+      api.get('/files', { params: { page: 1, page_size: 1 } }),
+    ])
+    if (results[0].status === 'fulfilled') setSpaces(results[0].value.data)
+    if (results[1].status === 'fulfilled') setConversations(results[1].value.data)
+    if (results[2].status === 'fulfilled') setBalance(results[2].value.data.balance)
+    if (results[3].status === 'fulfilled') setFileCount(results[3].value.data.total)
   }
 
   return (

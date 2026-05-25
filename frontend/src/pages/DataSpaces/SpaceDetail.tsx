@@ -22,7 +22,6 @@ export default function SpaceDetail({ space, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [indexLoading, setIndexLoading] = useState(false)
   const [indexStatus, setIndexStatus] = useState(space.index_status)
-  const token = useAuthStore((s) => s.token)
 
   useEffect(() => {
     loadDetail()
@@ -69,7 +68,11 @@ export default function SpaceDetail({ space, onBack }: Props) {
     name: 'files',
     multiple: true,
     action: `/api/data-spaces/${space.id}/upload`,
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${useAuthStore.getState().token}` },
+    beforeUpload: () => {
+      uploadProps.headers = { Authorization: `Bearer ${useAuthStore.getState().token}` }
+      return true
+    },
     onChange(info) {
       if (info.file.status === 'done') {
         message.success(`${info.file.name} 上传成功`)

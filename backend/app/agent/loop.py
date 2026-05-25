@@ -24,16 +24,17 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助�
 你可以使用以下工具来完成任务：
 - search_data_space: 在数据空间中搜索相关内容
 - read_file: 读取文件内容
-- inspect_data: 查看结构化数据的 schema 和样本
-- pandas_query: 对 CSV/Excel 数据执行 pandas 查询
-- execute_python: 执行 Python 代码进行数据分析
+- inspect_data: 查看结构化数据(CSV/Excel/JSON)的 schema、列信息和样本
+- pandas_query: 对 CSV/Excel/JSON 数据执行 pandas 查询（数据已加载为 df）
+- execute_python: 执行 Python 代码。数据空间中的文件已预加载为 DataFrame 变量（如 df_patient、df_examination），也可通过 FILES 字典获取文件路径
 
 工作原则：
 1. 先理解用户的问题，再决定使用哪些工具
-2. 对于数据分析任务，先用 inspect_data 了解数据结构，再进行分析
-3. 展示分析过程和关键发现
-4. 引用数据来源，让用户知道结论基于哪些文件
-5. 如果遇到错误，尝试修正并重试
+2. 对于数据分析任务，先用 inspect_data 了解数据结构，再用 pandas_query 或 execute_python 进行分析
+3. execute_python 中可直接使用预加载的 df_xxx 变量，无需手动读取文件
+4. 展示分析过程和关键发现
+5. 引用数据来源，让用户知道结论基于哪些文件
+6. 如果遇到错误，尝试修正并重试
 """
 
 
@@ -202,9 +203,9 @@ class AgentLoop:
 
                     if delta.tool_calls:
                         for tc in delta.tool_calls:
-                            if tc.index >= len(tool_calls_data):
+                            while tc.index >= len(tool_calls_data):
                                 tool_calls_data.append({
-                                    "id": tc.id or "",
+                                    "id": "",
                                     "function": {"name": "", "arguments": ""},
                                 })
                             if tc.id:
@@ -221,6 +222,8 @@ class AgentLoop:
 
                 # 如果没有工具调用，Agent 完成
                 if not tool_calls_data:
+                    if total_usage["input_tokens"] == 0:
+                        total_usage = self._estimate_tokens(messages, full_content)
                     credits_used = self._calculate_credits(total_usage, credit_multiplier)
                     credits_used = max(1, credits_used)
                     await self._deduct_credits(user_id, credits_used, actual_model_name)
@@ -288,6 +291,8 @@ class AgentLoop:
                 return
 
         # 达到最大迭代次数
+        if total_usage["input_tokens"] == 0:
+            total_usage = self._estimate_tokens(messages, "")
         credits_used = self._calculate_credits(total_usage, credit_multiplier)
         credits_used = max(1, credits_used)
         await self._deduct_credits(user_id, credits_used, actual_model_name)
@@ -296,7 +301,19 @@ class AgentLoop:
 
     def _calculate_credits(self, usage: dict, multiplier: float = 1.0) -> int:
         """根据 token 使用量和模型倍率计算消耗的额度"""
-        total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        total_tokens = input_tokens + output_tokens
         base_credits = total_tokens // 1000
         return max(1, int(base_credits * multiplier))
+
+    @staticmethod
+    def _estimate_tokens(messages: list[dict], output: str) -> dict:
+        """粗略估算 token 数（中文约 2 字符/token，英文约 4 字符/token）"""
+        input_chars = sum(len(str(m.get("content", ""))) for m in messages)
+        output_chars = len(output)
+        return {
+            "input_tokens": max(input_chars // 2, 100),
+            "output_tokens": max(output_chars // 2, 10),
+        }
 

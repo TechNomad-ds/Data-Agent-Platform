@@ -154,6 +154,8 @@ async def send_message(
         agent = AgentLoop()
         full_content = ""
         last_event: dict = {}
+        # Track segments: interleaved text and tool blocks
+        segments: list = []
 
         try:
             async for event in agent.run(
@@ -166,21 +168,35 @@ async def send_message(
                 last_event = event
                 if event["type"] == "text":
                     full_content += event["delta"]
+                    if segments and segments[-1]["type"] == "text":
+                        segments[-1]["content"] += event["delta"]
+                    else:
+                        segments.append({"type": "text", "content": event["delta"]})
+                elif event["type"] in ("tool_use", "tool_result"):
+                    if segments and segments[-1]["type"] == "tools":
+                        segments[-1]["events"].append(event)
+                    else:
+                        segments.append({"type": "tools", "events": [event]})
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
 
-        # 保存助手消息
-        async with get_session_factory()() as save_db:
-            assistant_message = Message(
-                conversation_id=conv_id,
-                role="assistant",
-                content=full_content,
-                token_usage=last_event.get("usage"),
-                credits_used=last_event.get("credits_used"),
-            )
-            save_db.add(assistant_message)
-            await save_db.commit()
+        # 保存助手消息（仅在有实际内容时）
+        if full_content and last_event.get("type") == "done":
+            try:
+                async with get_session_factory()() as save_db:
+                    assistant_message = Message(
+                        conversation_id=conv_id,
+                        role="assistant",
+                        content=full_content,
+                        tool_calls=segments if len(segments) > 1 else None,
+                        token_usage=last_event.get("usage"),
+                        credits_used=last_event.get("credits_used"),
+                    )
+                    save_db.add(assistant_message)
+                    await save_db.commit()
+            except Exception:
+                pass
 
         yield "data: [DONE]\n\n"
 

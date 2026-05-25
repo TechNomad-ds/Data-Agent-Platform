@@ -77,6 +77,11 @@ async def upload_files(
             tmp_dir.mkdir(parents=True, exist_ok=True)
             try:
                 zf = zipfile.ZipFile(io.BytesIO(content), "r")
+                # 安全检查：防止路径穿越
+                for info in zf.infolist():
+                    if info.filename.startswith('/') or '..' in info.filename:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        raise HTTPException(status_code=400, detail=f"zip 文件包含不安全的路径: {info.filename}")
                 zf.extractall(tmp_dir)
                 member_names = zf.namelist()
                 zf.close()

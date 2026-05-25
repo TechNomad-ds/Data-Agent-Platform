@@ -14,10 +14,11 @@ export interface Message {
   id: string
   role: string
   content: string | null
-  tool_calls: unknown | null
+  tool_calls: any[] | null
   token_usage: unknown | null
   credits_used: number | null
   created_at: string
+  segments?: any[]
 }
 
 export interface ConversationDetail extends Conversation {

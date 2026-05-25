@@ -32,7 +32,7 @@ class MessageResponse(BaseModel):
     id: uuid.UUID
     role: str
     content: Optional[str] = None
-    tool_calls: Optional[dict] = None
+    tool_calls: Optional[list] = None
     token_usage: Optional[dict] = None
     credits_used: Optional[int] = None
     created_at: datetime

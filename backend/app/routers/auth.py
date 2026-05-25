@@ -1,5 +1,5 @@
 """认证路由 - 注册、登录、刷新令牌"""
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ async def _check_daily_credit_reset(user_id, db: AsyncSession):
     if not account:
         return
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     last_reset = account.last_daily_reset.date() if account.last_daily_reset else None
 
     if last_reset != today:

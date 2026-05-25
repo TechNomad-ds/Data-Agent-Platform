@@ -1,5 +1,7 @@
 """数据空间路由 - CRUD、文件关联、索引管理"""
 import uuid
+import io
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -18,7 +20,7 @@ from app.schemas.data_space import (
 )
 from app.schemas.file import FileResponse
 from app.config import settings
-from app.routers.files import ALLOWED_EXTENSIONS, MAX_FILE_SIZE, get_file_type, get_user_storage_path
+from app.routers.files import ALLOWED_EXTENSIONS, MAX_FILE_SIZE, get_file_type, get_user_storage_path, _is_junk_path
 
 router = APIRouter()
 
@@ -256,8 +258,7 @@ async def upload_files_to_space(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传文件到数据空间（上传并自动关联）"""
-    # 验证数据空间归属
+    """上传文件到数据空间（上传并自动关联，ZIP 自动解压后每个文件单独入库）"""
     result = await db.execute(
         select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
     )
@@ -277,6 +278,62 @@ async def upload_files_to_space(
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(50MB)")
 
+        # ZIP 文件：解压后每个子文件单独入库并关联到数据空间
+        if file_type == "zip":
+            tmp_dir = user_storage / f"_zip_tmp_{uuid.uuid4()}"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                zf = zipfile.ZipFile(io.BytesIO(content), "r")
+                for info in zf.infolist():
+                    if info.filename.startswith('/') or '..' in info.filename:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        raise HTTPException(status_code=400, detail=f"zip 文件包含不安全的路径: {info.filename}")
+                zf.extractall(tmp_dir)
+                member_names = zf.namelist()
+                zf.close()
+            except zipfile.BadZipFile:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
+
+            for member in member_names:
+                if member.endswith("/") or _is_junk_path(member):
+                    continue
+                member_type = get_file_type(member)
+                if member_type not in ALLOWED_EXTENSIONS:
+                    continue
+
+                src = tmp_dir / member
+                if not src.is_file():
+                    continue
+
+                member_content = src.read_bytes()
+                member_name = Path(member).name
+                member_id = uuid.uuid4()
+                member_dir = user_storage / str(member_id)
+                member_dir.mkdir(parents=True, exist_ok=True)
+                member_path = member_dir / member_name
+                shutil.move(str(src), str(member_path))
+
+                relative_path = str(member_path.relative_to(Path(settings.storage_root)))
+                file_record = File(
+                    id=member_id,
+                    user_id=current_user.id,
+                    filename=member_name,
+                    original_filename=member_name,
+                    file_type=member_type,
+                    file_size=len(member_content),
+                    storage_path=relative_path,
+                    metadata_={"source_zip": upload_file.filename, "zip_path": member},
+                )
+                db.add(file_record)
+                await db.flush()
+                db.add(DataSpaceFile(data_space_id=space_id, file_id=member_id))
+                uploaded.append(file_record)
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            continue
+
+        # 普通文件：直接存储并关联
         file_id = uuid.uuid4()
         file_dir = user_storage / str(file_id)
         file_dir.mkdir(parents=True, exist_ok=True)
@@ -284,19 +341,6 @@ async def upload_files_to_space(
 
         with open(file_path, "wb") as f:
             f.write(content)
-
-        extracted_files = []
-        if file_type == "zip":
-            extract_dir = file_dir / "extracted"
-            extract_dir.mkdir(exist_ok=True)
-            try:
-                with zipfile.ZipFile(file_path, "r") as zf:
-                    zf.extractall(extract_dir)
-                    for name in zf.namelist():
-                        if not name.endswith("/"):
-                            extracted_files.append(name)
-            except zipfile.BadZipFile:
-                raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
 
         relative_path = str(file_path.relative_to(Path(settings.storage_root)))
         file_record = File(
@@ -308,12 +352,9 @@ async def upload_files_to_space(
             file_size=len(content),
             storage_path=relative_path,
             mime_type=upload_file.content_type,
-            metadata_={"extracted_files": extracted_files} if extracted_files else {},
         )
         db.add(file_record)
         await db.flush()
-
-        # 关联到数据空间
         db.add(DataSpaceFile(data_space_id=space_id, file_id=file_id))
         uploaded.append(file_record)
 

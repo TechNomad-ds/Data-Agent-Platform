@@ -66,7 +66,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "pandas_query",
-                "description": "对 CSV/Excel 文件执行 pandas 查询表达式。数据已加载为 df 变量",
+                "description": "对 CSV/Excel/JSON 文件执行 pandas 查询表达式。数据已加载为 df 变量。JSON 文件中的 records 数组会自动转为 DataFrame",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -81,7 +81,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "execute_python",
-                "description": "执行 Python 代码进行数据分析。可以使用 pandas、numpy、matplotlib 等库。数据空间文件在 /data/ 目录下",
+                "description": "执行 Python 代码进行数据分析。数据空间中的文件已预加载为 DataFrame 变量（文件名去掉扩展名并转小写，如 Patient.json -> df_patient）。可用库：pandas(pd)、numpy(np)、json。FILES 字典包含文件名到路径的映射",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -210,6 +210,18 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
         return f"读取文件失败: {str(e)}"
 
 
+def _load_json_as_df(file_path: Path) -> pd.DataFrame:
+    """将 JSON 文件加载为 DataFrame，支持 {table, records} 和纯数组格式"""
+    content = file_path.read_text(encoding="utf-8")
+    data = json.loads(content)
+    if isinstance(data, list):
+        return pd.DataFrame(data)
+    elif isinstance(data, dict) and "records" in data:
+        return pd.DataFrame(data["records"])
+    else:
+        raise ValueError("JSON 格式不支持直接转为表格，请使用 read_file 查看原始内容")
+
+
 async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     """查看结构化数据的 schema"""
     filename = args.get("filename", "")
@@ -222,30 +234,28 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
     try:
         if ext == "csv":
-            df = pd.read_csv(file_path, nrows=5)
+            df = pd.read_csv(file_path)
         elif ext in ("xlsx", "xls"):
-            df = pd.read_excel(file_path, nrows=5)
+            df = pd.read_excel(file_path)
         elif ext == "json":
-            content = file_path.read_text(encoding="utf-8")
-            data = json.loads(content)
-            if isinstance(data, list):
-                df = pd.DataFrame(data[:5])
-            else:
-                return f"JSON 结构:\n{json.dumps(data, indent=2, ensure_ascii=False)[:3000]}"
+            df = _load_json_as_df(file_path)
         else:
             return f"不支持 inspect_data 的文件类型: {ext}"
 
         info = []
         info.append(f"文件: {filename}")
-        info.append(f"行数: {len(pd.read_csv(file_path)) if ext == 'csv' else '(预览前5行)'}")
+        info.append(f"行数: {len(df)}")
         info.append(f"列数: {len(df.columns)}")
         info.append(f"\n列信息:")
         for col in df.columns:
-            info.append(f"  - {col}: {df[col].dtype} (示例: {df[col].iloc[0] if len(df) > 0 else 'N/A'})")
+            non_null = df[col].notna().sum()
+            info.append(f"  - {col}: {df[col].dtype} ({non_null}/{len(df)} 非空, 示例: {df[col].dropna().iloc[0] if non_null > 0 else 'N/A'})")
         info.append(f"\n前5行预览:")
-        info.append(df.to_string())
+        info.append(df.head(5).to_string())
 
         return "\n".join(info)
+    except ValueError as e:
+        return str(e)
     except Exception as e:
         return f"解析文件失败: {str(e)}"
 
@@ -272,8 +282,10 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
             df = pd.read_csv(file_path)
         elif ext in ("xlsx", "xls"):
             df = pd.read_excel(file_path)
+        elif ext == "json":
+            df = _load_json_as_df(file_path)
         else:
-            return f"pandas_query 仅支持 CSV/Excel 文件"
+            return f"pandas_query 仅支持 CSV/Excel/JSON 文件"
 
         # 在受限环境中执行表达式
         local_vars = {"df": df, "pd": pd}
@@ -295,18 +307,18 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
     """执行 Python 代码（当前为进程内执行，后续改为 Docker 沙箱）"""
     code = args.get("code", "")
 
-    # 安全检查
+    # 安全检查：只禁止真正危险的操作
     dangerous_patterns = [
         "import os", "import sys", "import subprocess", "import shutil",
         "os.system", "os.popen", "subprocess.", "__import__",
-        "open('/", "open(\"/"
+        "import socket", "import requests", "import urllib",
     ]
     for pattern in dangerous_patterns:
         if pattern in code:
             return f"安全限制：代码中不允许使用 '{pattern}'"
 
-    # 获取数据空间文件路径
-    data_dir = None
+    # 构建文件路径映射，让代码可以通过文件名访问数据
+    file_paths = {}
     if data_space_id:
         async with get_session_factory()() as db:
             result = await db.execute(
@@ -315,10 +327,9 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
                 .where(DataSpaceFile.data_space_id == data_space_id, File.user_id == user_id)
             )
             files = result.scalars().all()
-            if files:
-                # 使用第一个文件的目录作为数据目录
-                first_file_path = Path(settings.storage_root) / files[0].storage_path
-                data_dir = str(first_file_path.parent)
+            for f in files:
+                full_path = Path(settings.storage_root) / f.storage_path
+                file_paths[f.filename] = str(full_path)
 
     import io
     import sys
@@ -327,10 +338,36 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
 
-    # 准备执行环境
+    # 准备执行环境 - 使用受限的 builtins
+    ALLOWED_MODULES = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime"}
+
+    def _safe_import(name, *args, **kwargs):
+        if name not in ALLOWED_MODULES:
+            raise ImportError(f"不允许导入模块: {name}")
+        return __builtins__["__import__"](name, *args, **kwargs) if isinstance(__builtins__, dict) else __import__(name, *args, **kwargs)
+
+    safe_builtins = {
+        "__import__": _safe_import,
+        "abs": abs, "all": all, "any": any, "bool": bool,
+        "dict": dict, "enumerate": enumerate, "filter": filter,
+        "float": float, "format": format, "frozenset": frozenset,
+        "int": int, "isinstance": isinstance, "issubclass": issubclass,
+        "iter": iter, "len": len, "list": list, "map": map,
+        "max": max, "min": min, "next": next, "print": print,
+        "range": range, "repr": repr, "reversed": reversed,
+        "round": round, "set": set, "slice": slice, "sorted": sorted,
+        "str": str, "sum": sum, "tuple": tuple, "type": type,
+        "zip": zip, "True": True, "False": False, "None": None,
+        "ValueError": ValueError, "TypeError": TypeError,
+        "KeyError": KeyError, "IndexError": IndexError,
+        "Exception": Exception, "StopIteration": StopIteration,
+    }
+
     exec_globals = {
-        "__builtins__": __builtins__,
+        "__builtins__": safe_builtins,
         "pd": pd,
+        "json": json,
+        "FILES": file_paths,
     }
 
     try:
@@ -339,8 +376,19 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
     except ImportError:
         pass
 
-    if data_dir:
-        exec_globals["DATA_DIR"] = data_dir
+    # 预加载数据文件为 DataFrame
+    for fname, fpath in file_paths.items():
+        var_name = fname.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
+        ext = fname.rsplit(".", 1)[-1].lower()
+        try:
+            if ext == "csv":
+                exec_globals[f"df_{var_name}"] = pd.read_csv(fpath)
+            elif ext in ("xlsx", "xls"):
+                exec_globals[f"df_{var_name}"] = pd.read_excel(fpath)
+            elif ext == "json":
+                exec_globals[f"df_{var_name}"] = _load_json_as_df(Path(fpath))
+        except Exception:
+            pass
 
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
