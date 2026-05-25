@@ -141,7 +141,7 @@ export default function Files() {
           </p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
           <p className="ant-upload-hint">
-            支持 PDF、CSV、Excel、JSON、Markdown、Python、TXT 等格式，单文件最大 50MB
+            支持 PDF、CSV、Excel、JSON、Markdown、Python、TXT、ZIP 等格式，单文件最大 50MB。上传 ZIP 会自动解压
           </p>
         </Dragger>
       </Card>

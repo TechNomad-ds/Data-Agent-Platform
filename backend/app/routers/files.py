@@ -1,6 +1,6 @@
 """文件管理路由 - 上传、列表、预览、删除"""
 import uuid
-import os
+import io
 import shutil
 import zipfile
 from pathlib import Path
@@ -34,6 +34,15 @@ def get_file_type(filename: str) -> str:
     return ext
 
 
+def _is_junk_path(name: str) -> bool:
+    """过滤 zip 中的垃圾文件（macOS 元数据、隐藏文件等）"""
+    parts = name.replace("\\", "/").split("/")
+    for p in parts:
+        if p == "__MACOSX" or p.startswith("."):
+            return True
+    return False
+
+
 def get_user_storage_path(user_id: uuid.UUID) -> Path:
     """获取用户的存储根目录"""
     path = Path(settings.storage_root) / str(user_id)
@@ -62,31 +71,64 @@ async def upload_files(
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(50MB)")
 
-        # 生成存储路径
+        # zip 文件：解压后逐个入库
+        if file_type == "zip":
+            tmp_dir = user_storage / f"_zip_tmp_{uuid.uuid4()}"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                zf = zipfile.ZipFile(io.BytesIO(content), "r")
+                zf.extractall(tmp_dir)
+                member_names = zf.namelist()
+                zf.close()
+            except zipfile.BadZipFile:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
+
+            for member in member_names:
+                if member.endswith("/") or _is_junk_path(member):
+                    continue
+                member_type = get_file_type(member)
+                if member_type not in ALLOWED_EXTENSIONS:
+                    continue
+
+                src = tmp_dir / member
+                if not src.is_file():
+                    continue
+
+                member_content = src.read_bytes()
+                member_name = Path(member).name
+                member_id = uuid.uuid4()
+                member_dir = user_storage / str(member_id)
+                member_dir.mkdir(parents=True, exist_ok=True)
+                member_path = member_dir / member_name
+                shutil.move(str(src), str(member_path))
+
+                relative_path = str(member_path.relative_to(Path(settings.storage_root)))
+                record = File(
+                    id=member_id,
+                    user_id=current_user.id,
+                    filename=member_name,
+                    original_filename=member_name,
+                    file_type=member_type,
+                    file_size=len(member_content),
+                    storage_path=relative_path,
+                    metadata_={"source_zip": upload_file.filename},
+                )
+                db.add(record)
+                uploaded.append(record)
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            continue
+
+        # 普通文件：直接存储
         file_id = uuid.uuid4()
         file_dir = user_storage / str(file_id)
         file_dir.mkdir(parents=True, exist_ok=True)
         file_path = file_dir / upload_file.filename
 
-        # 写入文件
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # 如果是 zip 文件，解压
-        extracted_files = []
-        if file_type == "zip":
-            extract_dir = file_dir / "extracted"
-            extract_dir.mkdir(exist_ok=True)
-            try:
-                with zipfile.ZipFile(file_path, "r") as zf:
-                    zf.extractall(extract_dir)
-                    for name in zf.namelist():
-                        if not name.endswith("/"):
-                            extracted_files.append(name)
-            except zipfile.BadZipFile:
-                raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
-
-        # 创建数据库记录
         relative_path = str(file_path.relative_to(Path(settings.storage_root)))
         file_record = File(
             id=file_id,
@@ -97,7 +139,6 @@ async def upload_files(
             file_size=len(content),
             storage_path=relative_path,
             mime_type=upload_file.content_type,
-            metadata_={"extracted_files": extracted_files} if extracted_files else {},
         )
         db.add(file_record)
         uploaded.append(file_record)

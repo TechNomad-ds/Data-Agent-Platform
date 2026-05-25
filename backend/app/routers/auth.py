@@ -48,6 +48,9 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     )
     db.add(credit_account)
 
+    await db.flush()
+    await db.refresh(user)
+
     return user
 
 

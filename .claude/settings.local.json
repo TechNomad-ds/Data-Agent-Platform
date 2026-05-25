@@ -36,7 +36,19 @@
       "Bash(curl -s -N -X POST http://localhost:8000/api/chat/conversations/8322731b-9e18-4060-a25b-f17811170cd9/messages -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDQ1NzI1Yy0zZGRlLTRiZTItOWYxNy1lMWJjYjJkM2FjYjYiLCJleHAiOjE3Nzk3MTg4OTAsInR5cGUiOiJhY2Nlc3MifQ.8r7B3TAEMcsi_35Il2MNP-caINLaGGBAMQvIvW8peaQ' -H 'Content-Type: application/json' -d '{\"content\":\"请描述一下数据空间中的文件内容\"}' --max-time 30)",
       "Bash(curl -s -N -X POST http://localhost:8000/api/chat/conversations/__TRACKED_VAR__/messages -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"content\":\"请描述一下数据空间中的文件内容\"}' --max-time 60)",
       "Bash(python3 *)",
-      "Bash(xargs ls *)"
+      "Bash(xargs ls *)",
+      "Bash(curl *)",
+      "Bash(kill 388252 387493 387537)",
+      "Bash(nohup uvicorn app.main:app --reload --host 0.0.0.0 --port 8002)",
+      "Bash(echo \"backend pid: $!\")",
+      "Bash(nohup npx vite)",
+      "Bash(echo \"frontend pid: $!\")",
+      "Bash(kill -9 395631 395632 395650 395651)",
+      "Bash(kill -9 395631)",
+      "Bash(lsof -ti:5173 -ti:5174)",
+      "Bash(xargs -r kill -9)",
+      "Bash(pkill -9 -f \"vite\")",
+      "Bash(fuser -k 5173/tcp 5174/tcp 5175/tcp)"
     ]
   }
 }

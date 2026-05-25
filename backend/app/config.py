@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # 服务
     backend_host: str = "0.0.0.0"
-    backend_port: int = 8000
+    backend_port: int = 8002
     frontend_url: str = "http://localhost:5173"
 
     class Config:
