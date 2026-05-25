@@ -5,12 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.database import Base, get_engine
-from app.routers import auth, files, data_spaces, chat, credits, feedback, admin
+from app.routers import auth, files, data_spaces, chat, credits, feedback, admin, models
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    from app.seed import seed_models
+    await seed_models()
     yield
 
 
@@ -38,6 +40,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["对话"])
 app.include_router(credits.router, prefix="/api/credits", tags=["额度"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["反馈"])
 app.include_router(admin.router, prefix="/api/admin", tags=["管理后台"])
+app.include_router(models.router, prefix="/api/models", tags=["模型"])
 
 
 @app.get("/api/health")

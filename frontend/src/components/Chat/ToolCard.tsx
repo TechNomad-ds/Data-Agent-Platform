@@ -1,5 +1,9 @@
-import { Card, Tag, Typography } from 'antd'
-import { CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
+import { Typography } from 'antd'
+import {
+  CheckCircleOutlined, LoadingOutlined,
+  SearchOutlined, FileTextOutlined, CodeOutlined,
+  BarChartOutlined, DatabaseOutlined,
+} from '@ant-design/icons'
 import { SSEEvent } from '@/api/chat'
 
 const { Text } = Typography
@@ -8,48 +12,53 @@ interface ToolCardProps {
   event: SSEEvent
 }
 
-const toolNameMap: Record<string, string> = {
-  search_data_space: '搜索数据空间',
-  read_file: '读取文件',
-  inspect_data: '查看数据结构',
-  pandas_query: '数据查询',
-  execute_python: '执行代码',
+const toolConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  search_data_space: { label: '搜索数据空间', icon: <SearchOutlined />, color: '#1677ff' },
+  read_file: { label: '读取文件', icon: <FileTextOutlined />, color: '#52c41a' },
+  inspect_data: { label: '查看数据结构', icon: <DatabaseOutlined />, color: '#722ed1' },
+  pandas_query: { label: '数据查询', icon: <BarChartOutlined />, color: '#fa8c16' },
+  execute_python: { label: '执行代码', icon: <CodeOutlined />, color: '#eb2f96' },
 }
 
 export default function ToolCard({ event }: ToolCardProps) {
   const isResult = event.type === 'tool_result'
-  const name = event.name || '工具调用'
+  const name = event.name || 'unknown'
+  const config = toolConfig[name] || { label: name, icon: <CodeOutlined />, color: '#666' }
 
   return (
-    <Card
-      size="small"
+    <div
       style={{
         marginBottom: 8,
-        borderRadius: 8,
-        background: '#fafafa',
-        border: '1px solid #f0f0f0',
+        padding: '10px 14px',
+        borderRadius: 10,
+        background: isResult ? '#f6ffed' : '#f0f5ff',
+        border: `1px solid ${isResult ? '#b7eb8f' : '#adc6ff'}`,
+        transition: 'all 0.2s',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {isResult ? (
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 14 }} />
         ) : (
-          <LoadingOutlined style={{ color: '#1677ff' }} />
+          <LoadingOutlined style={{ color: '#1677ff', fontSize: 14 }} />
         )}
-        <Tag color={isResult ? 'success' : 'processing'}>
-          {toolNameMap[name] || name}
-        </Tag>
+        <span style={{ color: config.color, fontSize: 13 }}>{config.icon}</span>
+        <Text strong style={{ fontSize: 13 }}>{config.label}</Text>
         {event.type === 'tool_use' && event.input && (
-          <Text type="secondary" style={{ fontSize: 12 }} ellipsis>
-            {JSON.stringify(event.input).slice(0, 80)}
-          </Text>
-        )}
-        {isResult && event.content && (
-          <Text type="secondary" style={{ fontSize: 12 }} ellipsis>
-            {event.content.slice(0, 100)}
+          <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }} ellipsis>
+            {Object.entries(event.input).map(([k, v]) =>
+              `${k}: ${String(v).slice(0, 30)}`
+            ).join(', ')}
           </Text>
         )}
       </div>
-    </Card>
+      {isResult && event.content && (
+        <div style={{ marginTop: 6, paddingLeft: 22 }}>
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>
+            {event.content.slice(0, 200)}{event.content.length > 200 ? '...' : ''}
+          </Text>
+        </div>
+      )}
+    </div>
   )
 }

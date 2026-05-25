@@ -1,5 +1,6 @@
 """额度路由"""
 import uuid
+from datetime import datetime, timezone, date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,12 +15,41 @@ from app.schemas.credit import CreditBalanceResponse, CreditTransactionResponse,
 router = APIRouter()
 
 
+async def _ensure_daily_credits(user_id: uuid.UUID, db: AsyncSession) -> None:
+    """确保今日额度已发放"""
+    result = await db.execute(
+        select(CreditAccount).where(CreditAccount.user_id == user_id)
+    )
+    account = result.scalar_one_or_none()
+    if not account:
+        return
+
+    today = date.today()
+    last_reset = account.last_daily_reset.date() if account.last_daily_reset else None
+
+    if last_reset != today:
+        grant_amount = account.daily_free_allowance
+        account.balance += grant_amount
+        account.last_daily_reset = datetime.now(timezone.utc)
+        transaction = CreditTransaction(
+            user_id=user_id,
+            amount=grant_amount,
+            balance_after=account.balance,
+            transaction_type="daily_grant",
+            description=f"每日免费额度发放 ({today.isoformat()})",
+        )
+        db.add(transaction)
+        await db.flush()
+
+
 @router.get("/balance", response_model=CreditBalanceResponse)
 async def get_balance(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前额度余额"""
+    await _ensure_daily_credits(current_user.id, db)
+
     result = await db.execute(
         select(CreditAccount).where(CreditAccount.user_id == current_user.id)
     )

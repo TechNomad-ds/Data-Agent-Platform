@@ -12,6 +12,7 @@ from app.models.conversation import Message
 from app.models.file import File
 from app.models.data_space import DataSpace, DataSpaceFile
 from app.models.llm_model import LLMModel
+from app.models.credit import CreditAccount, CreditTransaction
 from app.agent.tools import get_tool_definitions, execute_tool
 
 
@@ -52,7 +53,6 @@ class AgentLoop:
             return "未选择数据空间。用户可以进行通用对话。"
 
         async with get_session_factory()() as db:
-            # 获取数据空间信息
             result = await db.execute(
                 select(DataSpace).where(DataSpace.id == data_space_id, DataSpace.user_id == user_id)
             )
@@ -60,7 +60,6 @@ class AgentLoop:
             if not space:
                 return "数据空间不存在"
 
-            # 获取文件列表
             file_result = await db.execute(
                 select(File)
                 .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
@@ -97,14 +96,44 @@ class AgentLoop:
 
             return history
 
-    async def _resolve_model_name(self, model_id: str) -> str:
-        """从数据库查找模型名称，找不到则回退到配置默认值"""
+    async def _resolve_model(self, model_id: str) -> tuple[str, float]:
+        """从数据库查找模型名称和倍率"""
         async with get_session_factory()() as db:
             result = await db.execute(select(LLMModel).where(LLMModel.id == model_id))
             model = result.scalar_one_or_none()
             if model and model.model_name:
-                return model.model_name
-        return settings.llm_default_model
+                return model.model_name, float(model.credit_multiplier)
+        return settings.llm_default_model, 1.0
+
+    async def _check_balance(self, user_id: uuid.UUID) -> int:
+        """检查用户余额，返回当前余额"""
+        async with get_session_factory()() as db:
+            result = await db.execute(
+                select(CreditAccount).where(CreditAccount.user_id == user_id)
+            )
+            account = result.scalar_one_or_none()
+            return account.balance if account else 0
+
+    async def _deduct_credits(self, user_id: uuid.UUID, credits: int, model_name: str) -> None:
+        """从用户账户扣减额度"""
+        async with get_session_factory()() as db:
+            result = await db.execute(
+                select(CreditAccount).where(CreditAccount.user_id == user_id)
+            )
+            account = result.scalar_one_or_none()
+            if not account:
+                return
+
+            account.balance = max(0, account.balance - credits)
+            transaction = CreditTransaction(
+                user_id=user_id,
+                amount=-credits,
+                balance_after=account.balance,
+                transaction_type="usage",
+                description=f"对话消耗 (模型: {model_name})",
+            )
+            db.add(transaction)
+            await db.commit()
 
     async def run(
         self,
@@ -115,8 +144,14 @@ class AgentLoop:
         user_message: str,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """执行 Agent 循环，流式返回事件"""
-        # 解析实际模型名称
-        actual_model_name = await self._resolve_model_name(model_id)
+        # 检查余额
+        balance = await self._check_balance(user_id)
+        if balance <= 0:
+            yield {"type": "error", "message": "额度不足，请充值或等待每日免费额度发放"}
+            return
+
+        # 解析实际模型名称和倍率
+        actual_model_name, credit_multiplier = await self._resolve_model(model_id)
 
         # 构建系统提示
         data_space_info = await self._get_data_space_info(data_space_id, user_id)
@@ -128,14 +163,23 @@ class AgentLoop:
         # 构建消息列表
         messages = [
             {"role": "system", "content": system_prompt},
-            *history[-20:],  # 保留最近20条消息
+            *history[-20:],
             {"role": "user", "content": user_message},
         ]
 
         tools = get_tool_definitions()
         total_usage = {"input_tokens": 0, "output_tokens": 0}
+        tool_calls_log = []
+
+        yield {"type": "thinking", "content": "正在分析问题..."}
 
         for iteration in range(self.max_iterations):
+            # 检查是否超过单次最大消耗
+            current_credits = self._calculate_credits(total_usage, credit_multiplier)
+            if current_credits >= settings.max_credits_per_run:
+                yield {"type": "text", "delta": "\n\n[已达到本次最大额度消耗上限，自动停止]"}
+                break
+
             try:
                 response = await self.client.chat.completions.create(
                     model=actual_model_name,
@@ -144,22 +188,18 @@ class AgentLoop:
                     stream=True,
                 )
 
-                # 收集流式响应
                 full_content = ""
                 tool_calls_data = []
-                current_tool_call = None
 
                 async for chunk in response:
                     delta = chunk.choices[0].delta if chunk.choices else None
                     if not delta:
                         continue
 
-                    # 文本内容
                     if delta.content:
                         full_content += delta.content
                         yield {"type": "text", "delta": delta.content}
 
-                    # 工具调用
                     if delta.tool_calls:
                         for tc in delta.tool_calls:
                             if tc.index >= len(tool_calls_data):
@@ -175,29 +215,30 @@ class AgentLoop:
                                 if tc.function.arguments:
                                     tool_calls_data[tc.index]["function"]["arguments"] += tc.function.arguments
 
-                    # 使用量
                     if hasattr(chunk, "usage") and chunk.usage:
                         total_usage["input_tokens"] += chunk.usage.prompt_tokens or 0
                         total_usage["output_tokens"] += chunk.usage.completion_tokens or 0
 
                 # 如果没有工具调用，Agent 完成
                 if not tool_calls_data:
+                    credits_used = self._calculate_credits(total_usage, credit_multiplier)
+                    credits_used = max(1, credits_used)
+                    await self._deduct_credits(user_id, credits_used, actual_model_name)
                     yield {
                         "type": "done",
                         "usage": total_usage,
-                        "credits_used": self._calculate_credits(total_usage),
+                        "credits_used": credits_used,
+                        "tool_calls_log": tool_calls_log,
                     }
                     return
 
                 # 有工具调用，执行工具
-                # 将助手消息加入历史
                 assistant_msg = {"role": "assistant", "content": full_content or None, "tool_calls": [
                     {"id": tc["id"], "type": "function", "function": tc["function"]}
                     for tc in tool_calls_data
                 ]}
                 messages.append(assistant_msg)
 
-                # 执行每个工具
                 for tc in tool_calls_data:
                     tool_name = tc["function"]["name"]
                     try:
@@ -212,7 +253,6 @@ class AgentLoop:
                         "id": tc["id"],
                     }
 
-                    # 执行工具
                     tool_result = await execute_tool(
                         tool_name=tool_name,
                         arguments=tool_args,
@@ -220,19 +260,23 @@ class AgentLoop:
                         data_space_id=data_space_id,
                     )
 
-                    # 截断过长的结果
                     result_str = str(tool_result)
                     if len(result_str) > 8000:
                         result_str = result_str[:8000] + "\n...(结果已截断)"
 
+                    tool_calls_log.append({
+                        "name": tool_name,
+                        "input": tool_args,
+                        "output_preview": result_str[:200],
+                    })
+
                     yield {
                         "type": "tool_result",
                         "name": tool_name,
-                        "content": result_str[:500],  # 前端预览
+                        "content": result_str[:500],
                         "is_error": False,
                     }
 
-                    # 将工具结果加入消息
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
@@ -244,11 +288,15 @@ class AgentLoop:
                 return
 
         # 达到最大迭代次数
+        credits_used = self._calculate_credits(total_usage, credit_multiplier)
+        credits_used = max(1, credits_used)
+        await self._deduct_credits(user_id, credits_used, actual_model_name)
         yield {"type": "text", "delta": "\n\n[已达到最大执行步数，自动停止]"}
-        yield {"type": "done", "usage": total_usage, "credits_used": self._calculate_credits(total_usage)}
+        yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log}
 
-    def _calculate_credits(self, usage: dict) -> int:
-        """根据 token 使用量计算消耗的额度"""
-        # 简单计费：每 1000 token 消耗 1 点
+    def _calculate_credits(self, usage: dict, multiplier: float = 1.0) -> int:
+        """根据 token 使用量和模型倍率计算消耗的额度"""
         total_tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
-        return max(1, total_tokens // 1000)
+        base_credits = total_tokens // 1000
+        return max(1, int(base_credits * multiplier))
+

@@ -1,5 +1,5 @@
 import api from './client'
-import { useAuthStore } from '@/stores/authStore'
+import { getValidToken } from './client'
 
 export interface Conversation {
   id: string
@@ -25,7 +25,7 @@ export interface ConversationDetail extends Conversation {
 }
 
 export interface SSEEvent {
-  type: 'text' | 'tool_use' | 'tool_result' | 'error' | 'done'
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'error' | 'done'
   delta?: string
   name?: string
   input?: Record<string, unknown>
@@ -34,6 +34,7 @@ export interface SSEEvent {
   message?: string
   usage?: { input_tokens: number; output_tokens: number }
   credits_used?: number
+  tool_calls_log?: Array<{ name: string; input: Record<string, unknown>; output_preview: string }>
   id?: string
 }
 
@@ -44,8 +45,8 @@ export const chatApi = {
     api.post<Conversation>('/chat/conversations', data),
   deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
 
-  sendMessage: (conversationId: string, content: string): Promise<Response> => {
-    const token = useAuthStore.getState().token
+  sendMessage: async (conversationId: string, content: string, signal?: AbortSignal): Promise<Response> => {
+    const token = await getValidToken()
     const url = `/api/chat/conversations/${conversationId}/messages`
     return fetch(url, {
       method: 'POST',
@@ -54,6 +55,7 @@ export const chatApi = {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ content }),
+      signal,
     })
   },
 }

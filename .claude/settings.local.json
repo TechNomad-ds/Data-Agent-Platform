@@ -48,7 +48,16 @@
       "Bash(lsof -ti:5173 -ti:5174)",
       "Bash(xargs -r kill -9)",
       "Bash(pkill -9 -f \"vite\")",
-      "Bash(fuser -k 5173/tcp 5174/tcp 5175/tcp)"
+      "Bash(fuser -k 5173/tcp 5174/tcp 5175/tcp)",
+      "Bash(kill -9 395498 395499)",
+      "Bash(uvicorn app.main:app --reload --host 0.0.0.0 --port 8002)",
+      "Bash(systemctl is-active *)",
+      "Bash(pg_isready)",
+      "Bash(docker-compose --version)",
+      "Bash(nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Read(//tmp/**)",
+      "Bash(pip uninstall *)"
     ]
   }
 }

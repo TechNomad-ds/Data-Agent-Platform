@@ -2,6 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -13,6 +14,7 @@ from app.models.file import File
 from app.models.credit import CreditAccount, CreditTransaction
 from app.models.feedback import Feedback
 from app.models.llm_model import LLMModel
+from app.models.conversation import Conversation, Message
 from app.schemas import UserResponse
 
 router = APIRouter()
@@ -173,3 +175,39 @@ async def get_stats(
         "total_files": file_count,
         "total_feedback": feedback_count,
     }
+
+
+# ===== 研究数据导出 =====
+
+@router.get("/research/export")
+async def export_research_data(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """导出已授权用户的匿名化交互数据用于研究"""
+    # 只导出同意研究授权的用户数据
+    result = await db.execute(
+        select(Message)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .join(User, User.id == Conversation.user_id)
+        .where(User.research_consent == True)
+        .order_by(Message.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    messages = result.scalars().all()
+
+    export_data = []
+    for msg in messages:
+        export_data.append({
+            "anonymous_id": str(uuid.uuid5(uuid.NAMESPACE_DNS, str(msg.conversation_id))),
+            "role": msg.role,
+            "content": msg.content[:500] if msg.content else None,
+            "token_usage": msg.token_usage,
+            "credits_used": msg.credits_used,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None,
+        })
+
+    return {"data": export_data, "page": page, "page_size": page_size}

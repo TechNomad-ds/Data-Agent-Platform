@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd'
 import {
@@ -24,6 +24,15 @@ export default function AppLayout() {
   useEffect(() => {
     if (!user) fetchUser()
   }, [user, fetchUser])
+
+  const selectedKey = useMemo(() => {
+    const path = location.pathname
+    if (path.startsWith('/chat')) return '/chat'
+    if (path.startsWith('/data-spaces')) return '/data-spaces'
+    if (path.startsWith('/credits')) return '/credits'
+    if (path.startsWith('/admin')) return '/admin'
+    return '/'
+  }, [location.pathname])
 
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '工作台' },
@@ -71,7 +80,7 @@ export default function AppLayout() {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[selectedKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 'none' }}
@@ -93,12 +102,12 @@ export default function AppLayout() {
         >
           <Dropdown menu={{ items: userMenuItems, onClick: ({ key }) => key === 'logout' && logout() }}>
             <Space style={{ cursor: 'pointer' }}>
-              <Avatar size="small" icon={<UserOutlined />} />
+              <Avatar size="small" icon={<UserOutlined />} style={{ background: '#1677ff' }} />
               <Text>{user?.username || '用户'}</Text>
             </Space>
           </Dropdown>
         </Header>
-        <Content style={{ padding: 24, background: '#f5f5f5', minHeight: 'calc(100vh - 64px)' }}>
+        <Content style={{ padding: 24, background: '#f5f7fa', minHeight: 'calc(100vh - 64px)' }}>
           <Outlet />
         </Content>
       </Layout>

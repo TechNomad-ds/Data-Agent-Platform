@@ -1,5 +1,5 @@
 """认证路由 - 注册、登录、刷新令牌"""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,12 +8,38 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.user import User
-from app.models.credit import CreditAccount
+from app.models.credit import CreditAccount, CreditTransaction
 from app.schemas import UserRegister, UserLogin, TokenResponse, TokenRefresh, UserResponse
 from app.deps import get_current_user
 from app.config import settings
 
 router = APIRouter()
+
+
+async def _check_daily_credit_reset(user_id, db: AsyncSession):
+    """检查并发放每日免费额度"""
+    result = await db.execute(
+        select(CreditAccount).where(CreditAccount.user_id == user_id)
+    )
+    account = result.scalar_one_or_none()
+    if not account:
+        return
+
+    today = date.today()
+    last_reset = account.last_daily_reset.date() if account.last_daily_reset else None
+
+    if last_reset != today:
+        grant_amount = account.daily_free_allowance
+        account.balance += grant_amount
+        account.last_daily_reset = datetime.now(timezone.utc)
+        transaction = CreditTransaction(
+            user_id=user_id,
+            amount=grant_amount,
+            balance_after=account.balance,
+            transaction_type="daily_grant",
+            description=f"每日免费额度发放 ({today.isoformat()})",
+        )
+        db.add(transaction)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -68,6 +94,9 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 
     # 更新最后登录时间
     user.last_login_at = datetime.now(timezone.utc)
+
+    # 检查并发放每日免费额度
+    await _check_daily_credit_reset(user.id, db)
 
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})

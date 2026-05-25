@@ -1,14 +1,15 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Layout, List, Button, Input, Select, Space, Typography, Card, Spin, message } from 'antd'
+import { Layout, List, Button, Input, Select, Space, Typography, Card, Spin, message, Empty, Tooltip, Tag } from 'antd'
 import {
   PlusOutlined, SendOutlined, RobotOutlined,
-  DatabaseOutlined, DeleteOutlined,
+  DatabaseOutlined, DeleteOutlined, StopOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
+import { modelsApi, ModelInfo } from '@/api/models'
 import { useChatStore } from '@/stores/chatStore'
-import { useAuthStore } from '@/stores/authStore'
 import ToolCard from '@/components/Chat/ToolCard'
 import MessageContent from '@/components/Chat/MessageContent'
 
@@ -19,23 +20,26 @@ const { TextArea } = Input
 export default function Chat() {
   const { conversationId } = useParams()
   const navigate = useNavigate()
-  const token = useAuthStore((s) => s.token)
 
   const {
     conversations, setConversations, currentConversation, setCurrentConversation,
-    messages, setMessages, streamingContent, toolEvents,
-    isStreaming, setIsStreaming, appendStreamDelta, addToolEvent, resetStream,
+    messages, setMessages, streamingContent, toolEvents, thinkingText,
+    isStreaming, setIsStreaming, appendStreamDelta, addToolEvent,
+    setThinkingText, resetStream, setAbortController, stopStreaming,
   } = useChatStore()
 
   const [spaces, setSpaces] = useState<DataSpace[]>([])
+  const [models, setModels] = useState<ModelInfo[]>([])
   const [selectedSpace, setSelectedSpace] = useState<string | undefined>()
-  const [selectedModel, setSelectedModel] = useState('gpt-4o')
+  const [selectedModel, setSelectedModel] = useState<string>('')
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const sseBufferRef = useRef('')
 
   useEffect(() => {
     loadConversations()
     loadSpaces()
+    loadModels()
   }, [])
 
   useEffect(() => {
@@ -60,6 +64,16 @@ export default function Chat() {
     } catch {}
   }
 
+  const loadModels = async () => {
+    try {
+      const res = await modelsApi.listAvailable()
+      setModels(res.data)
+      if (res.data.length > 0 && !selectedModel) {
+        setSelectedModel(res.data[0].id)
+      }
+    } catch {}
+  }
+
   const loadConversation = async (id: string) => {
     try {
       const res = await chatApi.getConversation(id)
@@ -71,6 +85,10 @@ export default function Chat() {
   }
 
   const handleNewConversation = async () => {
+    if (!selectedModel) {
+      message.warning('请先选择模型')
+      return
+    }
     try {
       const res = await chatApi.createConversation({
         data_space_id: selectedSpace,
@@ -86,12 +104,42 @@ export default function Chat() {
     }
   }
 
+  const parseSSELine = useCallback((line: string) => {
+    if (!line.startsWith('data: ')) return
+    const data = line.slice(6)
+    if (data === '[DONE]') return
+
+    try {
+      const event: SSEEvent = JSON.parse(data)
+      switch (event.type) {
+        case 'text':
+          if (event.delta) appendStreamDelta(event.delta)
+          break
+        case 'thinking':
+          if (event.content) setThinkingText(event.content)
+          break
+        case 'tool_use':
+        case 'tool_result':
+          addToolEvent(event)
+          break
+        case 'error':
+          message.error(event.message || 'Agent 执行出错')
+          break
+        case 'done':
+          break
+      }
+    } catch {}
+  }, [appendStreamDelta, setThinkingText, addToolEvent])
+
   const handleSend = async () => {
     if (!inputValue.trim() || isStreaming) return
 
-    const convId = currentConversation?.id
+    let convId = currentConversation?.id
     if (!convId) {
-      // 自动创建对话
+      if (!selectedModel) {
+        message.warning('请先选择模型')
+        return
+      }
       try {
         const res = await chatApi.createConversation({
           data_space_id: selectedSpace,
@@ -100,18 +148,17 @@ export default function Chat() {
         setCurrentConversation(res.data)
         navigate(`/chat/${res.data.id}`)
         loadConversations()
-        await sendMessage(res.data.id, inputValue)
+        convId = res.data.id
       } catch {
         message.error('创建对话失败')
+        return
       }
-      return
     }
 
     await sendMessage(convId, inputValue)
   }
 
   const sendMessage = async (convId: string, content: string) => {
-    // 添加用户消息到界面
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -121,74 +168,79 @@ export default function Chat() {
       credits_used: null,
       created_at: new Date().toISOString(),
     }
-    setMessages([...messages, userMsg])
+    const currentMessages = useChatStore.getState().messages
+    setMessages([...currentMessages, userMsg])
     setInputValue('')
     resetStream()
     setIsStreaming(true)
 
+    const controller = new AbortController()
+    setAbortController(controller)
+
     try {
-      const response = await fetch(`/api/chat/conversations/${convId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content }),
-      })
+      const response = await chatApi.sendMessage(convId, content, controller.signal)
 
       if (!response.ok) {
+        if (response.status === 401) {
+          message.error('登录已过期，请重新登录')
+          return
+        }
         throw new Error('请求失败')
       }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-
       if (!reader) return
+
+      sseBufferRef.current = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
+        sseBufferRef.current += decoder.decode(value, { stream: true })
+        const lines = sseBufferRef.current.split('\n\n')
+        // Keep the last potentially incomplete chunk
+        sseBufferRef.current = lines.pop() || ''
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]') continue
-
-            try {
-              const event: SSEEvent = JSON.parse(data)
-              if (event.type === 'text' && event.delta) {
-                appendStreamDelta(event.delta)
-              } else if (event.type === 'tool_use' || event.type === 'tool_result') {
-                addToolEvent(event)
-              } else if (event.type === 'error') {
-                message.error(event.message || 'Agent 执行出错')
-              }
-            } catch {}
+        for (const block of lines) {
+          const dataLines = block.split('\n')
+          for (const line of dataLines) {
+            parseSSELine(line.trim())
           }
         }
       }
 
-      // 流结束，将内容添加为助手消息
+      // Process any remaining buffer
+      if (sseBufferRef.current.trim()) {
+        const remaining = sseBufferRef.current.split('\n')
+        for (const line of remaining) {
+          parseSSELine(line.trim())
+        }
+      }
+
+      // Stream ended, add assistant message
       const finalContent = useChatStore.getState().streamingContent
+      const finalToolEvents = useChatStore.getState().toolEvents
       if (finalContent) {
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: finalContent,
-          tool_calls: null,
+          tool_calls: finalToolEvents.length > 0 ? finalToolEvents : null,
           token_usage: null,
           credits_used: null,
           created_at: new Date().toISOString(),
         }
         setMessages([...useChatStore.getState().messages, assistantMsg])
       }
-    } catch (err) {
-      message.error('发送消息失败')
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        message.error('发送消息失败')
+      }
     } finally {
       setIsStreaming(false)
+      setAbortController(null)
       loadConversations()
     }
   }
@@ -208,45 +260,67 @@ export default function Chat() {
   return (
     <Layout style={{ height: 'calc(100vh - 64px - 48px)', background: 'transparent' }}>
       {/* 左侧对话列表 */}
-      <Sider width={280} theme="light" style={{ borderRight: '1px solid #f0f0f0', borderRadius: 8, overflow: 'auto' }}>
+      <Sider width={280} theme="light" style={{
+        borderRight: '1px solid #e8e8e8',
+        borderRadius: 12,
+        overflow: 'auto',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      }}>
         <div style={{ padding: 16 }}>
-          <Button type="primary" icon={<PlusOutlined />} block onClick={handleNewConversation}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            block
+            onClick={handleNewConversation}
+            style={{ borderRadius: 8, height: 40, fontWeight: 500 }}
+          >
             新建对话
           </Button>
         </div>
-        <List
-          dataSource={conversations}
-          renderItem={(item) => (
-            <List.Item
-              style={{
-                padding: '8px 16px',
-                cursor: 'pointer',
-                background: currentConversation?.id === item.id ? '#e6f4ff' : 'transparent',
-              }}
-              onClick={() => navigate(`/chat/${item.id}`)}
-              actions={[
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => { e.stopPropagation(); handleDeleteConversation(item.id) }}
-                />,
-              ]}
-            >
-              <List.Item.Meta
-                title={<Text ellipsis style={{ maxWidth: 160 }}>{item.title || '新对话'}</Text>}
-                description={<Text type="secondary" style={{ fontSize: 12 }}>{new Date(item.updated_at).toLocaleString('zh-CN')}</Text>}
-              />
-            </List.Item>
-          )}
-        />
+        {conversations.length === 0 ? (
+          <Empty description="暂无对话" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ marginTop: 40 }} />
+        ) : (
+          <List
+            dataSource={conversations}
+            renderItem={(item) => (
+              <List.Item
+                style={{
+                  padding: '10px 16px',
+                  cursor: 'pointer',
+                  background: currentConversation?.id === item.id ? '#e6f7ff' : 'transparent',
+                  borderLeft: currentConversation?.id === item.id ? '3px solid #1677ff' : '3px solid transparent',
+                  transition: 'all 0.2s',
+                }}
+                onClick={() => navigate(`/chat/${item.id}`)}
+                actions={[
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteConversation(item.id) }}
+                  />,
+                ]}
+              >
+                <List.Item.Meta
+                  title={<Text ellipsis style={{ maxWidth: 160, fontSize: 13 }}>{item.title || '新对话'}</Text>}
+                  description={<Text type="secondary" style={{ fontSize: 11 }}>{new Date(item.updated_at).toLocaleString('zh-CN')}</Text>}
+                />
+              </List.Item>
+            )}
+          />
+        )}
       </Sider>
 
       {/* 右侧聊天区域 */}
       <Content style={{ display: 'flex', flexDirection: 'column', padding: '0 0 0 16px' }}>
         {/* 顶部选择器 */}
-        <Card size="small" style={{ marginBottom: 12, borderRadius: 8 }}>
+        <Card size="small" style={{
+          marginBottom: 12,
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          border: '1px solid #f0f0f0',
+        }}>
           <Space wrap>
             <Select
               placeholder="选择数据空间"
@@ -258,35 +332,56 @@ export default function Chat() {
               suffixIcon={<DatabaseOutlined />}
             />
             <Select
-              value={selectedModel}
+              value={selectedModel || undefined}
               onChange={setSelectedModel}
-              style={{ width: 160 }}
-              options={[
-                { label: '经济模型', value: 'deepseek-chat' },
-                { label: '标准模型', value: 'gpt-4o-mini' },
-                { label: '高级模型', value: 'gpt-4o' },
-                { label: '顶级模型', value: 'claude-sonnet-4-6' },
-              ]}
+              placeholder="选择模型"
+              style={{ width: 220 }}
+              options={models.map((m) => ({
+                label: (
+                  <Space>
+                    <span>{m.display_name}</span>
+                    <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>
+                      x{m.credit_multiplier}
+                    </Tag>
+                  </Space>
+                ),
+                value: m.id,
+              }))}
             />
           </Space>
         </Card>
 
         {/* 消息区域 */}
-        <div style={{ flex: 1, overflow: 'auto', borderRadius: 8, background: '#fff', padding: 16 }}>
+        <div style={{
+          flex: 1,
+          overflow: 'auto',
+          borderRadius: 12,
+          background: '#fff',
+          padding: 20,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          border: '1px solid #f0f0f0',
+        }}>
           {messages.length === 0 && !isStreaming ? (
             <div style={{ textAlign: 'center', paddingTop: 80 }}>
-              <RobotOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
-              <Title level={5} type="secondary" style={{ marginTop: 16 }}>
-                选择数据空间，开始与 Data Agent 对话
+              <div style={{
+                width: 80, height: 80, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px',
+              }}>
+                <RobotOutlined style={{ fontSize: 36, color: '#fff' }} />
+              </div>
+              <Title level={4} style={{ marginBottom: 8, color: '#333' }}>
+                Data Agent 准备就绪
               </Title>
-              <Text type="secondary">
-                我可以帮你分析数据、回答文档问题、执行代码、生成图表
+              <Text type="secondary" style={{ fontSize: 14 }}>
+                选择数据空间和模型，开始智能数据分析对话
               </Text>
             </div>
           ) : (
             <>
               {messages.map((msg) => (
-                <div key={msg.id} style={{ marginBottom: 16 }}>
+                <div key={msg.id} style={{ marginBottom: 20 }}>
                   <MessageContent message={msg} />
                 </div>
               ))}
@@ -294,18 +389,44 @@ export default function Chat() {
               {/* 流式内容 */}
               {isStreaming && (
                 <div style={{ marginBottom: 16 }}>
+                  {thinkingText && (
+                    <div style={{
+                      padding: '8px 12px',
+                      background: '#f6f8fa',
+                      borderRadius: 8,
+                      marginBottom: 12,
+                      borderLeft: '3px solid #1677ff',
+                    }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        <ThunderboltOutlined style={{ marginRight: 6 }} />
+                        {thinkingText}
+                      </Text>
+                    </div>
+                  )}
                   {toolEvents.map((event, i) => (
                     <ToolCard key={i} event={event} />
                   ))}
                   {streamingContent && (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <RobotOutlined style={{ marginTop: 4, color: '#1677ff' }} />
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <RobotOutlined style={{ color: '#fff', fontSize: 14 }} />
+                      </div>
                       <div style={{ flex: 1 }}>
                         <MessageContent message={{ id: 'streaming', role: 'assistant', content: streamingContent, tool_calls: null, token_usage: null, credits_used: null, created_at: '' }} />
                       </div>
                     </div>
                   )}
-                  {!streamingContent && toolEvents.length === 0 && <Spin tip="思考中..." />}
+                  {!streamingContent && toolEvents.length === 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0' }}>
+                      <Spin size="small" />
+                      <Text type="secondary" style={{ fontSize: 13 }}>思考中...</Text>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -315,7 +436,16 @@ export default function Chat() {
 
         {/* 输入区域 */}
         <div style={{ marginTop: 12 }}>
-          <Space.Compact style={{ width: '100%' }}>
+          <div style={{
+            display: 'flex',
+            gap: 8,
+            background: '#fff',
+            borderRadius: 12,
+            padding: '8px 12px',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+            border: '1px solid #e8e8e8',
+            alignItems: 'flex-end',
+          }}>
             <TextArea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -325,16 +455,29 @@ export default function Chat() {
                 if (!e.shiftKey) { e.preventDefault(); handleSend() }
               }}
               disabled={isStreaming}
-              style={{ borderRadius: '8px 0 0 8px' }}
+              variant="borderless"
+              style={{ flex: 1, resize: 'none' }}
             />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSend}
-              loading={isStreaming}
-              style={{ height: 'auto', borderRadius: '0 8px 8px 0' }}
-            />
-          </Space.Compact>
+            {isStreaming ? (
+              <Tooltip title="停止生成">
+                <Button
+                  type="default"
+                  danger
+                  icon={<StopOutlined />}
+                  onClick={stopStreaming}
+                  style={{ borderRadius: 8 }}
+                />
+              </Tooltip>
+            ) : (
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={handleSend}
+                disabled={!inputValue.trim()}
+                style={{ borderRadius: 8 }}
+              />
+            )}
+          </div>
         </div>
       </Content>
     </Layout>

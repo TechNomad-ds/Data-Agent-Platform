@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # LLM API 中转站
     llm_api_base_url: str = "https://api.example.com/v1"
     llm_api_key: str = "sk-your-api-key"
-    llm_default_model: str = "gpt-4o"
+    llm_default_model: str = "deepseek-v4-flash"
 
     # 文件存储
     storage_root: str = "./storage"
