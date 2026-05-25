@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Card, Row, Col, Button, Modal, Form, Input, Tag, Space, Typography, Empty, Popconfirm, message } from 'antd'
 import { PlusOutlined, DatabaseOutlined, DeleteOutlined, FileOutlined } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
+import SpaceDetail from './SpaceDetail'
 
 const { Title, Text } = Typography
 
 export default function DataSpaces() {
   const [spaces, setSpaces] = useState<DataSpace[]>([])
   const [modalOpen, setModalOpen] = useState(false)
+  const [selectedSpace, setSelectedSpace] = useState<DataSpace | null>(null)
   const [form] = Form.useForm()
 
   useEffect(() => {
@@ -57,6 +59,10 @@ export default function DataSpaces() {
     error: '索引失败',
   }
 
+  if (selectedSpace) {
+    return <SpaceDetail space={selectedSpace} onBack={() => { setSelectedSpace(null); loadSpaces() }} />
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -86,9 +92,10 @@ export default function DataSpaces() {
             <Col xs={24} sm={12} lg={8} key={space.id}>
               <Card
                 hoverable
+                onClick={() => setSelectedSpace(space)}
                 actions={[
-                  <Popconfirm title="确定删除？" onConfirm={() => handleDelete(space.id)}>
-                    <DeleteOutlined key="delete" />
+                  <Popconfirm title="确定删除？" onConfirm={(e) => { e?.stopPropagation(); handleDelete(space.id) }}>
+                    <DeleteOutlined key="delete" onClick={(e) => e.stopPropagation()} />
                   </Popconfirm>,
                 ]}
               >

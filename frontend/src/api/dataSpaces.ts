@@ -35,4 +35,8 @@ export const dataSpacesApi = {
   removeFile: (spaceId: string, fileId: string) =>
     api.delete(`/data-spaces/${spaceId}/files/${fileId}`),
   buildIndex: (id: string) => api.post(`/data-spaces/${id}/index/build`),
+  uploadFiles: (spaceId: string, formData: FormData) =>
+    api.post(`/data-spaces/${spaceId}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 }

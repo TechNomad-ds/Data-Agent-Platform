@@ -58,7 +58,7 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card hoverable onClick={() => navigate('/files')}>
+          <Card hoverable onClick={() => navigate('/data-spaces')}>
             <Statistic title="文件总数" value={fileCount} prefix={<FileOutlined />} />
           </Card>
         </Col>
@@ -93,7 +93,7 @@ export default function Dashboard() {
               <Button
                 icon={<FileOutlined />}
                 block
-                onClick={() => navigate('/files')}
+                onClick={() => navigate('/data-spaces')}
                 style={{ textAlign: 'left' }}
               >
                 上传数据文件

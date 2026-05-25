@@ -4,7 +4,6 @@ import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd'
 import {
   DashboardOutlined,
   DatabaseOutlined,
-  FileOutlined,
   MessageOutlined,
   WalletOutlined,
   SettingOutlined,
@@ -29,7 +28,6 @@ export default function AppLayout() {
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '工作台' },
     { key: '/data-spaces', icon: <DatabaseOutlined />, label: '数据空间' },
-    { key: '/files', icon: <FileOutlined />, label: '文件管理' },
     { key: '/chat', icon: <MessageOutlined />, label: '智能对话' },
     { key: '/credits', icon: <WalletOutlined />, label: '额度中心' },
     ...(user?.role === 'admin'

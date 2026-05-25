@@ -1,7 +1,9 @@
 """数据空间路由 - CRUD、文件关联、索引管理"""
 import uuid
+import zipfile
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File as FastAPIFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -14,6 +16,9 @@ from app.schemas.data_space import (
     DataSpaceCreate, DataSpaceUpdate, DataSpaceResponse,
     DataSpaceDetailResponse, FileInSpace, AddFilesRequest,
 )
+from app.schemas.file import FileResponse
+from app.config import settings
+from app.routers.files import ALLOWED_EXTENSIONS, MAX_FILE_SIZE, get_file_type, get_user_storage_path
 
 router = APIRouter()
 
@@ -242,3 +247,79 @@ async def build_index(
     space.index_status = "ready"
 
     return {"message": "索引构建已启动", "status": space.index_status}
+
+
+@router.post("/{space_id}/upload", response_model=list[FileResponse], status_code=201)
+async def upload_files_to_space(
+    space_id: uuid.UUID,
+    files: list[UploadFile] = FastAPIFile(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传文件到数据空间（上传并自动关联）"""
+    # 验证数据空间归属
+    result = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    space = result.scalar_one_or_none()
+    if not space:
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    uploaded = []
+    user_storage = get_user_storage_path(current_user.id)
+
+    for upload_file in files:
+        file_type = get_file_type(upload_file.filename)
+        if file_type not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"不支持的文件类型: {file_type}")
+
+        content = await upload_file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(50MB)")
+
+        file_id = uuid.uuid4()
+        file_dir = user_storage / str(file_id)
+        file_dir.mkdir(parents=True, exist_ok=True)
+        file_path = file_dir / upload_file.filename
+
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        extracted_files = []
+        if file_type == "zip":
+            extract_dir = file_dir / "extracted"
+            extract_dir.mkdir(exist_ok=True)
+            try:
+                with zipfile.ZipFile(file_path, "r") as zf:
+                    zf.extractall(extract_dir)
+                    for name in zf.namelist():
+                        if not name.endswith("/"):
+                            extracted_files.append(name)
+            except zipfile.BadZipFile:
+                raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
+
+        relative_path = str(file_path.relative_to(Path(settings.storage_root)))
+        file_record = File(
+            id=file_id,
+            user_id=current_user.id,
+            filename=upload_file.filename,
+            original_filename=upload_file.filename,
+            file_type=file_type,
+            file_size=len(content),
+            storage_path=relative_path,
+            mime_type=upload_file.content_type,
+            metadata_={"extracted_files": extracted_files} if extracted_files else {},
+        )
+        db.add(file_record)
+        await db.flush()
+
+        # 关联到数据空间
+        db.add(DataSpaceFile(data_space_id=space_id, file_id=file_id))
+        uploaded.append(file_record)
+
+    # 重置索引状态
+    if space.index_status == "ready":
+        space.index_status = "empty"
+
+    await db.flush()
+    return uploaded

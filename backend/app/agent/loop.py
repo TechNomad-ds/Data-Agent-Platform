@@ -11,6 +11,7 @@ from app.core.database import get_session_factory
 from app.models.conversation import Message
 from app.models.file import File
 from app.models.data_space import DataSpace, DataSpaceFile
+from app.models.llm_model import LLMModel
 from app.agent.tools import get_tool_definitions, execute_tool
 
 
@@ -96,6 +97,15 @@ class AgentLoop:
 
             return history
 
+    async def _resolve_model_name(self, model_id: str) -> str:
+        """从数据库查找模型名称，找不到则回退到配置默认值"""
+        async with get_session_factory()() as db:
+            result = await db.execute(select(LLMModel).where(LLMModel.id == model_id))
+            model = result.scalar_one_or_none()
+            if model and model.model_name:
+                return model.model_name
+        return settings.llm_default_model
+
     async def run(
         self,
         conversation_id: uuid.UUID,
@@ -105,6 +115,9 @@ class AgentLoop:
         user_message: str,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """执行 Agent 循环，流式返回事件"""
+        # 解析实际模型名称
+        actual_model_name = await self._resolve_model_name(model_id)
+
         # 构建系统提示
         data_space_info = await self._get_data_space_info(data_space_id, user_id)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(data_space_info=data_space_info)
@@ -125,7 +138,7 @@ class AgentLoop:
         for iteration in range(self.max_iterations):
             try:
                 response = await self.client.chat.completions.create(
-                    model=model_id,
+                    model=actual_model_name,
                     messages=messages,
                     tools=tools if tools else None,
                     stream=True,

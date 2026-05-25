@@ -17,6 +17,7 @@ frontend/dist/
 .idea/
 *.swp
 *.swo
+.claude/
 
 # 环境变量
 .env

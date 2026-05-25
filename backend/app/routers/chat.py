@@ -143,21 +143,32 @@ async def send_message(
 
     await db.commit()
 
+    # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）
+    conv_data_space_id = conv.data_space_id
+    conv_model_id = conv.model_id
+    message_content = data.content
+
     # 流式返回 Agent 回复
     async def event_stream() -> AsyncGenerator[str, None]:
+        from app.core.database import get_session_factory
         agent = AgentLoop()
         full_content = ""
+        last_event: dict = {}
 
-        async for event in agent.run(
-            conversation_id=conv_id,
-            user_id=current_user.id,
-            data_space_id=conv.data_space_id,
-            model_id=conv.model_id,
-            user_message=data.content,
-        ):
-            if event["type"] == "text":
-                full_content += event["delta"]
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        try:
+            async for event in agent.run(
+                conversation_id=conv_id,
+                user_id=current_user.id,
+                data_space_id=conv_data_space_id,
+                model_id=conv_model_id,
+                user_message=message_content,
+            ):
+                last_event = event
+                if event["type"] == "text":
+                    full_content += event["delta"]
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
 
         # 保存助手消息
         async with get_session_factory()() as save_db:
@@ -165,13 +176,12 @@ async def send_message(
                 conversation_id=conv_id,
                 role="assistant",
                 content=full_content,
-                token_usage=event.get("usage"),
-                credits_used=event.get("credits_used"),
+                token_usage=last_event.get("usage"),
+                credits_used=last_event.get("credits_used"),
             )
             save_db.add(assistant_message)
             await save_db.commit()
 
         yield "data: [DONE]\n\n"
 
-    from app.core.database import get_session_factory
     return StreamingResponse(event_stream(), media_type="text/event-stream")

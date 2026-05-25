@@ -5,7 +5,6 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Dashboard from '@/pages/Dashboard'
 import DataSpaces from '@/pages/DataSpaces'
-import Files from '@/pages/Files'
 import Chat from '@/pages/Chat'
 import Credits from '@/pages/Credits'
 import Admin from '@/pages/Admin'
@@ -32,7 +31,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="data-spaces" element={<DataSpaces />} />
-          <Route path="files" element={<Files />} />
+          <Route path="files" element={<Navigate to="/data-spaces" replace />} />
           <Route path="chat" element={<Chat />} />
           <Route path="chat/:conversationId" element={<Chat />} />
           <Route path="credits" element={<Credits />} />
