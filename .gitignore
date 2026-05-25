@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境变量
+.env
+.env.local
+
+# 存储
+storage/
+chroma_data/
+
+# 数据库
+*.db
+
+# 日志
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+需求

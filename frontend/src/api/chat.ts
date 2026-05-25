@@ -1,0 +1,59 @@
+import api from './client'
+import { useAuthStore } from '@/stores/authStore'
+
+export interface Conversation {
+  id: string
+  data_space_id: string | null
+  title: string | null
+  model_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Message {
+  id: string
+  role: string
+  content: string | null
+  tool_calls: unknown | null
+  token_usage: unknown | null
+  credits_used: number | null
+  created_at: string
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: Message[]
+}
+
+export interface SSEEvent {
+  type: 'text' | 'tool_use' | 'tool_result' | 'error' | 'done'
+  delta?: string
+  name?: string
+  input?: Record<string, unknown>
+  content?: string
+  is_error?: boolean
+  message?: string
+  usage?: { input_tokens: number; output_tokens: number }
+  credits_used?: number
+  id?: string
+}
+
+export const chatApi = {
+  listConversations: () => api.get<Conversation[]>('/chat/conversations'),
+  getConversation: (id: string) => api.get<ConversationDetail>(`/chat/conversations/${id}`),
+  createConversation: (data: { data_space_id?: string; model_id: string; title?: string }) =>
+    api.post<Conversation>('/chat/conversations', data),
+  deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
+
+  sendMessage: (conversationId: string, content: string): Promise<Response> => {
+    const token = useAuthStore.getState().token
+    const url = `/api/chat/conversations/${conversationId}/messages`
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content }),
+    })
+  },
+}
