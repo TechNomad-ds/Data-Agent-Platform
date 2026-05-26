@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Select, Table, Typography, Spin, Empty, Tag, Statistic, Button, Tooltip, Upload, Popconfirm, message } from 'antd'
-import { FileTextOutlined, CloseOutlined, DatabaseOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Select, Table, Typography, Spin, Empty, Tag, Statistic, Button, Tooltip, Upload, Popconfirm, message, Tabs } from 'antd'
+import { FileTextOutlined, CloseOutlined, DatabaseOutlined, UploadOutlined, DeleteOutlined, NodeIndexOutlined, SafetyOutlined } from '@ant-design/icons'
 import { dataSpacesApi, FileInSpace } from '@/api/dataSpaces'
 import api from '@/api/client'
+import GraphViewer from '@/components/Graph/GraphViewer'
 
 const { Text } = Typography
 
@@ -213,65 +214,115 @@ export default function DataPanel({ spaceId, visible, onClose }: Props) {
         </div>
       )}
 
-      {/* Data preview */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', paddingTop: 60 }}>
-            <Spin />
-            <div style={{ marginTop: 8, color: '#94a3b8', fontSize: 13 }}>加载中...</div>
-          </div>
-        ) : !preview ? (
-          <Empty description="选择文件查看数据" style={{ paddingTop: 60 }} />
-        ) : preview.type === 'table' ? (
-          <div style={{ fontSize: 12 }}>
-            <Table
-              dataSource={preview.rows?.map((row, i) => {
-                const obj: Record<string, string> = { _key: String(i + (page - 1) * 50) }
-                preview.columns?.forEach((col, j) => { obj[col.name] = row[j] })
-                return obj
-              })}
-              columns={preview.columns?.map(col => ({
-                title: (
-                  <Tooltip title={col.dtype}>
-                    <span style={{ fontSize: 11 }}>{col.name}</span>
-                  </Tooltip>
-                ),
-                dataIndex: col.name,
-                key: col.name,
-                width: 120,
-                ellipsis: true,
-                render: (v: string) => <span style={{ fontSize: 11 }}>{v}</span>,
-              }))}
-              rowKey="_key"
-              size="small"
-              scroll={{ x: (preview.columns?.length || 1) * 120, y: 400 }}
-              pagination={{
-                current: page,
-                pageSize: 50,
-                total: preview.total_rows,
-                size: 'small',
-                showSizeChanger: false,
-                onChange: (p) => loadPreview(p),
-              }}
-              style={{ fontSize: 11 }}
-            />
-          </div>
-        ) : preview.type === 'text' ? (
-          <pre style={{
-            padding: 16,
-            fontSize: 12,
-            lineHeight: 1.6,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
-            color: '#475569',
-            margin: 0,
-          }}>
-            {preview.content}
-          </pre>
-        ) : (
-          <Empty description={preview.message || '不支持预览'} style={{ paddingTop: 60 }} />
-        )}
-      </div>
+      {/* Tabbed content */}
+      <Tabs
+        defaultActiveKey="preview"
+        size="small"
+        style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        tabBarStyle={{ padding: '0 16px', marginBottom: 0 }}
+        items={[
+          {
+            key: 'preview',
+            label: '数据预览',
+            children: (
+              <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', paddingTop: 60 }}>
+                    <Spin />
+                    <div style={{ marginTop: 8, color: '#94a3b8', fontSize: 13 }}>加载中...</div>
+                  </div>
+                ) : !preview ? (
+                  <Empty description="选择文件查看数据" style={{ paddingTop: 60 }} />
+                ) : preview.type === 'table' ? (
+                  <div style={{ fontSize: 12 }}>
+                    <Table
+                      dataSource={preview.rows?.map((row, i) => {
+                        const obj: Record<string, string> = { _key: String(i + (page - 1) * 50) }
+                        preview.columns?.forEach((col, j) => { obj[col.name] = row[j] })
+                        return obj
+                      })}
+                      columns={preview.columns?.map(col => ({
+                        title: (
+                          <Tooltip title={col.dtype}>
+                            <span style={{ fontSize: 11 }}>{col.name}</span>
+                          </Tooltip>
+                        ),
+                        dataIndex: col.name,
+                        key: col.name,
+                        width: 120,
+                        ellipsis: true,
+                        render: (v: string) => <span style={{ fontSize: 11 }}>{v}</span>,
+                      }))}
+                      rowKey="_key"
+                      size="small"
+                      scroll={{ x: (preview.columns?.length || 1) * 120, y: 400 }}
+                      pagination={{
+                        current: page,
+                        pageSize: 50,
+                        total: preview.total_rows,
+                        size: 'small',
+                        showSizeChanger: false,
+                        onChange: (p) => loadPreview(p),
+                      }}
+                      style={{ fontSize: 11 }}
+                    />
+                  </div>
+                ) : preview.type === 'text' ? (
+                  <pre style={{
+                    padding: 16,
+                    fontSize: 12,
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    color: '#475569',
+                    margin: 0,
+                  }}>
+                    {preview.content}
+                  </pre>
+                ) : (
+                  <Empty description={preview.message || '不支持预览'} style={{ paddingTop: 60 }} />
+                )}
+              </div>
+            ),
+          },
+          {
+            key: 'graph',
+            label: <span><NodeIndexOutlined /> 知识图谱</span>,
+            children: <GraphViewer spaceId={spaceId} />,
+          },
+          {
+            key: 'quality',
+            label: <span><SafetyOutlined /> 数据质量</span>,
+            children: (
+              <div style={{ padding: 16, overflow: 'auto' }}>
+                {profile?.columns ? (
+                  <div>
+                    <div style={{ marginBottom: 12 }}>
+                      <Tag color="green">完整行: {((profile as any)?.quality?.complete_pct || 0).toFixed(1)}%</Tag>
+                      <Tag color="orange">重复行: {((profile as any)?.quality?.duplicate_pct || 0).toFixed(1)}%</Tag>
+                    </div>
+                    <Table
+                      dataSource={profile.columns.map(c => ({ ...c, key: c.name }))}
+                      columns={[
+                        { title: '列名', dataIndex: 'name', width: 100, ellipsis: true },
+                        { title: '类型', dataIndex: 'dtype', width: 70 },
+                        { title: '缺失%', dataIndex: 'null_pct', width: 60, render: (v: number) => <span style={{ color: v > 20 ? '#ef4444' : '#10b981' }}>{v}%</span> },
+                        { title: '唯一值', dataIndex: 'unique_count', width: 60 },
+                      ]}
+                      size="small"
+                      pagination={false}
+                      scroll={{ y: 300 }}
+                      style={{ fontSize: 11 }}
+                    />
+                  </div>
+                ) : (
+                  <Empty description="选择表格文件查看质量指标" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }

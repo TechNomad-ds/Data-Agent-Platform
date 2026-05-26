@@ -16,10 +16,21 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
-    # LLM API 中转站
-    llm_api_base_url: str = "https://api.example.com/v1"
-    llm_api_key: str = "sk-your-api-key"
-    llm_default_model: str = "deepseek-v4-flash"
+    # Anthropic API (主 LLM 接口)
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_max_tokens: int = 8192
+    enable_extended_thinking: bool = False
+    enable_prompt_caching: bool = True
+
+    # 检索配置
+    retrieval_mode: str = "hybrid"  # vector | bm25 | hybrid | multi_query
+    rrf_k: int = 60
+    multi_query_count: int = 3
+
+    # 知识图谱
+    graph_auto_extract: bool = True
+    graph_max_triples_per_file: int = 50
 
     # 文件存储
     storage_root: str = "./storage"

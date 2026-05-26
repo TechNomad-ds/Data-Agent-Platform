@@ -1,4 +1,4 @@
-"""Agent 工具定义与执行 - 增强版"""
+"""Agent 工具定义与执行 - 融合 DataMind + KDD-CUP 能力"""
 import uuid
 import json
 import ast
@@ -141,6 +141,94 @@ def get_tool_definitions() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "graph_search",
+                "description": "在知识图谱中搜索实体。返回匹配的节点及其关系数量",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "搜索关键词"},
+                        "top_k": {"type": "integer", "description": "返回结果数量", "default": 5},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "graph_traverse",
+                "description": "从指定实体出发，遍历知识图谱中的关系路径。用于探索实体之间的连接",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "start": {"type": "string", "description": "起始实体名称"},
+                        "max_hops": {"type": "integer", "description": "最大跳数", "default": 2},
+                    },
+                    "required": ["start"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "nl2sql",
+                "description": "用自然语言描述你想查询的内容，自动生成 SQL 并执行。适合复杂的多表查询场景",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string", "description": "自然语言问题，如'哪个客户消费最多'"},
+                    },
+                    "required": ["question"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "kb_reindex_file",
+                "description": "重新索引数据空间中的指定文件（重新分段和嵌入向量）。用于文件更新后刷新索引",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "要重新索引的文件名"},
+                    },
+                    "required": ["filename"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "db_import_csv",
+                "description": "将 CSV/TSV 文件导入为 SQL 表。导入后可用 sqlite_query 查询该表",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string", "description": "CSV/TSV 文件名"},
+                        "table_name": {"type": "string", "description": "导入后的表名"},
+                    },
+                    "required": ["filename", "table_name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "graph_extract_from_text",
+                "description": "从文本中提取知识图谱三元组（主体-关系-客体），存入当前数据空间的知识图谱",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "要提取三元组的文本内容"},
+                        "max_triples": {"type": "integer", "description": "最大提取数量", "default": 30},
+                    },
+                    "required": ["text"],
+                },
+            },
+        },
     ]
 
 
@@ -209,6 +297,12 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
             "execute_python": _tool_execute_python,
             "generate_chart": lambda a, u, d: _tool_generate_chart(a),
             "save_memory": _tool_save_memory,
+            "graph_search": _tool_graph_search,
+            "graph_traverse": _tool_graph_traverse,
+            "nl2sql": _tool_nl2sql,
+            "kb_reindex_file": _tool_kb_reindex,
+            "db_import_csv": _tool_db_import_csv,
+            "graph_extract_from_text": _tool_graph_extract,
         }
         handler = handlers.get(tool_name)
         if not handler:
@@ -227,15 +321,19 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
     if not data_space_id:
         return "未选择数据空间，无法搜索"
 
-    from app.services import embedding as embed_svc
-    results = embed_svc.search(str(data_space_id), query, top_k=top_k)
+    from app.services.retrieval import get_retrieval_service
+    svc = get_retrieval_service(str(data_space_id))
+    results = svc.search(query, top_k=top_k)
+
     if results:
         output = []
         for r in results:
-            meta = r.get("metadata", {})
-            output.append(f"[{meta.get('filename', '?')}] (相似度: {1 - r.get('distance', 0):.2f})\n{r['text'][:300]}")
+            meta = r.metadata
+            filename = meta.get("filename", "?")
+            output.append(f"[{filename}] (得分: {r.score:.3f}, 来源: {r.source})\n{r.text[:300]}")
         return "\n\n---\n\n".join(output)
 
+    # 回退到关键词搜索
     files = await _get_space_files(user_id, data_space_id)
     keyword_results = []
     for file in files:
@@ -325,7 +423,11 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
 
 def _detect_joins(all_columns: dict[str, dict[str, set]]) -> list[str]:
+    """增强的 join 检测（融合 KDD-CUP 的 ID-like + link_to 模式）"""
     suggestions = []
+    col_names = list(all_columns.keys())
+
+    # 1. 同名列跨文件 Jaccard 检测
     for col_name, file_vals in all_columns.items():
         if len(file_vals) < 2:
             continue
@@ -339,8 +441,50 @@ def _detect_joins(all_columns: dict[str, dict[str, set]]) -> list[str]:
                 union = vals_a | vals_b
                 jaccard = len(intersection) / len(union) if union else 0
                 if jaccard > 0.05 and len(intersection) > 1:
-                    suggestions.append(f"  - {files[i]}.{col_name} <-> {files[j]}.{col_name} (Jaccard: {jaccard:.2f})")
-    return suggestions[:10]
+                    tags = ["name_match"]
+                    if _is_id_like(col_name):
+                        tags.append("id_like")
+                    suggestions.append(
+                        f"  - {files[i]}.{col_name} <-> {files[j]}.{col_name} [{', '.join(tags)}] (Jaccard: {jaccard:.2f})"
+                    )
+
+    # 2. ID-like 模式匹配（customer_id <-> id, user_id <-> user_key）
+    for col_a in col_names:
+        if not _is_id_like(col_a):
+            continue
+        base_a = col_a.lower().replace("_id", "").replace("_key", "").replace("id", "").strip("_")
+        if not base_a:
+            continue
+        for col_b in col_names:
+            if col_a == col_b:
+                continue
+            base_b = col_b.lower().replace("_id", "").replace("_key", "").replace("id", "").strip("_")
+            if base_a == base_b and col_a in all_columns and col_b in all_columns:
+                for fa in all_columns[col_a]:
+                    for fb in all_columns[col_b]:
+                        if fa != fb:
+                            suggestions.append(f"  - {fa}.{col_a} <-> {fb}.{col_b} [id_pattern]")
+
+    # 3. link_to_X 模式（Airtable 风格）
+    for col_name in col_names:
+        lower = col_name.lower()
+        if lower.startswith("link_to_"):
+            target_base = lower[8:]
+            for other_col in col_names:
+                other_lower = other_col.lower()
+                if other_lower in (target_base, f"{target_base}_id", f"{target_base}id"):
+                    if col_name in all_columns and other_col in all_columns:
+                        for fa in all_columns[col_name]:
+                            for fb in all_columns[other_col]:
+                                if fa != fb:
+                                    suggestions.append(f"  - {fa}.{col_name} <-> {fb}.{other_col} [link_to]")
+
+    return suggestions[:15]
+
+
+def _is_id_like(name: str) -> bool:
+    n = name.lower()
+    return n.endswith("_id") or n.endswith("_key") or n == "id" or (n.endswith("id") and len(n) > 2 and n[-3].isalpha())
 
 
 async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
@@ -509,3 +653,115 @@ async def _tool_save_memory(args: dict, user_id: uuid.UUID, data_space_id: uuid.
         data_space_id=data_space_id,
     )
     return f"已保存记忆 (ID: {memory_id})"
+
+
+async def _tool_graph_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """知识图谱实体搜索"""
+    if not data_space_id:
+        return "未选择数据空间"
+    query = args.get("query", "")
+    top_k = args.get("top_k", 5)
+
+    from app.services.graph import GraphService
+    gs = GraphService(str(user_id), str(data_space_id))
+    results = await gs.search_entities(query, top_k=top_k)
+
+    if not results:
+        return f"知识图谱中未找到与 '{query}' 相关的实体"
+
+    output = [f"找到 {len(results)} 个相关实体："]
+    for r in results:
+        neighbors = await gs.neighbors(r["id"])
+        rel_summary = ", ".join(f"{n['relation']}→{n['entity']}" for n in neighbors[:3])
+        output.append(f"  - {r['label']} (类型: {r['type']}, 关系数: {r['degree']}) {rel_summary}")
+    return "\n".join(output)
+
+
+async def _tool_graph_traverse(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """知识图谱路径遍历"""
+    if not data_space_id:
+        return "未选择数据空间"
+    start = args.get("start", "")
+    max_hops = args.get("max_hops", 2)
+
+    from app.services.graph import GraphService
+    gs = GraphService(str(user_id), str(data_space_id))
+    paths = await gs.traverse(start, max_hops=max_hops)
+
+    if not paths:
+        return f"从 '{start}' 出发未找到关系路径（实体可能不存在）"
+
+    output = [f"从 '{start}' 出发的关系路径（最大 {max_hops} 跳）："]
+    for p in paths[:20]:
+        steps = " → ".join(f"{s['from']} --[{s['relation']}]--> {s['to']}" for s in p["path"])
+        output.append(f"  深度{p['depth']}: {steps}")
+    return "\n".join(output)
+
+
+async def _tool_nl2sql(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """自然语言转 SQL 并执行"""
+    if not data_space_id:
+        return "未选择数据空间"
+    question = args.get("question", "")
+    if not question:
+        return "请提供要查询的问题"
+
+    from app.services.nl2sql import generate_and_execute
+    return await generate_and_execute(question, user_id, data_space_id)
+
+
+async def _tool_kb_reindex(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """重新索引文件"""
+    if not data_space_id:
+        return "未选择数据空间"
+    filename = args.get("filename", "")
+    if not filename:
+        return "请指定文件名"
+
+    from app.services.ingest import IngestService
+    svc = IngestService(user_id, data_space_id)
+    result = await svc.kb_reindex_file(filename)
+    if "error" in result:
+        return result["error"]
+    return f"已重新索引 '{filename}'，生成 {result['chunks_indexed']} 个文本块"
+
+
+async def _tool_db_import_csv(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """将 CSV 导入为 SQL 表"""
+    if not data_space_id:
+        return "未选择数据空间"
+    filename = args.get("filename", "")
+    table_name = args.get("table_name", "")
+    if not filename or not table_name:
+        return "请指定文件名和表名"
+
+    from app.services.ingest import IngestService
+    svc = IngestService(user_id, data_space_id)
+    result = await svc.db_import_csv(filename, table_name)
+    if "error" in result:
+        return result["error"]
+    return f"已将 '{filename}' 导入为表 '{result['table_name']}'（{result['row_count']} 行, {result['column_count']} 列）。现在可以用 sqlite_query 查询该表。"
+
+
+async def _tool_graph_extract(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """从文本抽取知识图谱三元组"""
+    if not data_space_id:
+        return "未选择数据空间"
+    text = args.get("text", "")
+    max_triples = args.get("max_triples", 30)
+    if not text:
+        return "请提供文本内容"
+
+    from app.services.ingest import IngestService
+    svc = IngestService(user_id, data_space_id)
+    result = await svc.graph_extract_from_text(text, max_triples=max_triples)
+    if not result.get("triples"):
+        return "未能从文本中提取到三元组"
+
+    output = [f"已提取 {result['added']} 个三元组到知识图谱："]
+    for t in result["triples"][:10]:
+        output.append(f"  ({t['subject']}) --[{t['relation']}]--> ({t['object']})")
+    if len(result["triples"]) > 10:
+        output.append(f"  ... 共 {len(result['triples'])} 个")
+    output.append(f"图谱当前: {result.get('total_nodes', 0)} 节点, {result.get('total_edges', 0)} 条边")
+    return "\n".join(output)
