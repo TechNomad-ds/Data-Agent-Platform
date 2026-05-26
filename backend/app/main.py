@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.database import Base, get_engine
-from app.routers import auth, files, data_spaces, chat, credits, feedback, admin, models
+from app.routers import auth, files, data_spaces, chat, credits, feedback, admin, models, reports, suggestions, datasources
 
 
 @asynccontextmanager
@@ -26,11 +26,15 @@ app = FastAPI(
 # CORS 配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=[settings.frontend_url, "http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 限流中间件
+from app.middleware.rate_limit import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware, default_limit=60, window=60)
 
 # 注册路由
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
@@ -41,6 +45,9 @@ app.include_router(credits.router, prefix="/api/credits", tags=["额度"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["反馈"])
 app.include_router(admin.router, prefix="/api/admin", tags=["管理后台"])
 app.include_router(models.router, prefix="/api/models", tags=["模型"])
+app.include_router(reports.router, prefix="/api/reports", tags=["报告"])
+app.include_router(suggestions.router, prefix="/api/data-spaces", tags=["智能建议"])
+app.include_router(datasources.router, prefix="/api/datasources", tags=["外部数据源"])
 
 
 @app.get("/api/health")

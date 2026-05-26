@@ -22,6 +22,9 @@ const toolMeta: Record<string, { label: string; icon: React.ReactNode }> = {
   inspect_data: { label: '查看数据结构', icon: <DatabaseOutlined /> },
   pandas_query: { label: '数据查询', icon: <BarChartOutlined /> },
   execute_python: { label: '执行代码', icon: <CodeOutlined /> },
+  sqlite_query: { label: 'SQL 查询', icon: <DatabaseOutlined /> },
+  generate_chart: { label: '生成图表', icon: <BarChartOutlined /> },
+  generate_report: { label: '生成报告', icon: <FileTextOutlined /> },
 }
 
 export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpanded = false }: ThinkingBlockProps) {
@@ -36,8 +39,8 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
   return (
     <div style={{
       borderRadius: 10,
-      border: '1px solid #e8e8e8',
-      background: '#fafbfc',
+      border: '1px solid #e2e8f0',
+      background: '#f8fafc',
       overflow: 'hidden',
     }}>
       <div
@@ -52,26 +55,26 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
         }}
       >
         {expanded
-          ? <DownOutlined style={{ fontSize: 10, color: '#8c8c8c' }} />
-          : <RightOutlined style={{ fontSize: 10, color: '#8c8c8c' }} />
+          ? <DownOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
+          : <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
         }
-        <ThunderboltOutlined style={{ color: '#faad14', fontSize: 13 }} />
-        <Text style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>
+        <ThunderboltOutlined style={{ color: '#f59e0b', fontSize: 13 }} />
+        <Text style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
           {allDone ? '已完成' : '执行中'}
         </Text>
         {toolUseCount > 0 && (
-          <Text style={{ fontSize: 11, color: '#8c8c8c' }}>
+          <Text style={{ fontSize: 11, color: '#94a3b8' }}>
             · {toolUseCount} 次工具调用
           </Text>
         )}
-        {allDone && <CheckCircleOutlined style={{ fontSize: 11, color: '#52c41a', marginLeft: 'auto' }} />}
-        {!allDone && toolUseCount > 0 && <LoadingOutlined style={{ fontSize: 11, color: '#1677ff', marginLeft: 'auto' }} />}
+        {allDone && <CheckCircleOutlined style={{ fontSize: 11, color: '#10b981', marginLeft: 'auto' }} />}
+        {!allDone && toolUseCount > 0 && <LoadingOutlined style={{ fontSize: 11, color: '#4f46e5', marginLeft: 'auto' }} />}
       </div>
       {expanded && (
-        <div style={{ padding: '0 12px 10px', borderTop: '1px solid #f0f0f0' }}>
+        <div style={{ padding: '0 12px 10px', borderTop: '1px solid #e2e8f0' }}>
           {thinkingText && (
             <div style={{ padding: '8px 0' }}>
-              <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
+              <Text style={{ fontSize: 12, fontStyle: 'italic', color: '#94a3b8' }}>
                 {thinkingText}
               </Text>
             </div>
@@ -86,16 +89,16 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 0',
-                  borderBottom: '1px solid #f5f5f5',
+                  borderBottom: '1px solid #f1f5f9',
                 }}>
                   {hasResult
-                    ? <CheckCircleOutlined style={{ fontSize: 11, color: '#52c41a' }} />
-                    : <LoadingOutlined style={{ fontSize: 11, color: '#1677ff' }} />
+                    ? <CheckCircleOutlined style={{ fontSize: 11, color: '#10b981' }} />
+                    : <LoadingOutlined style={{ fontSize: 11, color: '#4f46e5' }} />
                   }
-                  <span style={{ fontSize: 12, color: hasResult ? '#52c41a' : '#1677ff' }}>{meta.icon}</span>
-                  <Text style={{ fontSize: 12, fontWeight: 500 }}>{meta.label}</Text>
+                  <span style={{ fontSize: 12, color: hasResult ? '#10b981' : '#4f46e5' }}>{meta.icon}</span>
+                  <Text style={{ fontSize: 12, fontWeight: 500, color: '#475569' }}>{meta.label}</Text>
                   {event.input && (
-                    <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }} ellipsis>
+                    <Text style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }} ellipsis>
                       {Object.entries(event.input).map(([k, v]) =>
                         `${k}: ${String(v).slice(0, 25)}`
                       ).join(', ')}
@@ -107,9 +110,9 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
 
             if (event.type === 'tool_result') {
               return (
-                <div key={i} style={{ padding: '4px 0 6px 17px', borderBottom: '1px solid #f5f5f5' }}>
+                <div key={i} style={{ padding: '4px 0 6px 17px', borderBottom: '1px solid #f1f5f9' }}>
                   {event.content && (
-                    <Text type="secondary" style={{ fontSize: 11, whiteSpace: 'pre-wrap', display: 'block', maxHeight: 60, overflow: 'hidden' }}>
+                    <Text style={{ fontSize: 11, whiteSpace: 'pre-wrap', display: 'block', maxHeight: 60, overflow: 'hidden', color: '#94a3b8' }}>
                       {event.content.slice(0, 150)}{event.content.length > 150 ? '...' : ''}
                     </Text>
                   )}

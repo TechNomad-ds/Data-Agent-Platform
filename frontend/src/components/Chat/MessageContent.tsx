@@ -3,9 +3,10 @@ import { UserOutlined, RobotOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
+import ChartMessage from '@/components/Charts/ChartMessage'
 
 const { Text } = Typography
 
@@ -14,6 +15,24 @@ interface MessageContentProps {
 }
 
 function MarkdownBlock({ content }: { content: string }) {
+  const parts = content.split(/```chart\n([\s\S]*?)```/)
+
+  if (parts.length === 1) {
+    return <MarkdownRaw content={content} />
+  }
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 0
+          ? part.trim() && <MarkdownRaw key={i} content={part} />
+          : <ChartMessage key={i} chartJson={part} />
+      )}
+    </>
+  )
+}
+
+function MarkdownRaw({ content }: { content: string }) {
   return (
     <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7 }}>
       <ReactMarkdown
@@ -25,7 +44,7 @@ function MarkdownBlock({ content }: { content: string }) {
             if (match || codeString.includes('\n')) {
               return (
                 <SyntaxHighlighter
-                  style={oneLight}
+                  style={oneDark}
                   language={match?.[1] || 'text'}
                   PreTag="div"
                   customStyle={{ borderRadius: 8, fontSize: 13, margin: '8px 0' }}
@@ -35,7 +54,7 @@ function MarkdownBlock({ content }: { content: string }) {
               )
             }
             return (
-              <code style={{ background: '#e8eaed', padding: '2px 6px', borderRadius: 4, fontSize: 13 }} {...props}>
+              <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 13, color: '#7c3aed' }} {...props}>
                 {children}
               </code>
             )
@@ -60,33 +79,30 @@ export default function MessageContent({ message }: MessageContentProps) {
   return (
     <div style={{ display: 'flex', gap: 12, flexDirection: isUser ? 'row-reverse' : 'row' }}>
       <div style={{
-        width: 34, height: 34, borderRadius: '50%',
+        width: 32, height: 32, borderRadius: 8,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: isUser
-          ? 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)'
-          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: '#fff', flexShrink: 0, fontSize: 14,
+          ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
+          : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        color: '#fff', flexShrink: 0, fontSize: 13,
       }}>
         {isUser ? <UserOutlined /> : <RobotOutlined />}
       </div>
-      <div style={{ maxWidth: '78%', minWidth: 0 }}>
+      <div style={{ maxWidth: '80%', minWidth: 0 }}>
         {isUser ? (
           <div style={{
-            padding: '12px 16px', borderRadius: '16px 16px 4px 16px',
-            background: 'linear-gradient(135deg, #1677ff 0%, #0958d9 100%)',
-            color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            padding: '10px 14px', borderRadius: '12px 12px 4px 12px',
+            background: '#e2e8f0', color: '#1e293b',
           }}>
-            <Text style={{ color: '#fff', whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.content}</Text>
+            <Text style={{ color: '#1e293b', whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.content}</Text>
           </div>
         ) : segments ? (
-          // Render with interleaved segments
           <div>
             {segments.map((seg: any, i: number) => (
               seg.type === 'text' ? (
                 <div key={i} style={{
-                  padding: '12px 16px', borderRadius: 12, marginBottom: 8,
-                  background: '#f8f9fa', color: '#1f2937',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  padding: '10px 14px', borderRadius: 10, marginBottom: 8,
+                  background: '#ffffff', border: '1px solid #e2e8f0',
                 }}>
                   <MarkdownBlock content={seg.content || ''} />
                 </div>
@@ -98,21 +114,19 @@ export default function MessageContent({ message }: MessageContentProps) {
             ))}
             {message.credits_used && (
               <div style={{ textAlign: 'right', marginTop: 2 }}>
-                <Text style={{ fontSize: 11, color: '#999' }}>消耗 {message.credits_used} 点</Text>
+                <Text style={{ fontSize: 11, color: '#94a3b8' }}>消耗 {message.credits_used} 点</Text>
               </div>
             )}
           </div>
         ) : (
-          // Fallback: plain message without segments
           <div style={{
-            padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-            background: '#f8f9fa', color: '#1f2937',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            padding: '10px 14px', borderRadius: '12px 12px 12px 4px',
+            background: '#ffffff', border: '1px solid #e2e8f0',
           }}>
             <MarkdownBlock content={message.content || ''} />
             {message.credits_used && (
               <div style={{ marginTop: 6, textAlign: 'right' }}>
-                <Text style={{ fontSize: 11, color: '#999' }}>消耗 {message.credits_used} 点</Text>
+                <Text style={{ fontSize: 11, color: '#94a3b8' }}>消耗 {message.credits_used} 点</Text>
               </div>
             )}
           </div>

@@ -16,25 +16,30 @@ from app.models.credit import CreditAccount, CreditTransaction
 from app.agent.tools import get_tool_definitions, execute_tool
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助手。你可以帮助用户理解、查询和分析他们的数据。
+SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助手。你帮助普通用户理解、查询和分析他们的数据。用户可能不懂技术，请用通俗易懂的语言解释分析结果。
 
 当前数据空间信息：
 {data_space_info}
 
-你可以使用以下工具来完成任务：
-- search_data_space: 在数据空间中搜索相关内容
+{memory_context}
+
+你可以使用以下工具：
+- search_data_space: 语义搜索数据空间中的内容
 - read_file: 读取文件内容
-- inspect_data: 查看结构化数据(CSV/Excel/JSON)的 schema、列信息和样本
-- pandas_query: 对 CSV/Excel/JSON 数据执行 pandas 查询（数据已加载为 df）
-- execute_python: 执行 Python 代码。数据空间中的文件已预加载为 DataFrame 变量（如 df_patient、df_examination），也可通过 FILES 字典获取文件路径
+- inspect_data: 查看数据结构和跨文件 join 关系（不传 filename 则检查所有文件）
+- pandas_query: 对数据执行 pandas 查询
+- sqlite_query: 用 SQL 查询数据（表名=文件名去扩展名小写）
+- execute_python: 执行 Python 代码分析数据
+- generate_chart: 生成可视化图表（bar/line/pie/scatter/heatmap）
+- save_memory: 保存重要发现到记忆系统
 
 工作原则：
-1. 先理解用户的问题，再决定使用哪些工具
-2. 对于数据分析任务，先用 inspect_data 了解数据结构，再用 pandas_query 或 execute_python 进行分析
-3. execute_python 中可直接使用预加载的 df_xxx 变量，无需手动读取文件
-4. 展示分析过程和关键发现
-5. 引用数据来源，让用户知道结论基于哪些文件
-6. 如果遇到错误，尝试修正并重试
+1. 先用 inspect_data（不传文件名）了解整体数据结构和 join 关系
+2. 对于简单查询用 pandas_query，复杂多表查询用 sqlite_query
+3. 主动生成图表帮助用户理解数据（用 generate_chart）
+4. 用通俗语言解释发现，避免技术术语
+5. 如果发现重要模式或用户偏好，用 save_memory 记住
+6. 引用数据来源，让用户知道结论基于哪些文件
 """
 
 
@@ -156,7 +161,22 @@ class AgentLoop:
 
         # 构建系统提示
         data_space_info = await self._get_data_space_info(data_space_id, user_id)
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(data_space_info=data_space_info)
+
+        # 召回相关记忆
+        memory_context = ""
+        try:
+            from app.services.memory import recall
+            memories = await recall(user_id, user_message, data_space_id=data_space_id)
+            if memories:
+                memory_lines = [f"- [{m['scope']}/{m['kind']}] {m['content']}" for m in memories]
+                memory_context = "相关记忆：\n" + "\n".join(memory_lines)
+        except Exception:
+            pass
+
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            data_space_info=data_space_info,
+            memory_context=memory_context,
+        )
 
         # 获取对话历史
         history = await self._get_conversation_history(conversation_id)

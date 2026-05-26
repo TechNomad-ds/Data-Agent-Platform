@@ -1,13 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { ConfigProvider } from 'antd'
 import { useAuthStore } from '@/stores/authStore'
+import { lightThemeConfig } from '@/theme/themeConfig'
 import AppLayout from '@/components/Layout/AppLayout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
-import Dashboard from '@/pages/Dashboard'
-import DataSpaces from '@/pages/DataSpaces'
-import Chat from '@/pages/Chat'
-import Credits from '@/pages/Credits'
-import Admin from '@/pages/Admin'
+import ChatView from '@/pages/Chat'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -17,27 +15,26 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <AppLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="data-spaces" element={<DataSpaces />} />
-          <Route path="files" element={<Navigate to="/data-spaces" replace />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="chat/:conversationId" element={<Chat />} />
-          <Route path="credits" element={<Credits />} />
-          <Route path="admin" element={<Admin />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ConfigProvider theme={lightThemeConfig}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <AppLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route index element={<ChatView />} />
+            <Route path="chat" element={<ChatView />} />
+            <Route path="chat/:conversationId" element={<ChatView />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ConfigProvider>
   )
 }

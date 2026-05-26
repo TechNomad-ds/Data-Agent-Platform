@@ -5,6 +5,8 @@ from app.models.conversation import Conversation, Message
 from app.models.credit import CreditAccount, CreditTransaction
 from app.models.feedback import Feedback
 from app.models.llm_model import LLMModel
+from app.models.data_profile import DataProfile
+from app.models.memory import AgentMemory
 
 __all__ = [
     "User",
@@ -17,4 +19,6 @@ __all__ = [
     "CreditTransaction",
     "Feedback",
     "LLMModel",
+    "DataProfile",
+    "AgentMemory",
 ]

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Card, Form, Input, Button, Typography, message } from 'antd'
+import { Form, Input, Button, Typography, message, ConfigProvider } from 'antd'
 import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/authStore'
+import { lightThemeConfig } from '@/theme/themeConfig'
 
 const { Title, Text } = Typography
 
@@ -28,44 +29,46 @@ export default function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      }}
-    >
-      <Card style={{ width: 420, borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img src="/logo.png" alt="Logo" style={{ width: 56, height: 56, borderRadius: 12 }} />
-          <Title level={3} style={{ marginTop: 12, marginBottom: 4 }}>
-            Data Agent Platform
-          </Title>
-          <Text type="secondary">智能数据交互平台</Text>
-        </div>
+    <ConfigProvider theme={lightThemeConfig}>
+      <div className="auth-page">
+        <div className="auth-card">
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24, color: '#fff', fontWeight: 700,
+              boxShadow: '0 4px 16px rgba(79,70,229,0.2)',
+            }}>
+              D
+            </div>
+            <Title level={3} style={{ marginBottom: 4, color: '#1e293b' }}>
+              Data Agent Platform
+            </Title>
+            <Text style={{ color: '#64748b' }}>智能数据交互平台</Text>
+          </div>
 
-        <Form layout="vertical" onFinish={onFinish} size="large">
-          <Form.Item name="email" rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}>
-            <Input prefix={<MailOutlined />} placeholder="邮箱" />
-          </Form.Item>
-          <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block>
-              登录
-            </Button>
-          </Form.Item>
-        </Form>
+          <Form layout="vertical" onFinish={onFinish} size="large">
+            <Form.Item name="email" rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}>
+              <Input prefix={<MailOutlined style={{ color: '#94a3b8' }} />} placeholder="邮箱" />
+            </Form.Item>
+            <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
+              <Input.Password prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="密码" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 44 }}>
+                登录
+              </Button>
+            </Form.Item>
+          </Form>
 
-        <div style={{ textAlign: 'center' }}>
-          <Text type="secondary">
-            还没有账号？<Link to="/register">立即注册</Link>
-          </Text>
+          <div style={{ textAlign: 'center' }}>
+            <Text style={{ color: '#64748b' }}>
+              还没有账号？<Link to="/register" style={{ color: '#4f46e5' }}>立即注册</Link>
+            </Text>
+          </div>
         </div>
-      </Card>
-    </div>
+      </div>
+    </ConfigProvider>
   )
 }

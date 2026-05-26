@@ -20,12 +20,14 @@ router = APIRouter()
 
 # 支持的文件类型
 ALLOWED_EXTENSIONS = {
-    "txt", "md", "pdf", "docx", "csv", "xlsx", "json", "jsonl",
+    "txt", "md", "pdf", "docx", "csv", "xlsx", "xls", "json", "jsonl",
     "html", "xml", "sql", "py", "ipynb", "zip", "yaml", "yml",
-    "log", "tsv", "parquet",
+    "log", "tsv", "parquet", "feather", "sqlite", "db", "sqlite3",
+    "png", "jpg", "jpeg", "gif", "bmp", "webp",
+    "r", "sas7bdat", "dta", "sav",
 }
 
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB (databases can be large)
 
 
 def get_file_type(filename: str) -> str:

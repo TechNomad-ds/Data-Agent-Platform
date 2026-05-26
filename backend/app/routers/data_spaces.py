@@ -363,4 +363,200 @@ async def upload_files_to_space(
         space.index_status = "empty"
 
     await db.flush()
+
+    # 触发后台预处理
+    from fastapi import BackgroundTasks
+    import asyncio
+    from app.services.preprocessing import preprocess_file
+
+    async def _run_preprocessing():
+        for f in uploaded:
+            await preprocess_file(f.id, space_id)
+
+    asyncio.ensure_future(_run_preprocessing())
+
     return uploaded
+
+
+@router.get("/{space_id}/profile")
+async def get_space_profile_endpoint(
+    space_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取数据空间的聚合数据画像"""
+    result = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    from app.services.preprocessing import get_space_profile
+    profile = await get_space_profile(space_id)
+    return profile
+
+
+@router.get("/{space_id}/files/{file_id}/profile")
+async def get_file_profile_endpoint(
+    space_id: uuid.UUID,
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取单个文件的数据画像"""
+    from app.models.data_profile import DataProfile as DP
+    result = await db.execute(
+        select(DP).where(DP.file_id == file_id, DP.data_space_id == space_id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="画像不存在，可能正在处理中")
+    return {
+        "file_id": str(profile.file_id),
+        "profile_type": profile.profile_type,
+        "status": profile.status,
+        "profile_data": profile.profile_data,
+        "error_message": profile.error_message,
+    }
+
+
+@router.get("/{space_id}/files/{file_id}/preview")
+async def preview_file_data(
+    space_id: uuid.UUID,
+    file_id: uuid.UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=10, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """预览文件数据（表格形式，支持分页）"""
+    import pandas as pd
+    import json as json_mod
+
+    result = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    file_result = await db.execute(
+        select(File).where(File.id == file_id, File.user_id == current_user.id)
+    )
+    file = file_result.scalar_one_or_none()
+    if not file:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    file_path = Path(settings.storage_root) / file.storage_path
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不在磁盘上")
+
+    ext = file.file_type.lower()
+
+    # SQLite database files
+    if ext in ("sqlite", "db", "sqlite3"):
+        import sqlite3
+        table_name = Query(default=None)
+        conn = sqlite3.connect(str(file_path))
+        try:
+            # List tables if no specific table requested
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cursor.fetchall()]
+            if not tables:
+                return {"type": "database", "tables": [], "message": "数据库为空"}
+
+            # Use first table by default
+            target_table = tables[0]
+            count_cursor = conn.execute(f"SELECT COUNT(*) FROM '{target_table}'")
+            total = count_cursor.fetchone()[0]
+
+            offset = (page - 1) * page_size
+            data_cursor = conn.execute(f"SELECT * FROM '{target_table}' LIMIT {page_size} OFFSET {offset}")
+            col_names = [desc[0] for desc in data_cursor.description]
+            rows_data = [list(str(v) if v is not None else "" for v in row) for row in data_cursor.fetchall()]
+
+            return {
+                "type": "database",
+                "tables": tables,
+                "current_table": target_table,
+                "columns": [{"name": c, "dtype": "text"} for c in col_names],
+                "rows": rows_data,
+                "total_rows": total,
+                "page": page,
+                "page_size": page_size,
+                "filename": file.filename,
+            }
+        finally:
+            conn.close()
+
+    # Tabular formats
+    df = None
+    if ext == "csv":
+        from app.services.preprocessing import _detect_encoding
+        encoding = _detect_encoding(file_path)
+        df = pd.read_csv(file_path, encoding=encoding, nrows=page * page_size, on_bad_lines="skip")
+    elif ext == "tsv":
+        from app.services.preprocessing import _detect_encoding
+        encoding = _detect_encoding(file_path)
+        df = pd.read_csv(file_path, sep="\t", encoding=encoding, nrows=page * page_size, on_bad_lines="skip")
+    elif ext in ("xlsx", "xls"):
+        df = pd.read_excel(file_path, nrows=page * page_size)
+    elif ext == "parquet":
+        df = pd.read_parquet(file_path).head(page * page_size)
+    elif ext == "feather":
+        df = pd.read_feather(file_path).head(page * page_size)
+    elif ext == "json":
+        content = file_path.read_text(encoding="utf-8")
+        data = json_mod.loads(content)
+        if isinstance(data, list):
+            df = pd.DataFrame(data[:page * page_size])
+        elif isinstance(data, dict) and "records" in data:
+            df = pd.DataFrame(data["records"][:page * page_size])
+        else:
+            return {"type": "text", "content": content[:2000], "total_chars": len(content)}
+    elif ext == "jsonl":
+        df = pd.read_json(file_path, lines=True, nrows=page * page_size)
+    elif ext in ("txt", "md", "py", "sql", "html", "xml", "yaml", "yml", "log", "r", "ipynb"):
+        from app.services.preprocessing import _detect_encoding
+        encoding = _detect_encoding(file_path)
+        content = file_path.read_text(encoding=encoding, errors="ignore")
+        lines = content.split("\n")
+        start = (page - 1) * page_size
+        end = start + page_size
+        return {
+            "type": "text",
+            "content": "\n".join(lines[start:end]),
+            "total_lines": len(lines),
+            "page": page,
+            "page_size": page_size,
+        }
+    elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
+        return {"type": "image", "filename": file.filename, "file_size_kb": round(file_path.stat().st_size / 1024, 1)}
+    else:
+        return {"type": "unsupported", "message": f"不支持预览的文件类型: {ext}"}
+
+    if df is None or df.empty:
+        return {"type": "unsupported", "message": "无法解析文件内容"}
+
+    total_rows = len(df)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_df = df.iloc[start:end]
+
+    columns = []
+    for col in df.columns:
+        columns.append({
+            "name": str(col),
+            "dtype": str(df[col].dtype),
+        })
+
+    rows = page_df.fillna("").astype(str).values.tolist()
+
+    return {
+        "type": "table",
+        "columns": columns,
+        "rows": rows,
+        "total_rows": total_rows,
+        "page": page,
+        "page_size": page_size,
+        "filename": file.filename,
+    }
