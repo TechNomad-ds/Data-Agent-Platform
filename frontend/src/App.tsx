@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
 import { useAuthStore } from '@/stores/authStore'
 import { lightThemeConfig } from '@/theme/themeConfig'
-import AppLayout from '@/components/Layout/AppLayout'
+import MainLayout from '@/components/Layout/MainLayout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
-import ChatView from '@/pages/Chat'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -15,24 +15,19 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <ConfigProvider theme={lightThemeConfig}>
+    <ConfigProvider locale={zhCN} theme={lightThemeConfig}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route
-            path="/"
+            path="/*"
             element={
               <PrivateRoute>
-                <AppLayout />
+                <MainLayout />
               </PrivateRoute>
             }
-          >
-            <Route index element={<ChatView />} />
-            <Route path="chat" element={<ChatView />} />
-            <Route path="chat/:conversationId" element={<ChatView />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
+          />
         </Routes>
       </BrowserRouter>
     </ConfigProvider>

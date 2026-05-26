@@ -88,7 +88,7 @@ export default function MessageContent({ message }: MessageContentProps) {
       }}>
         {isUser ? <UserOutlined /> : <RobotOutlined />}
       </div>
-      <div style={{ maxWidth: '80%', minWidth: 0 }}>
+      <div style={{ maxWidth: '100%', minWidth: 0 }}>
         {isUser ? (
           <div style={{
             padding: '10px 14px', borderRadius: '12px 12px 4px 12px',

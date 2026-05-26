@@ -1,47 +1,45 @@
 import { useState, useEffect } from 'react'
-import { Input, Button, Typography, Upload, message, Tooltip } from 'antd'
-import { PlusOutlined, SearchOutlined, CloudUploadOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { DataSpace, dataSpacesApi } from '@/api/dataSpaces'
-import { chatApi } from '@/api/chat'
-import { useChatStore } from '@/stores/chatStore'
-import DataSpaceSelector from './DataSpaceSelector'
-import ConversationList from './ConversationList'
+import { Input, Button, Typography, Divider } from 'antd'
+import {
+  PlusOutlined, SearchOutlined, DatabaseOutlined,
+  MessageOutlined, LogoutOutlined,
+} from '@ant-design/icons'
+import { chatApi, Conversation } from '@/api/chat'
+import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
+import { useAuthStore } from '@/stores/authStore'
+import { MainView } from '@/components/Layout/MainLayout'
 
 const { Text } = Typography
 
 interface Props {
-  collapsed: boolean
-  onSpaceChange?: (spaceId: string | undefined) => void
+  selectedSpaceId: string | undefined
+  onSpaceChange: (id: string | undefined) => void
+  currentConvId: string | undefined
+  onNewChat: () => void
+  onSelectConversation: (id: string) => void
+  onOpenDataManager: () => void
+  currentView: MainView
 }
 
-export default function Sidebar({ collapsed, onSpaceChange }: Props) {
-  const navigate = useNavigate()
-  const {
-    conversations, setConversations,
-    currentConversation, setCurrentConversation,
-    setMessages, resetStream,
-  } = useChatStore()
+interface GroupedConversations {
+  spaceName: string
+  spaceId: string
+  conversations: Conversation[]
+}
 
+export default function Sidebar({
+  currentConvId,
+  onNewChat, onSelectConversation, onOpenDataManager, currentView,
+}: Props) {
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [spaces, setSpaces] = useState<DataSpace[]>([])
-  const [selectedSpaceId, setSelectedSpaceId] = useState<string | undefined>()
   const [searchText, setSearchText] = useState('')
+  const { user, logout } = useAuthStore()
 
   useEffect(() => {
-    onSpaceChange?.(selectedSpaceId)
-  }, [selectedSpaceId])
-
-  useEffect(() => {
-    loadSpaces()
     loadConversations()
+    loadSpaces()
   }, [])
-
-  const loadSpaces = async () => {
-    try {
-      const res = await dataSpacesApi.list()
-      setSpaces(res.data)
-    } catch {}
-  }
 
   const loadConversations = async () => {
     try {
@@ -50,61 +48,41 @@ export default function Sidebar({ collapsed, onSpaceChange }: Props) {
     } catch {}
   }
 
-  const handleNewConversation = () => {
-    setCurrentConversation(null)
-    setMessages([])
-    resetStream()
-    navigate('/chat')
-  }
-
-  const handleSelectConversation = (id: string) => {
-    navigate(`/chat/${id}`)
-  }
-
-  const handleDeleteConversation = async (id: string) => {
+  const loadSpaces = async () => {
     try {
-      await chatApi.deleteConversation(id)
-      if (currentConversation?.id === id) {
-        setCurrentConversation(null)
-        setMessages([])
-        navigate('/chat')
-      }
-      loadConversations()
+      const res = await dataSpacesApi.list()
+      setSpaces(res.data)
     } catch {}
   }
 
-  const handleUpload = async (file: File) => {
-    if (!selectedSpaceId) {
-      message.warning('请先选择数据空间')
-      return false
+  // Group conversations by data space
+  const grouped: GroupedConversations[] = (() => {
+    const filtered = searchText
+      ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchText.toLowerCase()))
+      : conversations
+
+    const map = new Map<string, Conversation[]>()
+    for (const conv of filtered) {
+      const key = conv.data_space_id || '_none'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(conv)
     }
-    const formData = new FormData()
-    formData.append('files', file)
-    try {
-      await dataSpacesApi.uploadFiles(selectedSpaceId, formData)
-      message.success(`${file.name} 上传成功`)
-      loadSpaces()
-    } catch {
-      message.error('上传失败')
+
+    const result: GroupedConversations[] = []
+    for (const [spaceId, convs] of map) {
+      const space = spaces.find(s => s.id === spaceId)
+      result.push({
+        spaceId,
+        spaceName: space?.name || '未关联数据空间',
+        conversations: convs.slice(0, 10),
+      })
     }
-    return false
-  }
-
-  const filteredConversations = searchText
-    ? conversations.filter(c =>
-        (c.title || '').toLowerCase().includes(searchText.toLowerCase())
-      )
-    : conversations
-
-  const spaceConversations = selectedSpaceId
-    ? filteredConversations.filter(c => c.data_space_id === selectedSpaceId)
-    : filteredConversations
-
-  if (collapsed) return null
+    return result
+  })()
 
   return (
     <div style={{
-      width: 300,
+      width: 280,
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
@@ -112,85 +90,141 @@ export default function Sidebar({ collapsed, onSpaceChange }: Props) {
       borderRight: '1px solid #e2e8f0',
       flexShrink: 0,
     }}>
-      {/* Header */}
-      <div style={{ padding: '16px 14px 12px' }}>
+      {/* Logo + New Chat */}
+      <div style={{ padding: '16px 14px 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 8,
+            width: 30, height: 30, borderRadius: 8,
             background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, color: '#fff', fontWeight: 700,
-          }}>
-            D
-          </div>
-          <Text style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>
-            Data Agent
-          </Text>
+            fontSize: 14, color: '#fff', fontWeight: 700,
+          }}>D</div>
+          <Text style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>Data Agent</Text>
         </div>
 
-        <DataSpaceSelector
-          spaces={spaces}
-          selectedSpaceId={selectedSpaceId}
-          onSelect={setSelectedSpaceId}
-          onRefresh={loadSpaces}
-        />
-      </div>
-
-      {/* Actions */}
-      <div style={{ padding: '0 14px 10px', display: 'flex', gap: 6 }}>
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={handleNewConversation}
-          style={{ flex: 1, height: 34, fontSize: 13 }}
+          block
+          onClick={onNewChat}
+          style={{ height: 36, fontSize: 13, marginBottom: 10 }}
         >
           新对话
         </Button>
-        <Upload
-          showUploadList={false}
-          multiple
-          beforeUpload={handleUpload}
-          accept=".csv,.xlsx,.xls,.json,.txt,.md,.pdf,.docx,.py,.sql,.html,.xml,.zip"
-        >
-          <Tooltip title={selectedSpaceId ? '上传文件到数据空间' : '请先选择数据空间'}>
-            <Button
-              icon={<CloudUploadOutlined />}
-              style={{ height: 34 }}
-              disabled={!selectedSpaceId}
-            />
-          </Tooltip>
-        </Upload>
-      </div>
 
-      {/* Search */}
-      <div style={{ padding: '0 14px 10px' }}>
+        {/* Search */}
         <Input
           prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
           placeholder="搜索对话..."
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
           allowClear
-          style={{ height: 32, fontSize: 13 }}
+          size="small"
+          style={{ marginBottom: 8 }}
         />
       </div>
 
-      {/* Conversation List */}
-      <ConversationList
-        conversations={spaceConversations}
-        currentId={currentConversation?.id}
-        onSelect={handleSelectConversation}
-        onDelete={handleDeleteConversation}
-      />
+      {/* Data Manager Entry */}
+      <div style={{ padding: '0 14px 8px' }}>
+        <Button
+          type={currentView === 'data' ? 'default' : 'text'}
+          icon={<DatabaseOutlined />}
+          block
+          onClick={onOpenDataManager}
+          style={{
+            height: 34, fontSize: 13, justifyContent: 'flex-start',
+            background: currentView === 'data' ? '#f1f5f9' : 'transparent',
+            fontWeight: currentView === 'data' ? 500 : 400,
+          }}
+        >
+          数据管理
+        </Button>
+      </div>
 
-      {/* Footer */}
+      <Divider style={{ margin: '4px 0' }} />
+
+      {/* Conversation History grouped by space */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
+        {grouped.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px 16px', color: '#94a3b8', fontSize: 13 }}>
+            暂无对话记录
+          </div>
+        ) : (
+          grouped.map(group => (
+            <div key={group.spaceId} style={{ marginBottom: 8 }}>
+              {/* Space header */}
+              <div style={{
+                padding: '6px 16px',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}>
+                <DatabaseOutlined style={{ marginRight: 4 }} />
+                {group.spaceName}
+              </div>
+
+              {/* Conversations in this space */}
+              {group.conversations.map(conv => (
+                <div
+                  key={conv.id}
+                  onClick={() => onSelectConversation(conv.id)}
+                  style={{
+                    padding: '8px 16px 8px 28px',
+                    cursor: 'pointer',
+                    background: currentConvId === conv.id ? '#f1f5f9' : 'transparent',
+                    borderRadius: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { if (currentConvId !== conv.id) e.currentTarget.style.background = '#f8fafc' }}
+                  onMouseLeave={e => { if (currentConvId !== conv.id) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <MessageOutlined style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }} />
+                  <Text
+                    ellipsis
+                    style={{
+                      flex: 1, fontSize: 13,
+                      color: currentConvId === conv.id ? '#1e293b' : '#475569',
+                    }}
+                  >
+                    {conv.title || '新对话'}
+                  </Text>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer - user info */}
       <div style={{
-        padding: '12px 14px',
+        padding: '10px 14px',
         borderTop: '1px solid #e2e8f0',
-        fontSize: 11,
-        color: '#94a3b8',
-        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
       }}>
-        Data Agent Platform v1.0
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, color: '#fff', fontWeight: 600,
+        }}>
+          {(user?.username || 'U')[0].toUpperCase()}
+        </div>
+        <Text style={{ flex: 1, fontSize: 12, color: '#475569' }} ellipsis>
+          {user?.username || '用户'}
+        </Text>
+        <Button
+          type="text"
+          size="small"
+          icon={<LogoutOutlined />}
+          onClick={logout}
+          style={{ color: '#94a3b8' }}
+        />
       </div>
     </div>
   )
