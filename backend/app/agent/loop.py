@@ -1,5 +1,6 @@
 """Agent ReAct 循环 - 基于 Anthropic SDK 的流式 Agent
-融合 KDD-CUP 的 schema 预注入 + 重试逻辑 + DataMind 的能力"""
+融合 KDD-CUP 的 schema 预注入 + 重试逻辑 + DataMind 的能力
+支持双后端：Anthropic 原生 / OpenAI 兼容接口"""
 import uuid
 import json
 from typing import AsyncGenerator, Any
@@ -50,10 +51,18 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助�
 
 
 class AgentLoop:
-    """Anthropic SDK 驱动的 ReAct Agent 循环"""
+    """支持 Anthropic / OpenAI 双后端的 ReAct Agent 循环"""
 
     def __init__(self):
-        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        self.backend = settings.llm_backend  # "anthropic" | "openai"
+        if self.backend == "anthropic":
+            self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        else:
+            from openai import AsyncOpenAI
+            self.client = AsyncOpenAI(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_api_base,
+            )
         self.max_iterations = 10
 
     async def _get_data_space_info(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
@@ -259,6 +268,35 @@ class AgentLoop:
             })
         return anthropic_tools
 
+    async def _resolve_model_config(self, model_id: str, user_id: uuid.UUID) -> dict:
+        """解析模型配置：平台模型 or 用户自带 key"""
+        if model_id and model_id.startswith("user_"):
+            key_id = model_id[5:]
+            async with get_session_factory()() as db:
+                from app.models.user_api_key import UserApiKey
+                result = await db.execute(
+                    select(UserApiKey).where(UserApiKey.id == key_id, UserApiKey.user_id == user_id, UserApiKey.is_active == True)
+                )
+                key = result.scalar_one_or_none()
+                if key:
+                    return {
+                        "provider": key.provider,
+                        "api_key": key.api_key_encrypted,
+                        "model_name": key.model_name,
+                        "api_base": key.api_base_url,
+                        "charge_credits": False,
+                        "multiplier": 0,
+                    }
+        # 默认用平台配置
+        return {
+            "provider": self.backend,
+            "api_key": settings.anthropic_api_key if self.backend == "anthropic" else settings.openai_api_key,
+            "model_name": settings.anthropic_model if self.backend == "anthropic" else settings.openai_model,
+            "api_base": settings.openai_api_base if self.backend == "openai" else None,
+            "charge_credits": True,
+            "multiplier": 1.0,
+        }
+
     async def run(
         self,
         conversation_id: uuid.UUID,
@@ -268,13 +306,27 @@ class AgentLoop:
         user_message: str,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """执行 Agent 循环，流式返回事件"""
-        balance = await self._check_balance(user_id)
-        if balance <= 0:
-            yield {"type": "error", "message": "额度不足，请充值或等待每日免费额度发放"}
-            return
+        # 解析模型配置（平台模型 or 用户自带）
+        model_config = await self._resolve_model_config(model_id, user_id)
+        charge_credits = model_config["charge_credits"]
+        credit_multiplier = model_config["multiplier"]
+        model_name = model_config["model_name"]
 
-        model_name = settings.anthropic_model
-        credit_multiplier = 1.0
+        # 根据模型配置动态创建 client
+        if model_config["provider"] == "anthropic":
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=model_config["api_key"])
+            active_backend = "anthropic"
+        else:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=model_config["api_key"], base_url=model_config["api_base"])
+            active_backend = "openai"
+
+        if charge_credits:
+            balance = await self._check_balance(user_id)
+            if balance <= 0:
+                yield {"type": "error", "message": "额度不足，请充值或等待每日免费额度发放"}
+                return
 
         # 构建系统提示（含 schema 预注入 + knowledge.md + 记忆）
         schema_context = await self._build_schema_context(data_space_id, user_id)
@@ -322,42 +374,83 @@ class AgentLoop:
                 break
 
             try:
-                response_stream = self.client.messages.stream(
-                    model=model_name,
-                    max_tokens=settings.anthropic_max_tokens,
-                    system=system_blocks,
-                    messages=messages,
-                    tools=tools,
-                )
-
                 full_text = ""
                 tool_uses = []
 
-                async with response_stream as stream:
-                    async for event in stream:
-                        if event.type == "content_block_start":
-                            if event.content_block.type == "tool_use":
-                                tool_uses.append({
-                                    "id": event.content_block.id,
-                                    "name": event.content_block.name,
-                                    "input_json": "",
-                                })
-                        elif event.type == "content_block_delta":
-                            if event.delta.type == "text_delta":
-                                full_text += event.delta.text
-                                yield {"type": "text", "delta": event.delta.text}
-                            elif event.delta.type == "input_json_delta":
-                                if tool_uses:
-                                    tool_uses[-1]["input_json"] += event.delta.partial_json
+                if active_backend == "anthropic":
+                    # Anthropic SDK 流式调用
+                    response_stream = client.messages.stream(
+                        model=model_name,
+                        max_tokens=settings.anthropic_max_tokens,
+                        system=system_blocks,
+                        messages=messages,
+                        tools=tools,
+                    )
+                    async with response_stream as stream:
+                        async for event in stream:
+                            if event.type == "content_block_start":
+                                if event.content_block.type == "tool_use":
+                                    tool_uses.append({
+                                        "id": event.content_block.id,
+                                        "name": event.content_block.name,
+                                        "input_json": "",
+                                    })
+                            elif event.type == "content_block_delta":
+                                if event.delta.type == "text_delta":
+                                    full_text += event.delta.text
+                                    yield {"type": "text", "delta": event.delta.text}
+                                elif event.delta.type == "input_json_delta":
+                                    if tool_uses:
+                                        tool_uses[-1]["input_json"] += event.delta.partial_json
+                        final_message = await stream.get_final_message()
+                        total_usage["input_tokens"] += final_message.usage.input_tokens
+                        total_usage["output_tokens"] += final_message.usage.output_tokens
 
-                    final_message = await stream.get_final_message()
-                    total_usage["input_tokens"] += final_message.usage.input_tokens
-                    total_usage["output_tokens"] += final_message.usage.output_tokens
+                else:
+                    # OpenAI 兼容接口流式调用
+                    openai_tools = get_tool_definitions()
+                    oai_messages = [{"role": "system", "content": system_blocks if isinstance(system_blocks, str) else system_blocks[0]["text"]}] + messages
+                    response = await client.chat.completions.create(
+                        model=model_name,
+                        messages=oai_messages,
+                        tools=openai_tools if openai_tools else None,
+                        stream=True,
+                    )
+                    tool_calls_data = []
+                    async for chunk in response:
+                        delta = chunk.choices[0].delta if chunk.choices else None
+                        if not delta:
+                            continue
+                        if delta.content:
+                            full_text += delta.content
+                            yield {"type": "text", "delta": delta.content}
+                        if delta.tool_calls:
+                            for tc in delta.tool_calls:
+                                while tc.index >= len(tool_calls_data):
+                                    tool_calls_data.append({"id": "", "function": {"name": "", "arguments": ""}})
+                                if tc.id:
+                                    tool_calls_data[tc.index]["id"] = tc.id
+                                if tc.function:
+                                    if tc.function.name:
+                                        tool_calls_data[tc.index]["function"]["name"] = tc.function.name
+                                    if tc.function.arguments:
+                                        tool_calls_data[tc.index]["function"]["arguments"] += tc.function.arguments
+                        if hasattr(chunk, "usage") and chunk.usage:
+                            total_usage["input_tokens"] += chunk.usage.prompt_tokens or 0
+                            total_usage["output_tokens"] += chunk.usage.completion_tokens or 0
+                    # 转换为统一的 tool_uses 格式
+                    for tc in tool_calls_data:
+                        tool_uses.append({
+                            "id": tc["id"],
+                            "name": tc["function"]["name"],
+                            "input_json": tc["function"]["arguments"],
+                        })
 
                 # 没有工具调用 → Agent 完成
                 if not tool_uses:
-                    credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier))
-                    await self._deduct_credits(user_id, credits_used, model_name)
+                    credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
+                    if charge_credits:
+                        await self._deduct_credits(user_id, credits_used, model_name)
                     yield {
                         "type": "done",
                         "usage": total_usage,
@@ -366,23 +459,33 @@ class AgentLoop:
                     }
                     return
 
-                # 构建 assistant 消息（含文本 + tool_use blocks）
-                assistant_content = []
-                if full_text:
-                    assistant_content.append({"type": "text", "text": full_text})
-                for tu in tool_uses:
-                    try:
-                        input_data = json.loads(tu["input_json"]) if tu["input_json"] else {}
-                    except json.JSONDecodeError:
-                        input_data = {}
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": tu["id"],
-                        "name": tu["name"],
-                        "input": input_data,
+                # 构建 assistant 消息（格式因后端而异）
+                if active_backend == "anthropic":
+                    assistant_content = []
+                    if full_text:
+                        assistant_content.append({"type": "text", "text": full_text})
+                    for tu in tool_uses:
+                        try:
+                            input_data = json.loads(tu["input_json"]) if tu["input_json"] else {}
+                        except json.JSONDecodeError:
+                            input_data = {}
+                        assistant_content.append({
+                            "type": "tool_use",
+                            "id": tu["id"],
+                            "name": tu["name"],
+                            "input": input_data,
+                        })
+                    messages.append({"role": "assistant", "content": assistant_content})
+                else:
+                    # OpenAI 格式
+                    messages.append({
+                        "role": "assistant",
+                        "content": full_text or None,
+                        "tool_calls": [
+                            {"id": tu["id"], "type": "function", "function": {"name": tu["name"], "arguments": tu["input_json"]}}
+                            for tu in tool_uses
+                        ],
                     })
-
-                messages.append({"role": "assistant", "content": assistant_content})
 
                 # 执行工具并收集结果
                 tool_results = []
@@ -437,7 +540,16 @@ class AgentLoop:
                         "is_error": is_error,
                     })
 
-                messages.append({"role": "user", "content": tool_results})
+                # 追加工具结果到消息（格式因后端而异）
+                if active_backend == "anthropic":
+                    messages.append({"role": "user", "content": tool_results})
+                else:
+                    for tr in tool_results:
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tr["tool_use_id"],
+                            "content": tr["content"],
+                        })
 
                 # 重试逻辑：连续失败时注入提示（来自 KDD-CUP）
                 if consecutive_errors >= 2:
@@ -452,8 +564,9 @@ class AgentLoop:
                 return
 
         # 达到最大迭代次数
-        credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier))
-        await self._deduct_credits(user_id, credits_used, model_name)
+        credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
+        if charge_credits:
+            await self._deduct_credits(user_id, credits_used, model_name)
         yield {"type": "text", "delta": "\n\n[已达到最大执行步数，自动停止]"}
         yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log}
 

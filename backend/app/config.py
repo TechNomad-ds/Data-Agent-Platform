@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     enable_extended_thinking: bool = False
     enable_prompt_caching: bool = True
 
+    # OpenAI 兼容接口（备选，当 llm_backend=openai 时使用）
+    llm_backend: str = "anthropic"  # anthropic | openai
+    openai_api_base: str = ""  # 如 https://api.deepseek.com/v1
+    openai_api_key: str = ""
+    openai_model: str = ""  # 如 deepseek-chat
+
     # 检索配置
     retrieval_mode: str = "hybrid"  # vector | bm25 | hybrid | multi_query
     rrf_k: int = 60

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Input, Button, Typography, Divider } from 'antd'
 import {
   PlusOutlined, SearchOutlined, DatabaseOutlined,
-  MessageOutlined, LogoutOutlined,
+  MessageOutlined, LogoutOutlined, SettingOutlined,
 } from '@ant-design/icons'
 import { chatApi, Conversation } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
@@ -18,6 +18,7 @@ interface Props {
   onNewChat: () => void
   onSelectConversation: (id: string) => void
   onOpenDataManager: () => void
+  onOpenSettings: () => void
   currentView: MainView
 }
 
@@ -29,7 +30,7 @@ interface GroupedConversations {
 
 export default function Sidebar({
   currentConvId,
-  onNewChat, onSelectConversation, onOpenDataManager, currentView,
+  onNewChat, onSelectConversation, onOpenDataManager, onOpenSettings, currentView,
 }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [spaces, setSpaces] = useState<DataSpace[]>([])
@@ -73,7 +74,7 @@ export default function Sidebar({
       const space = spaces.find(s => s.id === spaceId)
       result.push({
         spaceId,
-        spaceName: space?.name || '未关联数据空间',
+        spaceName: space?.name || '未关联项目',
         conversations: convs.slice(0, 10),
       })
     }
@@ -218,6 +219,13 @@ export default function Sidebar({
         <Text style={{ flex: 1, fontSize: 12, color: '#475569' }} ellipsis>
           {user?.username || '用户'}
         </Text>
+        <Button
+          type="text"
+          size="small"
+          icon={<SettingOutlined />}
+          onClick={onOpenSettings}
+          style={{ color: currentView === 'settings' ? '#4f46e5' : '#94a3b8' }}
+        />
         <Button
           type="text"
           size="small"

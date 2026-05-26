@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
-import { Typography, Select, Button, Upload, Table, Tabs, Card, Statistic, Tag, Empty, message, Popconfirm, Space, Spin } from 'antd'
-import { UploadOutlined, DeleteOutlined, FileTextOutlined, BarChartOutlined, DatabaseOutlined } from '@ant-design/icons'
+import { useState, useEffect, useRef } from 'react'
+import { Typography, Select, Button, Upload, Table, Tabs, Card, Statistic, Tag, Empty, message, Popconfirm, Spin, Progress, Alert } from 'antd'
+import { UploadOutlined, DeleteOutlined, FileTextOutlined, BarChartOutlined, DatabaseOutlined, MessageOutlined, NodeIndexOutlined, CheckCircleOutlined, LoadingOutlined, SyncOutlined } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
 import api from '@/api/client'
+import GraphViewer from '@/components/Graph/GraphViewer'
 
 const { Text, Title } = Typography
 
 interface Props {
   selectedSpaceId: string | undefined
   onSpaceChange: (id: string | undefined) => void
+  onStartChat: () => void
 }
 
-export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
+export default function DataManager({ selectedSpaceId, onSpaceChange, onStartChat }: Props) {
   const [spaces, setSpaces] = useState<DataSpace[]>([])
   const [files, setFiles] = useState<FileInSpace[]>([])
   const [selectedFileId, setSelectedFileId] = useState<string | undefined>()
@@ -20,18 +22,19 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [processingFiles, setProcessingFiles] = useState<Set<string>>(new Set())
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadSpaces() }, [])
-  useEffect(() => { if (selectedSpaceId) loadFiles() }, [selectedSpaceId])
+  useEffect(() => { if (selectedSpaceId) { loadFiles(); setSelectedFileId(undefined); setPreview(null); setProfile(null) } }, [selectedSpaceId])
   useEffect(() => { if (selectedFileId && selectedSpaceId) { loadPreview(); loadProfile() } }, [selectedFileId])
 
   const loadSpaces = async () => { try { setSpaces((await dataSpacesApi.list()).data) } catch {} }
   const loadFiles = async () => {
     if (!selectedSpaceId) return
-    try {
-      const res = await dataSpacesApi.get(selectedSpaceId)
-      setFiles(res.data.files || [])
-    } catch {}
+    try { setFiles((await dataSpacesApi.get(selectedSpaceId)).data.files || []) } catch {}
   }
   const loadPreview = async () => {
     if (!selectedSpaceId || !selectedFileId) return
@@ -48,15 +51,87 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
 
   const handleUpload = async (file: File) => {
     if (!selectedSpaceId) { message.warning('请先选择数据空间'); return false }
+
+    // 文件大小检查 (100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      message.error(`文件 ${file.name} 超过 100MB 限制`)
+      return false
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
     const formData = new FormData()
     formData.append('files', file)
+
     try {
+      // 模拟上传进度（实际进度需要 XMLHttpRequest）
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 15, 90))
+      }, 300)
+
       await dataSpacesApi.uploadFiles(selectedSpaceId, formData)
-      message.success(`${file.name} 上传成功，正在预处理...`)
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      message.success(`${file.name} 上传成功`)
+
+      // 标记为处理中，开始轮询状态
+      setProcessingFiles(prev => new Set([...prev, file.name]))
       loadFiles()
-    } catch { message.error('上传失败') }
+
+      // 3秒后检查处理状态
+      setTimeout(() => {
+        checkProcessingStatus()
+      }, 3000)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || '上传失败，请检查文件格式和大小'
+      message.error(detail)
+    } finally {
+      setTimeout(() => {
+        setUploading(false)
+        setUploadProgress(0)
+      }, 1000)
+    }
     return false
   }
+
+  const checkProcessingStatus = async () => {
+    if (!selectedSpaceId || processingFiles.size === 0) return
+    try {
+      const res = await dataSpacesApi.get(selectedSpaceId)
+      const currentFiles = res.data.files || []
+      setFiles(currentFiles)
+
+      // 检查是否所有文件都有 profile 了
+      const stillProcessing = new Set<string>()
+      for (const name of processingFiles) {
+        const f = currentFiles.find((cf: FileInSpace) => cf.filename === name)
+        if (f) {
+          try {
+            const profileRes = await api.get(`/data-spaces/${selectedSpaceId}/files/${f.file_id}/profile`)
+            if (profileRes.data?.status === 'processing' || profileRes.data?.status === 'pending') {
+              stillProcessing.add(name)
+            }
+          } catch {
+            stillProcessing.add(name)
+          }
+        }
+      }
+
+      setProcessingFiles(stillProcessing)
+      if (stillProcessing.size > 0) {
+        // 继续轮询
+        pollTimerRef.current = setTimeout(checkProcessingStatus, 5000)
+      } else {
+        message.success('所有文件处理完成，数据已就绪')
+      }
+    } catch {}
+  }
+
+  // 清理轮询
+  useEffect(() => {
+    return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current) }
+  }, [])
 
   const handleDeleteFile = async (fileId: string) => {
     if (!selectedSpaceId) return
@@ -76,90 +151,172 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
       onSpaceChange(res.data.id)
       setNewSpaceName('')
       loadSpaces()
-      message.success('数据空间已创建')
+      message.success('分析项目已创建')
     } catch { message.error('创建失败') }
     finally { setCreating(false) }
+  }
+
+  // 空间概览数据
+  const totalRows = files.reduce((sum, f) => sum + (f.file_size || 0), 0)
+  const fileTypes = files.reduce((acc, f) => { acc[f.file_type] = (acc[f.file_type] || 0) + 1; return acc }, {} as Record<string, number>)
+
+  if (!selectedSpaceId) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <Card style={{ width: 420, textAlign: 'center' }}>
+          <DatabaseOutlined style={{ fontSize: 40, color: '#94a3b8', marginBottom: 16 }} />
+          <Title level={5}>创建或选择分析项目</Title>
+          <Text style={{ color: '#64748b', display: 'block', marginBottom: 16 }}>每个项目对应一组相关数据，比如"销售分析"、"客户调研"等</Text>
+          <Select
+            value={selectedSpaceId}
+            onChange={onSpaceChange}
+            placeholder="选择已有项目"
+            style={{ width: '100%', marginBottom: 12 }}
+            options={spaces.map(s => ({ label: `${s.name} (${s.file_count}文件)`, value: s.id }))}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              placeholder="或输入名称创建新项目"
+              value={newSpaceName}
+              onChange={e => setNewSpaceName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreateSpace()}
+              style={{ flex: 1, padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
+            />
+            <Button type="primary" onClick={handleCreateSpace} loading={creating}>创建</Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Title level={4} style={{ margin: 0 }}>数据管理</Title>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Select
-              value={selectedSpaceId}
-              onChange={onSpaceChange}
-              placeholder="选择数据空间"
-              style={{ width: 200 }}
-              options={spaces.map(s => ({ label: `${s.name} (${s.file_count}文件)`, value: s.id }))}
-            />
-            <Upload showUploadList={false} multiple beforeUpload={handleUpload} accept=".csv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.png,.jpg,.tsv">
-              <Button icon={<UploadOutlined />} type="primary" disabled={!selectedSpaceId}>上传文件</Button>
-            </Upload>
-          </div>
-        </div>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Select
+          value={selectedSpaceId}
+          onChange={onSpaceChange}
+          style={{ width: 200 }}
+          options={spaces.map(s => ({ label: s.name, value: s.id }))}
+        />
+        <Upload showUploadList={false} multiple beforeUpload={handleUpload} accept=".csv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.png,.jpg,.tsv">
+          <Button icon={<UploadOutlined />} type="primary">上传文件</Button>
+        </Upload>
+        <div style={{ flex: 1 }} />
+        <Tag color="green" icon={<CheckCircleOutlined />}>{files.length} 个文件</Tag>
       </div>
 
-      {!selectedSpaceId ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Card style={{ width: 400, textAlign: 'center' }}>
-            <DatabaseOutlined style={{ fontSize: 40, color: '#94a3b8', marginBottom: 16 }} />
-            <Title level={5}>创建或选择数据空间</Title>
-            <Text style={{ color: '#64748b', display: 'block', marginBottom: 16 }}>数据空间用于组织你的数据文件</Text>
-            <Space.Compact style={{ width: '100%' }}>
-              <input
-                placeholder="输入名称创建新空间"
-                value={newSpaceName}
-                onChange={e => setNewSpaceName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateSpace()}
-                style={{ flex: 1, padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '8px 0 0 8px', outline: 'none' }}
-              />
-              <Button type="primary" onClick={handleCreateSpace} loading={creating} style={{ borderRadius: '0 8px 8px 0' }}>创建</Button>
-            </Space.Compact>
-          </Card>
+      {/* Upload progress bar */}
+      {uploading && (
+        <div style={{ padding: '8px 20px', borderBottom: '1px solid #e2e8f0', background: '#f0f9ff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <LoadingOutlined style={{ color: '#1677ff' }} />
+            <Text style={{ fontSize: 12, color: '#1677ff' }}>正在上传文件...</Text>
+          </div>
+          <Progress percent={uploadProgress} size="small" strokeColor="#1677ff" showInfo={false} />
         </div>
-      ) : (
-        <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
-          <Tabs defaultActiveKey="files" items={[
-            {
-              key: 'files',
-              label: <span><FileTextOutlined /> 文件列表</span>,
-              children: (
-                <div>
-                  {files.length === 0 ? (
-                    <Empty description="暂无文件，点击上方上传" />
-                  ) : (
-                    <Table
-                      dataSource={files}
-                      rowKey="file_id"
-                      size="small"
-                      onRow={(record) => ({ onClick: () => setSelectedFileId(record.file_id), style: { cursor: 'pointer', background: selectedFileId === record.file_id ? '#f1f5f9' : undefined } })}
-                      columns={[
-                        { title: '文件名', dataIndex: 'filename', key: 'filename', render: (v: string) => <Text style={{ fontSize: 13 }}>{v}</Text> },
-                        { title: '类型', dataIndex: 'file_type', key: 'type', width: 80, render: (v: string) => <Tag>{v}</Tag> },
-                        { title: '大小', dataIndex: 'file_size', key: 'size', width: 100, render: (v: number) => <Text style={{ fontSize: 12 }}>{v > 1024*1024 ? `${(v/1024/1024).toFixed(1)}MB` : `${(v/1024).toFixed(0)}KB`}</Text> },
-                        { title: '', key: 'action', width: 50, render: (_: any, record: FileInSpace) => (
-                          <Popconfirm title="确定移除？" onConfirm={() => handleDeleteFile(record.file_id)} okText="移除" cancelText="取消">
-                            <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={e => e.stopPropagation()} />
-                          </Popconfirm>
-                        )},
-                      ]}
-                      pagination={false}
-                    />
-                  )}
+      )}
+
+      {/* Processing notification */}
+      {processingFiles.size > 0 && !uploading && (
+        <div style={{ padding: '8px 20px', borderBottom: '1px solid #e2e8f0' }}>
+          <Alert
+            type="info"
+            showIcon
+            icon={<SyncOutlined spin />}
+            message={`${processingFiles.size} 个文件正在处理中（建立索引、提取知识图谱...）`}
+            style={{ fontSize: 12 }}
+            banner
+          />
+        </div>
+      )}
+
+      {/* Main: left file list + right content */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left: file list */}
+        <div style={{ width: 240, borderRight: '1px solid #e2e8f0', background: '#fff', overflow: 'auto', flexShrink: 0 }}>
+          <div style={{ padding: '12px 12px 8px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' }}>
+            文件列表
+          </div>
+          {files.length === 0 ? (
+            <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+              暂无文件，点击上方上传
+            </div>
+          ) : (
+            files.map(f => (
+              <div
+                key={f.file_id}
+                onClick={() => setSelectedFileId(f.file_id === selectedFileId ? undefined : f.file_id)}
+                style={{
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  background: selectedFileId === f.file_id ? '#f1f5f9' : 'transparent',
+                  borderLeft: selectedFileId === f.file_id ? '3px solid #4f46e5' : '3px solid transparent',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <FileTextOutlined style={{ color: processingFiles.has(f.filename) ? '#faad14' : '#64748b', fontSize: 13 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text ellipsis style={{ fontSize: 12, display: 'block' }}>{f.filename}</Text>
+                  <Text style={{ fontSize: 10, color: '#94a3b8' }}>
+                    {processingFiles.has(f.filename) ? (
+                      <span style={{ color: '#faad14' }}><SyncOutlined spin style={{ marginRight: 3 }} />处理中...</span>
+                    ) : (
+                      <>{f.file_type} · {f.file_size > 1024*1024 ? `${(f.file_size/1024/1024).toFixed(1)}MB` : `${(f.file_size/1024).toFixed(0)}KB`}</>
+                    )}
+                  </Text>
                 </div>
-              ),
-            },
-            {
-              key: 'preview',
-              label: <span><BarChartOutlined /> 数据预览</span>,
-              children: (
-                <div>
-                  {!selectedFileId ? (
-                    <Empty description="在文件列表中点击文件查看预览" />
-                  ) : loading ? (
+                <Popconfirm title="移除？" onConfirm={(e) => { e?.stopPropagation(); handleDeleteFile(f.file_id) }} okText="移除" cancelText="取消">
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={e => e.stopPropagation()} style={{ opacity: 0.5 }} />
+                </Popconfirm>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Right: overview or file detail */}
+        <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+          {!selectedFileId ? (
+            /* Space Overview */
+            <div>
+              <Title level={5} style={{ marginBottom: 16 }}>项目概览</Title>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+                <Card size="small" style={{ minWidth: 120 }}><Statistic title="文件数" value={files.length} /></Card>
+                <Card size="small" style={{ minWidth: 120 }}><Statistic title="总大小" value={`${(totalRows / 1024 / 1024).toFixed(1)} MB`} /></Card>
+                <Card size="small" style={{ minWidth: 120 }}>
+                  <Statistic title="文件类型" value={Object.keys(fileTypes).length} suffix="种" />
+                </Card>
+              </div>
+
+              {Object.keys(fileTypes).length > 0 && (
+                <Card size="small" title="文件类型分布" style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {Object.entries(fileTypes).map(([type, count]) => (
+                      <Tag key={type} color="blue">{type}: {count}</Tag>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <Card size="small" title="知识图谱" style={{ marginBottom: 16 }}>
+                <div style={{ height: 250 }}>
+                  <GraphViewer spaceId={selectedSpaceId} />
+                </div>
+              </Card>
+            </div>
+          ) : (
+            /* File Detail */
+            <div>
+              <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FileTextOutlined style={{ color: '#4f46e5' }} />
+                <Title level={5} style={{ margin: 0 }}>{files.find(f => f.file_id === selectedFileId)?.filename}</Title>
+              </div>
+              <Tabs defaultActiveKey="preview" size="small" items={[
+                {
+                  key: 'preview',
+                  label: <span><BarChartOutlined /> 预览</span>,
+                  children: loading ? (
                     <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
                   ) : preview?.type === 'table' ? (
                     <Table
@@ -169,90 +326,73 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
                         return obj
                       })}
                       columns={preview.columns?.map((col: any) => ({ title: col.name, dataIndex: col.name, key: col.name, width: 120, ellipsis: true, render: (v: string) => <span style={{ fontSize: 12 }}>{v}</span> }))}
-                      rowKey="_key"
-                      size="small"
-                      scroll={{ x: (preview.columns?.length || 1) * 120 }}
+                      rowKey="_key" size="small" scroll={{ x: (preview.columns?.length || 1) * 120 }}
                       pagination={{ pageSize: 50, size: 'small' }}
                     />
-                  ) : preview?.type === 'database' ? (
-                    <div>
-                      <Text style={{ fontSize: 13, color: '#64748b', marginBottom: 8, display: 'block' }}>SQLite 数据库 · 表: {preview.tables?.join(', ')}</Text>
-                      <Table
-                        dataSource={preview.rows?.map((row: string[], i: number) => {
-                          const obj: Record<string, string> = { _key: String(i) }
-                          preview.columns?.forEach((col: any, j: number) => { obj[col.name] = row[j] })
-                          return obj
-                        })}
-                        columns={preview.columns?.map((col: any) => ({ title: col.name, dataIndex: col.name, key: col.name, width: 120, ellipsis: true }))}
-                        rowKey="_key" size="small" scroll={{ x: (preview.columns?.length || 1) * 120 }}
-                      />
-                    </div>
                   ) : preview?.type === 'text' ? (
-                    <pre style={{ padding: 16, fontSize: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 500, overflow: 'auto' }}>{preview.content}</pre>
+                    <pre style={{ padding: 16, fontSize: 12, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, maxHeight: 400, overflow: 'auto' }}>{preview.content}</pre>
                   ) : (
-                    <Empty description="不支持预览此文件类型" />
-                  )}
-                </div>
-              ),
-            },
-            {
-              key: 'quality',
-              label: <span><DatabaseOutlined /> 数据质量</span>,
-              children: (
-                <div>
-                  {!profile ? (
-                    <Empty description="选择文件查看数据质量报告" />
-                  ) : (
+                    <Empty description="不支持预览" />
+                  ),
+                },
+                {
+                  key: 'quality',
+                  label: <span><DatabaseOutlined /> 质量</span>,
+                  children: !profile ? <Empty description="无质量数据" /> : (
                     <div>
                       {profile.quality && (
-                        <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-                          <Card size="small"><Statistic title="总行数" value={profile.row_count || 0} /></Card>
-                          <Card size="small"><Statistic title="完整行" value={`${profile.quality.complete_pct || 0}%`} /></Card>
-                          <Card size="small"><Statistic title="重复行" value={`${profile.quality.duplicate_pct || 0}%`} valueStyle={{ color: (profile.quality.duplicate_pct || 0) > 5 ? '#ef4444' : '#10b981' }} /></Card>
+                        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                          <Card size="small"><Statistic title="行数" value={profile.row_count || 0} /></Card>
+                          <Card size="small"><Statistic title="完整率" value={`${profile.quality.complete_pct || 0}%`} valueStyle={{ color: '#10b981' }} /></Card>
+                          <Card size="small"><Statistic title="重复率" value={`${profile.quality.duplicate_pct || 0}%`} valueStyle={{ color: (profile.quality.duplicate_pct || 0) > 5 ? '#ef4444' : '#10b981' }} /></Card>
                         </div>
                       )}
-                      {profile.quality?.outlier_columns?.length > 0 && (
-                        <Card size="small" title="异常值检测" style={{ marginBottom: 16 }}>
-                          {profile.quality.outlier_columns.map((o: any) => (
-                            <div key={o.column} style={{ fontSize: 13, marginBottom: 4 }}>
-                              <Tag color="orange">{o.column}</Tag> {o.outlier_count} 个异常值 ({o.outlier_pct}%)
-                            </div>
-                          ))}
-                        </Card>
-                      )}
-                      {profile.quality?.type_suggestions?.length > 0 && (
-                        <Card size="small" title="类型建议">
-                          {profile.quality.type_suggestions.map((s: any) => (
-                            <div key={s.column} style={{ fontSize: 13, marginBottom: 4 }}>
-                              <Tag color="blue">{s.column}</Tag> {s.suggestion}
-                            </div>
-                          ))}
-                        </Card>
-                      )}
                       {profile.columns && (
-                        <Card size="small" title="列详情" style={{ marginTop: 16 }}>
-                          <Table
-                            dataSource={profile.columns}
-                            rowKey="name"
-                            size="small"
-                            pagination={false}
-                            columns={[
-                              { title: '列名', dataIndex: 'name', key: 'name' },
-                              { title: '类型', dataIndex: 'dtype', key: 'dtype', width: 80 },
-                              { title: '缺失率', dataIndex: 'null_pct', key: 'null', width: 80, render: (v: number) => <span style={{ color: v > 20 ? '#ef4444' : '#475569' }}>{v}%</span> },
-                              { title: '唯一值', dataIndex: 'unique_count', key: 'unique', width: 80 },
-                            ]}
-                          />
-                        </Card>
+                        <Table
+                          dataSource={profile.columns}
+                          rowKey="name" size="small" pagination={false}
+                          columns={[
+                            { title: '列名', dataIndex: 'name' },
+                            { title: '类型', dataIndex: 'dtype', width: 80 },
+                            { title: '缺失%', dataIndex: 'null_pct', width: 70, render: (v: number) => <span style={{ color: v > 20 ? '#ef4444' : '#475569' }}>{v}%</span> },
+                            { title: '唯一值', dataIndex: 'unique_count', width: 70 },
+                          ]}
+                        />
                       )}
                     </div>
-                  )}
-                </div>
-              ),
-            },
-          ]} />
+                  ),
+                },
+                {
+                  key: 'graph',
+                  label: <span><NodeIndexOutlined /> 图谱</span>,
+                  children: <div style={{ height: 300 }}><GraphViewer spaceId={selectedSpaceId} /></div>,
+                },
+              ]} />
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Bottom CTA */}
+      <div style={{
+        padding: '12px 20px',
+        borderTop: '1px solid #e2e8f0',
+        background: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <Text style={{ fontSize: 13, color: '#64748b' }}>
+          {processingFiles.size > 0
+            ? `${processingFiles.size} 个文件处理中，完成后即可分析...`
+            : files.length > 0
+              ? '数据已就绪，可以开始分析'
+              : '上传数据后即可与 Agent 对话'}
+        </Text>
+        <Button type="primary" icon={<MessageOutlined />} onClick={onStartChat} disabled={files.length === 0 || processingFiles.size > 0}>
+          {processingFiles.size > 0 ? '处理中...' : '开始对话分析'}
+        </Button>
+      </div>
     </div>
   )
 }

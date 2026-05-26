@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
-import { modelsApi, ModelInfo } from '@/api/models'
+import { settingsApi, ModelOption } from '@/api/settings'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
 import MessageContent from '@/components/Chat/MessageContent'
@@ -31,7 +31,7 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
   } = useChatStore()
 
   const [spaces, setSpaces] = useState<DataSpace[]>([])
-  const [models, setModels] = useState<ModelInfo[]>([])
+  const [models, setModels] = useState<ModelOption[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -49,7 +49,7 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
   const loadSpaces = async () => { try { setSpaces((await dataSpacesApi.list()).data) } catch {} }
   const loadModels = async () => {
     try {
-      const res = await modelsApi.listAvailable()
+      const res = await settingsApi.listModels()
       setModels(res.data)
       if (res.data.length > 0 && !selectedModel) setSelectedModel(res.data[0].id)
     } catch {}
@@ -143,21 +143,51 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
       {/* Top bar */}
       <div style={{ padding: '10px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Select
-            value={selectedSpaceId}
-            placeholder="选择数据空间（必选）"
-            style={{ width: 180 }}
-            status={!selectedSpaceId ? 'warning' : undefined}
-            options={spaces.map(s => ({ label: s.name, value: s.id }))}
-            onChange={() => {}}
-            disabled
-          />
+          {/* Data space summary */}
+          {selectedSpaceId ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '4px 12px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0',
+            }}>
+              <span style={{ fontSize: 13 }}>📊</span>
+              <span style={{ fontSize: 12, color: '#166534', fontWeight: 500 }}>
+                {spaces.find(s => s.id === selectedSpaceId)?.name || '分析项目'}
+              </span>
+              <span style={{ fontSize: 11, color: '#4ade80' }}>·</span>
+              <span style={{ fontSize: 11, color: '#15803d' }}>
+                {spaces.find(s => s.id === selectedSpaceId)?.file_count || 0} 个文件
+              </span>
+              <span style={{ fontSize: 11, color: '#16a34a' }}>✓ 就绪</span>
+            </div>
+          ) : (
+            <div style={{
+              padding: '4px 12px', borderRadius: 6, background: '#fef3c7', border: '1px solid #fde68a',
+              fontSize: 12, color: '#92400e',
+            }}>
+              ⚠️ 请先在左侧选择一个分析项目
+            </div>
+          )}
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
-            placeholder="模型"
-            style={{ width: 160 }}
-            options={models.map(m => ({ label: m.display_name, value: m.id }))}
+            placeholder="选择模型"
+            style={{ width: 200 }}
+            options={[
+              {
+                label: '平台模型（消耗额度）',
+                options: models.filter(m => m.source === 'platform').map(m => ({
+                  label: `${m.display_name} (${m.credit_multiplier}x)`,
+                  value: m.id,
+                })),
+              },
+              ...(models.some(m => m.source === 'user') ? [{
+                label: '我的模型（免费）',
+                options: models.filter(m => m.source === 'user').map(m => ({
+                  label: m.display_name,
+                  value: m.id,
+                })),
+              }] : []),
+            ]}
           />
         </div>
         <ExportButton conversationId={conversationId} />
