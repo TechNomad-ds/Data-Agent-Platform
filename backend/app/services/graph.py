@@ -120,16 +120,31 @@ class GraphService:
         if not text.strip():
             return {"triples": [], "added": 0}
 
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         prompt = TRIPLE_EXTRACTION_PROMPT.format(text=text[:5000], max_triples=max_triples)
 
         try:
-            response = await client.messages.create(
-                model=settings.anthropic_model,
-                max_tokens=2048,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = response.content[0].text.strip()
+            if settings.llm_backend == "openai" and settings.openai_api_base:
+                import httpx
+                resp = await httpx.AsyncClient(timeout=60).post(
+                    f"{settings.openai_api_base}/chat/completions",
+                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                    json={
+                        "model": settings.openai_model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 2048,
+                        "temperature": 0,
+                    },
+                )
+                resp.raise_for_status()
+                raw = resp.json()["choices"][0]["message"]["content"].strip()
+            else:
+                client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+                response = await client.messages.create(
+                    model=settings.anthropic_model,
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                raw = response.content[0].text.strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
             triples = json.loads(raw)

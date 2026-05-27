@@ -17,6 +17,7 @@ export interface GraphExport {
   nodes: GraphNode[]
   edges: GraphEdge[]
   stats: { nodes: number; edges: number; connected_components: number }
+  building?: boolean
 }
 
 export interface GraphSearchResult {
@@ -45,4 +46,9 @@ export const graphApi = {
 
   getExport: (spaceId: string) =>
     api.get<GraphExport>(`/data-spaces/${spaceId}/graph/export`),
+
+  buildGraph: (spaceId: string) =>
+    api.post<{ status: string; message: string; file_count?: number }>(
+      `/data-spaces/${spaceId}/graph/build`
+    ),
 }

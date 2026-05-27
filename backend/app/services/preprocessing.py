@@ -198,7 +198,7 @@ def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
 async def _profile_text(
     file_path: Path, file_id: str, data_space_id: str, filename: str
 ) -> Dict[str, Any]:
-    """生成文本文件画像并建立向量索引 + 知识图谱抽取"""
+    """生成文本文件画像并建立向量索引（图谱抽取延迟到用户查看时触发）"""
     content = file_path.read_text(encoding="utf-8", errors="ignore")
     lines = content.split("\n")
 
@@ -212,26 +212,12 @@ async def _profile_text(
     except Exception:
         pass
 
-    # 知识图谱三元组抽取
-    graph_triples_count = 0
-    if settings.graph_auto_extract and len(content) > 100:
-        try:
-            from app.services.graph import GraphService
-            user_id = file_path.parts[-3] if len(file_path.parts) > 3 else "unknown"
-            gs = GraphService(user_id, data_space_id)
-            result = await gs.extract_triples_from_text(
-                content[:5000], max_triples=settings.graph_max_triples_per_file
-            )
-            graph_triples_count = result.get("added", 0)
-        except Exception:
-            pass
-
     return {
         "char_count": len(content),
         "line_count": len(lines),
         "word_count": len(content.split()),
         "chunk_count": chunk_count,
-        "graph_triples_count": graph_triples_count,
+        "graph_status": "pending",
         "bm25_indexed": True,
         "preview": content[:500],
     }
@@ -240,7 +226,7 @@ async def _profile_text(
 async def _profile_document(
     file_path: Path, ext: str, file_id: str, data_space_id: str, filename: str
 ) -> Dict[str, Any]:
-    """生成 PDF/DOCX 文件画像 + 知识图谱抽取"""
+    """生成 PDF/DOCX 文件画像（图谱抽取延迟到用户查看时触发）"""
     text = ""
     page_count = 0
 
@@ -274,25 +260,11 @@ async def _profile_document(
     except Exception:
         pass
 
-    # 知识图谱三元组抽取
-    graph_triples_count = 0
-    if settings.graph_auto_extract and len(text) > 100:
-        try:
-            from app.services.graph import GraphService
-            user_id = file_path.parts[-3] if len(file_path.parts) > 3 else "unknown"
-            gs = GraphService(user_id, data_space_id)
-            result = await gs.extract_triples_from_text(
-                text[:5000], max_triples=settings.graph_max_triples_per_file
-            )
-            graph_triples_count = result.get("added", 0)
-        except Exception:
-            pass
-
     return {
         "char_count": len(text),
         "page_count": page_count,
         "chunk_count": chunk_count,
-        "graph_triples_count": graph_triples_count,
+        "graph_status": "pending",
         "bm25_indexed": True,
         "preview": text[:500],
     }
