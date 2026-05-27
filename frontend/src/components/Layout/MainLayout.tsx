@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { dataSpacesApi } from '@/api/dataSpaces'
+import { chatApi } from '@/api/chat'
 import Sidebar from '@/components/Sidebar/Sidebar'
 import ChatView from '@/components/Chat/ChatView'
 import DataManager from '@/components/DataManager/DataManager'
@@ -15,6 +16,7 @@ export default function MainLayout() {
   const [currentConvId, setCurrentConvId] = useState<string | undefined>()
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [checkingSpaces, setCheckingSpaces] = useState(true)
+  const [spaceLockedByConversation, setSpaceLockedByConversation] = useState(false)
   const { user, fetchUser } = useAuthStore()
 
   useEffect(() => {
@@ -45,13 +47,29 @@ export default function MainLayout() {
 
   const handleNewChat = useCallback(() => {
     setCurrentConvId(undefined)
+    setSpaceLockedByConversation(false)
     setCurrentView('chat')
   }, [])
 
-  const handleSelectConversation = useCallback((id: string) => {
+  const handleSelectConversation = useCallback(async (id: string) => {
     setCurrentConvId(id)
     setCurrentView('chat')
+    try {
+      const res = await chatApi.getConversation(id)
+      if (res.data.data_space_id) {
+        setSelectedSpaceId(res.data.data_space_id)
+      }
+      setSpaceLockedByConversation(true)
+    } catch {
+      setSpaceLockedByConversation(true)
+    }
   }, [])
+
+  const handleSpaceChange = useCallback((id: string | undefined) => {
+    if (!spaceLockedByConversation) {
+      setSelectedSpaceId(id)
+    }
+  }, [spaceLockedByConversation])
 
   const handleOpenDataManager = useCallback(() => {
     setCurrentView('data')
@@ -61,8 +79,14 @@ export default function MainLayout() {
     setCurrentView('settings')
   }, [])
 
+  const handleConversationCreated = useCallback((id: string) => {
+    setCurrentConvId(id)
+    setSpaceLockedByConversation(true)
+  }, [])
+
   const handleStartChat = useCallback(() => {
     setCurrentConvId(undefined)
+    setSpaceLockedByConversation(false)
     setCurrentView('chat')
   }, [])
 
@@ -77,8 +101,6 @@ export default function MainLayout() {
       ) : (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
           <Sidebar
-            selectedSpaceId={selectedSpaceId}
-            onSpaceChange={setSelectedSpaceId}
             currentConvId={currentConvId}
             onNewChat={handleNewChat}
             onSelectConversation={handleSelectConversation}
@@ -92,7 +114,9 @@ export default function MainLayout() {
               <ChatView
                 selectedSpaceId={selectedSpaceId}
                 conversationId={currentConvId}
-                onConversationCreated={setCurrentConvId}
+                onConversationCreated={handleConversationCreated}
+                onSpaceChange={handleSpaceChange}
+                spaceLockedByConversation={spaceLockedByConversation}
               />
             ) : currentView === 'data' ? (
               <DataManager

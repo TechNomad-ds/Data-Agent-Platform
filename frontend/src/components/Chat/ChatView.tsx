@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Input, Button, Select, Typography, Spin, message, Alert } from 'antd'
-import { SendOutlined, RobotOutlined, StopOutlined } from '@ant-design/icons'
+import { Input, Button, Select, Typography, Spin, message } from 'antd'
+import { SendOutlined, RobotOutlined, StopOutlined, LockOutlined, DatabaseOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
@@ -16,13 +16,30 @@ import api from '@/api/client'
 const { Text } = Typography
 const { TextArea } = Input
 
+const FALLBACK_MODELS: ModelOption[] = [
+  { id: 'deepseek-v4-flash', display_name: 'DeepSeek V4 Flash', model_name: 'deepseek-v4-flash', provider: 'deepseek', source: 'platform', credit_multiplier: 1.0 },
+  { id: 'qwen3.5-flash', display_name: 'Qwen 3.5 Flash', model_name: 'qwen3.5-flash', provider: 'qwen', source: 'platform', credit_multiplier: 1.5 },
+  { id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5', model_name: 'claude-haiku-4-5-20251001', provider: 'anthropic', source: 'platform', credit_multiplier: 3.0 },
+  { id: 'gpt-4o-mini', display_name: 'GPT-4o Mini', model_name: 'gpt-4o-mini', provider: 'openai', source: 'platform', credit_multiplier: 2.0 },
+  { id: 'deepseek-r1', display_name: 'DeepSeek R1', model_name: 'deepseek-r1', provider: 'deepseek', source: 'platform', credit_multiplier: 2.0 },
+]
+
+const DEFAULT_SUGGESTIONS = [
+  '这份数据有哪些字段，各自是什么含义？',
+  '数据整体质量如何，有没有缺失或异常值？',
+  '帮我做一个关键指标的统计摘要',
+  '数据中有哪些值得关注的趋势或规律？',
+]
+
 interface Props {
   selectedSpaceId: string | undefined
   conversationId: string | undefined
   onConversationCreated: (id: string) => void
+  onSpaceChange: (id: string | undefined) => void
+  spaceLockedByConversation?: boolean
 }
 
-export default function ChatView({ selectedSpaceId, conversationId, onConversationCreated }: Props) {
+export default function ChatView({ selectedSpaceId, conversationId, onConversationCreated, onSpaceChange, spaceLockedByConversation = false }: Props) {
   const {
     setCurrentConversation,
     messages, setMessages, segments, thinkingText,
@@ -50,9 +67,13 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
   const loadModels = async () => {
     try {
       const res = await settingsApi.listModels()
-      setModels(res.data)
-      if (res.data.length > 0 && !selectedModel) setSelectedModel(res.data[0].id)
-    } catch {}
+      const available = res.data.length > 0 ? res.data : FALLBACK_MODELS
+      setModels(available)
+      if (available.length > 0 && !selectedModel) setSelectedModel(available[0].id)
+    } catch {
+      setModels(FALLBACK_MODELS)
+      if (!selectedModel) setSelectedModel(FALLBACK_MODELS[0].id)
+    }
   }
   const loadConversation = async (id: string) => {
     try {
@@ -65,8 +86,9 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
   const loadSuggestions = async () => {
     try {
       const res = await api.get(`/data-spaces/${selectedSpaceId}/suggestions`)
-      setSuggestions(res.data.suggestions || [])
-    } catch { setSuggestions([]) }
+      const items = res.data.suggestions || []
+      setSuggestions(items.length > 0 ? items : DEFAULT_SUGGESTIONS)
+    } catch { setSuggestions(DEFAULT_SUGGESTIONS) }
   }
 
   const parseSSELine = useCallback((line: string) => {
@@ -111,7 +133,7 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
     setAbortController(controller)
 
     try {
-      const response = await chatApi.sendMessage(convId, content, controller.signal)
+      const response = await chatApi.sendMessage(convId, content, controller.signal, selectedModel)
       if (!response.ok) { if (response.status === 401) { useAuthStore.getState().logout() }; throw new Error() }
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
@@ -143,45 +165,45 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
       {/* Top bar */}
       <div style={{ padding: '10px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Data space summary */}
-          {selectedSpaceId ? (
+          {spaceLockedByConversation && selectedSpaceId ? (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '4px 12px', borderRadius: 6, background: '#f0fdf4', border: '1px solid #bbf7d0',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', borderRadius: 6, background: '#f1f5f9', border: '1px solid #e2e8f0',
             }}>
-              <span style={{ fontSize: 13 }}>📊</span>
-              <span style={{ fontSize: 12, color: '#166534', fontWeight: 500 }}>
-                {spaces.find(s => s.id === selectedSpaceId)?.name || '分析项目'}
+              <DatabaseOutlined style={{ fontSize: 12, color: '#64748b' }} />
+              <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                {spaces.find(s => s.id === selectedSpaceId)?.name || '数据空间'}
               </span>
-              <span style={{ fontSize: 11, color: '#4ade80' }}>·</span>
-              <span style={{ fontSize: 11, color: '#15803d' }}>
-                {spaces.find(s => s.id === selectedSpaceId)?.file_count || 0} 个文件
-              </span>
-              <span style={{ fontSize: 11, color: '#16a34a' }}>✓ 就绪</span>
+              <LockOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
             </div>
           ) : (
-            <div style={{
-              padding: '4px 12px', borderRadius: 6, background: '#fef3c7', border: '1px solid #fde68a',
-              fontSize: 12, color: '#92400e',
-            }}>
-              ⚠️ 请先在左侧选择一个分析项目
-            </div>
+            <Select
+              value={selectedSpaceId}
+              onChange={onSpaceChange}
+              placeholder="选择数据空间"
+              style={{ width: 180 }}
+              popupMatchSelectWidth={false}
+              options={spaces.map(s => ({
+                label: s.name,
+                value: s.id,
+              }))}
+            />
           )}
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
             placeholder="选择模型"
-            style={{ width: 200 }}
+            style={{ width: 180 }}
             options={[
               {
-                label: '平台模型（消耗额度）',
+                label: '平台模型',
                 options: models.filter(m => m.source === 'platform').map(m => ({
-                  label: `${m.display_name} (${m.credit_multiplier}x)`,
+                  label: m.display_name,
                   value: m.id,
                 })),
               },
               ...(models.some(m => m.source === 'user') ? [{
-                label: '我的模型（免费）',
+                label: '我的模型',
                 options: models.filter(m => m.source === 'user').map(m => ({
                   label: m.display_name,
                   value: m.id,
@@ -193,33 +215,82 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
         <ExportButton conversationId={conversationId} />
       </div>
 
-      {!selectedSpaceId && (
-        <Alert message="请在左侧选择或创建数据空间后开始对话" type="warning" showIcon style={{ margin: '12px 24px 0', borderRadius: 8 }} />
-      )}
-
       {/* Messages */}
       <div style={{ flex: 1, overflow: 'auto', padding: '24px 0' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
           {messages.length === 0 && !isStreaming ? (
-            <div style={{ textAlign: 'center', paddingTop: 100 }}>
-              <div style={{ width: 64, height: 64, borderRadius: 16, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                <RobotOutlined style={{ fontSize: 28, color: '#fff' }} />
+            <div style={{ textAlign: 'center', paddingTop: 80 }}>
+              <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <RobotOutlined style={{ fontSize: 24, color: '#fff' }} />
               </div>
-              <Text style={{ fontSize: 18, fontWeight: 600, color: '#1e293b', display: 'block', marginBottom: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: 600, color: '#1e293b', display: 'block', marginBottom: 4 }}>
                 有什么可以帮你分析的？
               </Text>
-              <Text style={{ fontSize: 13, color: '#94a3b8' }}>
-                {selectedSpaceId ? '基于你的数据，试试下面的问题' : '选择数据空间后开始对话'}
+              <Text style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 28 }}>
+                {selectedSpaceId ? '基于你的数据，试试下面的问题' : '选择一个数据空间开始'}
               </Text>
-              {suggestions.length > 0 && (
-                <div style={{ marginTop: 24, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 550, margin: '24px auto 0' }}>
-                  {suggestions.map(q => (
-                    <Button key={q} size="small" onClick={() => setInputValue(q)} style={{ borderRadius: 16, fontSize: 12, padding: '2px 14px', color: '#475569' }}>
-                      {q}
-                    </Button>
+
+              {!selectedSpaceId && spaces.length > 0 ? (
+                <div style={{ maxWidth: 400, margin: '0 auto' }}>
+                  {spaces.slice(0, 4).map(s => (
+                    <div
+                      key={s.id}
+                      onClick={() => onSpaceChange(s.id)}
+                      style={{
+                        padding: '12px 16px', borderRadius: 10, marginBottom: 8,
+                        border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#a5b4fc'; e.currentTarget.style.background = '#f8faff' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff' }}
+                    >
+                      <DatabaseOutlined style={{ fontSize: 16, color: '#4f46e5' }} />
+                      <div>
+                        <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{s.name}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{s.file_count} 个文件</div>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              )}
+              ) : suggestions.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 12,
+                  maxWidth: 560,
+                  margin: '0 auto',
+                }}>
+                  {suggestions.slice(0, 4).map(q => (
+                    <div
+                      key={q}
+                      onClick={() => setInputValue(q)}
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: 10,
+                        border: '1px solid #e2e8f0',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 13,
+                        color: '#334155',
+                        lineHeight: 1.5,
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = '#a5b4fc'
+                        e.currentTarget.style.background = '#f8faff'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#fff'
+                      }}
+                    >
+                      {q}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : (
             <>
@@ -254,7 +325,7 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
           <TextArea
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
-            placeholder={selectedSpaceId ? '输入你的问题...' : '请先选择数据空间'}
+            placeholder={selectedSpaceId ? '输入你的问题...  Enter 发送，Shift+Enter 换行' : '请先选择数据空间'}
             autoSize={{ minRows: 1, maxRows: 5 }}
             onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); handleSend() } }}
             disabled={isStreaming || !selectedSpaceId}

@@ -141,6 +141,10 @@ async def send_message(
     if not conv.title:
         conv.title = data.content[:50]
 
+    # 如果前端传了 model_id，更新对话使用的模型
+    if data.model_id and data.model_id != conv.model_id:
+        conv.model_id = data.model_id
+
     await db.commit()
 
     # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）

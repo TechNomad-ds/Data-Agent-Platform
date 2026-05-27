@@ -46,7 +46,7 @@ export const chatApi = {
     api.post<Conversation>('/chat/conversations', data),
   deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
 
-  sendMessage: async (conversationId: string, content: string, signal?: AbortSignal): Promise<Response> => {
+  sendMessage: async (conversationId: string, content: string, signal?: AbortSignal, modelId?: string): Promise<Response> => {
     const token = await getValidToken()
     const url = `/api/chat/conversations/${conversationId}/messages`
     return fetch(url, {
@@ -55,7 +55,7 @@ export const chatApi = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, model_id: modelId }),
       signal,
     })
   },

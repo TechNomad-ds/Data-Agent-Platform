@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Select, Table, Typography, Spin, Empty, Tag, Statistic, Button, Tooltip, Upload, Popconfirm, message, Tabs } from 'antd'
-import { FileTextOutlined, CloseOutlined, DatabaseOutlined, UploadOutlined, DeleteOutlined, NodeIndexOutlined, SafetyOutlined } from '@ant-design/icons'
+import { FileTextOutlined, CloseOutlined, DatabaseOutlined, UploadOutlined, DeleteOutlined, SafetyOutlined } from '@ant-design/icons'
 import { dataSpacesApi, FileInSpace } from '@/api/dataSpaces'
 import api from '@/api/client'
-import GraphViewer from '@/components/Graph/GraphViewer'
 
 const { Text } = Typography
 
@@ -284,11 +283,6 @@ export default function DataPanel({ spaceId, visible, onClose }: Props) {
                 )}
               </div>
             ),
-          },
-          {
-            key: 'graph',
-            label: <span><NodeIndexOutlined /> 知识图谱</span>,
-            children: <GraphViewer spaceId={spaceId} />,
           },
           {
             key: 'quality',

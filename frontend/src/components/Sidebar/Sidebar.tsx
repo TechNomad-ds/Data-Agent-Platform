@@ -11,9 +11,20 @@ import { MainView } from '@/components/Layout/MainLayout'
 
 const { Text } = Typography
 
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const now = Date.now()
+    const d = new Date(dateStr).getTime()
+    const diff = Math.floor((now - d) / 1000)
+    if (diff < 60) return '刚刚'
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
+    if (diff < 172800) return '昨天'
+    return `${Math.floor(diff / 86400)}天前`
+  } catch { return '' }
+}
+
 interface Props {
-  selectedSpaceId: string | undefined
-  onSpaceChange: (id: string | undefined) => void
   currentConvId: string | undefined
   onNewChat: () => void
   onSelectConversation: (id: string) => void
@@ -40,7 +51,7 @@ export default function Sidebar({
   useEffect(() => {
     loadConversations()
     loadSpaces()
-  }, [])
+  }, [currentConvId])
 
   const loadConversations = async () => {
     try {
@@ -58,13 +69,14 @@ export default function Sidebar({
 
   // Group conversations by data space
   const grouped: GroupedConversations[] = (() => {
-    const filtered = searchText
+    const filtered = (searchText
       ? conversations.filter(c => (c.title || '').toLowerCase().includes(searchText.toLowerCase()))
       : conversations
+    ).filter(c => c.data_space_id)
 
     const map = new Map<string, Conversation[]>()
     for (const conv of filtered) {
-      const key = conv.data_space_id || '_none'
+      const key = conv.data_space_id!
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(conv)
     }
@@ -74,7 +86,7 @@ export default function Sidebar({
       const space = spaces.find(s => s.id === spaceId)
       result.push({
         spaceId,
-        spaceName: space?.name || '未关联项目',
+        spaceName: space?.name || '未知空间',
         conversations: convs.slice(0, 10),
       })
     }
@@ -193,6 +205,9 @@ export default function Sidebar({
                     }}
                   >
                     {conv.title || '新对话'}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#cbd5e1', flexShrink: 0 }}>
+                    {formatRelativeTime(conv.updated_at)}
                   </Text>
                 </div>
               ))}

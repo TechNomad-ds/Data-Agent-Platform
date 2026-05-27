@@ -1,5 +1,6 @@
-import { Typography } from 'antd'
-import { UserOutlined, RobotOutlined } from '@ant-design/icons'
+import { useState } from 'react'
+import { Typography, message as antMessage } from 'antd'
+import { UserOutlined, RobotOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -7,6 +8,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
 import ChartMessage from '@/components/Charts/ChartMessage'
+import { colors, radius } from '@/styles/tokens'
 
 const { Text } = Typography
 
@@ -14,13 +16,36 @@ interface MessageContentProps {
   message: Message
 }
 
+function formatTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  } catch { return '' }
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    antMessage.success('已复制')
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <span
+      onClick={handleCopy}
+      style={{ cursor: 'pointer', color: colors.textMuted, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3 }}
+      onMouseEnter={e => (e.currentTarget.style.color = colors.primary)}
+      onMouseLeave={e => (e.currentTarget.style.color = colors.textMuted)}
+    >
+      {copied ? <CheckOutlined /> : <CopyOutlined />}
+    </span>
+  )
+}
+
 function MarkdownBlock({ content }: { content: string }) {
   const parts = content.split(/```chart\n([\s\S]*?)```/)
-
-  if (parts.length === 1) {
-    return <MarkdownRaw content={content} />
-  }
-
+  if (parts.length === 1) return <MarkdownRaw content={content} />
   return (
     <>
       {parts.map((part, i) =>
@@ -43,94 +68,65 @@ function MarkdownRaw({ content }: { content: string }) {
             const codeString = String(children).replace(/\n$/, '')
             if (match || codeString.includes('\n')) {
               return (
-                <SyntaxHighlighter
-                  style={oneDark}
-                  language={match?.[1] || 'text'}
-                  PreTag="div"
-                  customStyle={{ borderRadius: 8, fontSize: 13, margin: '8px 0' }}
-                >
+                <SyntaxHighlighter style={oneDark} language={match?.[1] || 'text'} PreTag="div" customStyle={{ borderRadius: 8, fontSize: 13, margin: '8px 0' }}>
                   {codeString}
                 </SyntaxHighlighter>
               )
             }
-            return (
-              <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 13, color: '#7c3aed' }} {...props}>
-                {children}
-              </code>
-            )
+            return <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 13, color: '#7c3aed' }} {...props}>{children}</code>
           },
         }}
-      >
-        {content}
-      </ReactMarkdown>
+      >{content}</ReactMarkdown>
     </div>
   )
 }
 
-function hasSegmentsStructure(toolCalls: any[] | null): boolean {
+function hasSegments(toolCalls: any[] | null): boolean {
   if (!toolCalls || toolCalls.length === 0) return false
   return toolCalls[0]?.type === 'text' || toolCalls[0]?.type === 'tools'
 }
 
 export default function MessageContent({ message }: MessageContentProps) {
   const isUser = message.role === 'user'
-  const segments = hasSegmentsStructure(message.tool_calls) ? message.tool_calls! : null
+  const segments = hasSegments(message.tool_calls) ? message.tool_calls! : null
+  const textContent = segments
+    ? segments.filter((s: any) => s.type === 'text').map((s: any) => s.content || '').join('')
+    : (message.content || '')
 
   return (
-    <div style={{ display: 'flex', gap: 12, flexDirection: isUser ? 'row-reverse' : 'row' }}>
+    <div style={{ display: 'flex', gap: 12, flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 8,
+        width: 30, height: 30, borderRadius: radius.md,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: isUser
-          ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
-          : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-        color: '#fff', flexShrink: 0, fontSize: 13,
+        background: isUser ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : `linear-gradient(135deg, ${colors.primary}, #7c3aed)`,
+        color: '#fff', flexShrink: 0, fontSize: 12,
       }}>
         {isUser ? <UserOutlined /> : <RobotOutlined />}
       </div>
-      <div style={{ maxWidth: '100%', minWidth: 0 }}>
+      <div style={{ maxWidth: '80%', minWidth: 0 }}>
         {isUser ? (
-          <div style={{
-            padding: '10px 14px', borderRadius: '12px 12px 4px 12px',
-            background: '#e2e8f0', color: '#1e293b',
-          }}>
-            <Text style={{ color: '#1e293b', whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.content}</Text>
+          <div style={{ padding: '10px 14px', borderRadius: '14px 14px 4px 14px', background: colors.userBubble, border: `1px solid ${colors.aiBorder}` }}>
+            <Text style={{ color: colors.textPrimary, whiteSpace: 'pre-wrap', fontSize: 14 }}>{message.content}</Text>
           </div>
         ) : segments ? (
           <div>
-            {segments.map((seg: any, i: number) => (
-              seg.type === 'text' ? (
-                <div key={i} style={{
-                  padding: '10px 14px', borderRadius: 10, marginBottom: 8,
-                  background: '#ffffff', border: '1px solid #e2e8f0',
-                }}>
-                  <MarkdownBlock content={seg.content || ''} />
-                </div>
-              ) : (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <ThinkingBlock toolEvents={seg.events || []} defaultExpanded={false} />
-                </div>
-              )
-            ))}
-            {message.credits_used && (
-              <div style={{ textAlign: 'right', marginTop: 2 }}>
-                <Text style={{ fontSize: 11, color: '#94a3b8' }}>消耗 {message.credits_used} 点</Text>
+            {segments.map((seg: any, i: number) => seg.type === 'text' ? (
+              <div key={i} style={{ padding: '12px 16px', borderRadius: radius.lg, marginBottom: 8, background: colors.surface, borderLeft: `3px solid ${colors.primary}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <MarkdownBlock content={seg.content || ''} />
               </div>
-            )}
+            ) : (
+              <div key={i} style={{ marginBottom: 8 }}><ThinkingBlock toolEvents={seg.events || []} defaultExpanded={false} /></div>
+            ))}
           </div>
         ) : (
-          <div style={{
-            padding: '10px 14px', borderRadius: '12px 12px 12px 4px',
-            background: '#ffffff', border: '1px solid #e2e8f0',
-          }}>
+          <div style={{ padding: '12px 16px', borderRadius: '4px 14px 14px 14px', background: colors.surface, borderLeft: `3px solid ${colors.primary}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <MarkdownBlock content={message.content || ''} />
-            {message.credits_used && (
-              <div style={{ marginTop: 6, textAlign: 'right' }}>
-                <Text style={{ fontSize: 11, color: '#94a3b8' }}>消耗 {message.credits_used} 点</Text>
-              </div>
-            )}
           </div>
         )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, justifyContent: isUser ? 'flex-end' : 'flex-start', padding: '0 4px' }}>
+          <Text style={{ fontSize: 11, color: colors.textMuted }}>{formatTime(message.created_at)}</Text>
+          {!isUser && textContent && <CopyButton text={textContent} />}
+        </div>
       </div>
     </div>
   )

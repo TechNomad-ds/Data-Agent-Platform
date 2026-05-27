@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Typography, Select, Button, Upload, Table, Tabs, Card, Statistic, Tag, Empty, message, Popconfirm, Spin, Progress, Input, Popover } from 'antd'
-import { UploadOutlined, DeleteOutlined, FileTextOutlined, BarChartOutlined, DatabaseOutlined, NodeIndexOutlined, CheckCircleOutlined, LoadingOutlined, SyncOutlined, PlusOutlined } from '@ant-design/icons'
+import { UploadOutlined, DeleteOutlined, FileTextOutlined, BarChartOutlined, DatabaseOutlined, CheckCircleOutlined, LoadingOutlined, SyncOutlined, PlusOutlined } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
 import api from '@/api/client'
-import GraphViewer from '@/components/Graph/GraphViewer'
 
 const { Text, Title } = Typography
 
@@ -221,8 +220,8 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
 
       {/* Main: left file list + right content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Floating upload/processing overlay */}
-        {(uploading || (processingFiles.size > 0 && !uploading)) && (
+        {/* Floating upload overlay (only show during upload) */}
+        {uploading && (
           <div style={{
             position: 'absolute',
             top: 12,
@@ -237,22 +236,11 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
             padding: '12px 16px',
             animation: 'fadeSlideDown 0.25s ease-out',
           }}>
-            {uploading ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <LoadingOutlined style={{ color: '#1677ff' }} />
-                  <Text style={{ fontSize: 12, color: '#1677ff', fontWeight: 500 }}>正在上传文件...</Text>
-                </div>
-                <Progress percent={uploadProgress} size="small" strokeColor="#1677ff" showInfo={false} />
-              </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SyncOutlined spin style={{ color: '#1677ff' }} />
-                <Text style={{ fontSize: 12, color: '#475569' }}>
-                  {processingFiles.size} 个文件正在处理中（建立索引...）
-                </Text>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <LoadingOutlined style={{ color: '#1677ff' }} />
+              <Text style={{ fontSize: 12, color: '#1677ff', fontWeight: 500 }}>正在上传文件...</Text>
+            </div>
+            <Progress percent={uploadProgress} size="small" strokeColor="#1677ff" showInfo={false} />
           </div>
         )}
         {/* Left: file list */}
@@ -278,15 +266,12 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
                   transition: 'all 0.15s',
                 }}
               >
-                <FileTextOutlined style={{ color: processingFiles.has(f.filename) ? '#faad14' : '#64748b', fontSize: 13 }} />
+                <FileTextOutlined style={{ color: '#64748b', fontSize: 13 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Text ellipsis style={{ fontSize: 12, display: 'block' }}>{f.filename}</Text>
                   <Text style={{ fontSize: 10, color: '#94a3b8' }}>
-                    {processingFiles.has(f.filename) ? (
-                      <span style={{ color: '#faad14' }}><SyncOutlined spin style={{ marginRight: 3 }} />处理中...</span>
-                    ) : (
-                      <>{f.file_type} · {f.file_size > 1024*1024 ? `${(f.file_size/1024/1024).toFixed(1)}MB` : `${(f.file_size/1024).toFixed(0)}KB`}</>
-                    )}
+                    {f.file_type} · {f.file_size > 1024*1024 ? `${(f.file_size/1024/1024).toFixed(1)}MB` : `${(f.file_size/1024).toFixed(0)}KB`}
+                    {processingFiles.has(f.filename) && <SyncOutlined spin style={{ marginLeft: 4, color: '#1677ff', fontSize: 9 }} />}
                   </Text>
                 </div>
                 <Popconfirm title="移除？" onConfirm={(e) => { e?.stopPropagation(); handleDeleteFile(f.file_id) }} okText="移除" cancelText="取消">
@@ -320,12 +305,6 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
                   </div>
                 </Card>
               )}
-
-              <Card size="small" title="知识图谱" style={{ marginBottom: 16 }}>
-                <div style={{ height: 250 }}>
-                  <GraphViewer spaceId={selectedSpaceId} />
-                </div>
-              </Card>
             </div>
           ) : (
             /* File Detail */
@@ -337,10 +316,6 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
                 <Title level={5} style={{ margin: 0 }}>{files.find(f => f.file_id === selectedFileId)?.filename}</Title>
               </div>
               {(() => {
-                const selectedFile = files.find(f => f.file_id === selectedFileId)
-                const graphEligibleTypes = ['txt', 'md', 'pdf', 'docx', 'py', 'sql', 'html', 'xml', 'yaml', 'yml']
-                const showGraphTab = selectedFile && graphEligibleTypes.includes(selectedFile.file_type?.toLowerCase())
-
                 const tabItems = [
                 {
                   key: 'preview',
@@ -364,12 +339,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange }: Props) {
                     <Empty description="不支持预览" />
                   ),
                 },
-                {
-                  key: 'graph',
-                  label: <span><NodeIndexOutlined /> 图谱</span>,
-                  children: <div style={{ height: 300 }}><GraphViewer spaceId={selectedSpaceId} /></div>,
-                },
-              ].filter(item => item.key !== 'graph' || showGraphTab)
+              ]
 
               return <Tabs defaultActiveKey="preview" size="small" items={tabItems} />
               })()}

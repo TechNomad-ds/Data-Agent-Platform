@@ -1,28 +1,36 @@
 import { useState } from 'react'
-import { Typography, Button, Steps, Upload, Input, message, Card } from 'antd'
-import { CloudUploadOutlined, MessageOutlined, RocketOutlined } from '@ant-design/icons'
+import { Typography, Button, Upload, Input, message } from 'antd'
+import { CloudUploadOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { dataSpacesApi } from '@/api/dataSpaces'
+import { colors, radius, shadow } from '@/styles/tokens'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 interface Props {
   onComplete: (spaceId: string) => void
 }
 
+const TEMPLATES = [
+  { label: '销售分析', icon: '📊' },
+  { label: '客户数据', icon: '👥' },
+  { label: '财务报表', icon: '💰' },
+  { label: '运营监控', icon: '📈' },
+]
+
 export default function Onboarding({ onComplete }: Props) {
   const [step, setStep] = useState(0)
   const [spaceName, setSpaceName] = useState('')
-  const [spaceId, setSpaceId] = useState<string>('')
+  const [spaceId, setSpaceId] = useState('')
   const [creating, setCreating] = useState(false)
-  const [uploadedCount, setUploadedCount] = useState(0)
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
 
   const handleCreateSpace = async () => {
-    if (!spaceName.trim()) { message.warning('请输入名称'); return }
+    if (!spaceName.trim()) { message.warning('请输入项目名称'); return }
     setCreating(true)
     try {
       const res = await dataSpacesApi.create({ name: spaceName.trim() })
       setSpaceId(res.data.id)
-      setStep(2)
+      setStep(1)
     } catch {
       message.error('创建失败')
     } finally {
@@ -36,10 +44,9 @@ export default function Onboarding({ onComplete }: Props) {
     formData.append('files', file)
     try {
       await dataSpacesApi.uploadFiles(spaceId, formData)
-      setUploadedCount(prev => prev + 1)
-      message.success(`${file.name} 已上传`)
+      setUploadedFiles(prev => [...prev, file.name])
     } catch {
-      message.error('上传失败')
+      message.error(`${file.name} 上传失败`)
     }
     return false
   }
@@ -50,133 +57,119 @@ export default function Onboarding({ onComplete }: Props) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)',
+      background: `linear-gradient(135deg, ${colors.bg} 0%, ${colors.primaryLight} 100%)`,
       padding: 32,
     }}>
-      <Card style={{ maxWidth: 560, width: '100%', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+      <div style={{
+        maxWidth: 480, width: '100%', borderRadius: radius.xl,
+        background: colors.surface, boxShadow: shadow.lg, padding: '40px 36px',
+      }}>
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
-            width: 56, height: 56, borderRadius: 16, margin: '0 auto 16px',
-            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+            width: 48, height: 48, borderRadius: radius.lg, margin: '0 auto 14px',
+            background: `linear-gradient(135deg, ${colors.primary}, #7c3aed)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, color: '#fff', fontWeight: 700,
+            fontSize: 20, color: '#fff', fontWeight: 700,
           }}>D</div>
-          <Title level={3} style={{ marginBottom: 4 }}>欢迎使用 Data Agent</Title>
-          <Text type="secondary">上传你的数据，AI 帮你分析和理解</Text>
+          <Title level={4} style={{ marginBottom: 4 }}>
+            {step === 0 ? '创建你的分析项目' : '上传数据文件'}
+          </Title>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {step === 0 ? '给你的数据分析起个名字，方便管理' : '上传后即可开始和 AI 对话分析'}
+          </Text>
         </div>
 
-        <Steps
-          current={step}
-          size="small"
-          style={{ marginBottom: 32 }}
-          items={[
-            { title: '了解' },
-            { title: '创建项目' },
-            { title: '上传数据' },
-            { title: '开始分析' },
-          ]}
-        />
+        {/* Step indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{
+              width: i <= step ? 32 : 20, height: 4, borderRadius: 2,
+              background: i <= step ? colors.primary : colors.border,
+              transition: 'all 0.3s',
+            }} />
+          ))}
+        </div>
 
         {step === 0 && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 24, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <FeatureCard icon={<CloudUploadOutlined />} title="上传数据" desc="支持 CSV、Excel、PDF、文本等 20+ 格式" />
-              <FeatureCard icon={<RocketOutlined />} title="自动分析" desc="AI 自动理解数据结构、发现问题" />
-              <FeatureCard icon={<MessageOutlined />} title="对话分析" desc="用自然语言提问，获得数据洞察" />
+          <div>
+            {/* Template buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 20 }}>
+              {TEMPLATES.map(t => (
+                <div
+                  key={t.label}
+                  onClick={() => setSpaceName(t.label)}
+                  style={{
+                    padding: '12px 14px', borderRadius: radius.md,
+                    border: `1px solid ${spaceName === t.label ? colors.primary : colors.border}`,
+                    background: spaceName === t.label ? colors.primaryLight : colors.surface,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <span style={{ fontSize: 13, color: colors.textPrimary }}>{t.label}</span>
+                </div>
+              ))}
             </div>
-            <Paragraph style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>
-              只需三步：创建一个分析项目 → 上传你的数据文件 → 开始和 AI 对话
-            </Paragraph>
-            <Button type="primary" size="large" onClick={() => setStep(1)}>
-              开始使用
+
+            <Input
+              size="large"
+              placeholder="或输入自定义名称..."
+              value={spaceName}
+              onChange={e => setSpaceName(e.target.value)}
+              onPressEnter={handleCreateSpace}
+              style={{ marginBottom: 16, borderRadius: radius.md }}
+            />
+            <Button
+              type="primary" block size="large"
+              onClick={handleCreateSpace} loading={creating}
+              style={{ borderRadius: radius.md, height: 44 }}
+            >
+              创建项目
             </Button>
           </div>
         )}
 
         {step === 1 && (
           <div>
-            <Title level={5}>创建你的第一个分析项目</Title>
-            <Paragraph style={{ color: '#64748b', fontSize: 13 }}>
-              一个项目对应一组相关的数据。比如"销售数据分析"、"客户调研"、"财务报表"等。
-            </Paragraph>
-            <Input
-              size="large"
-              placeholder="输入项目名称，如：销售数据分析"
-              value={spaceName}
-              onChange={e => setSpaceName(e.target.value)}
-              onPressEnter={handleCreateSpace}
-              style={{ marginBottom: 16 }}
-            />
-            <Button type="primary" block size="large" onClick={handleCreateSpace} loading={creating}>
-              创建项目
-            </Button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div>
-            <Title level={5}>上传你的数据文件</Title>
-            <Paragraph style={{ color: '#64748b', fontSize: 13 }}>
-              支持 CSV、Excel、JSON、PDF、Word、文本文件，也可以直接上传 ZIP 压缩包。
-            </Paragraph>
             <Upload.Dragger
               multiple
               showUploadList={false}
               beforeUpload={handleUpload}
               accept=".csv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.tsv"
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: 16, borderRadius: radius.lg, border: `1px dashed ${colors.border}` }}
             >
-              <p style={{ fontSize: 32, color: '#4f46e5', marginBottom: 8 }}>
+              <p style={{ fontSize: 28, color: colors.primary, marginBottom: 6 }}>
                 <CloudUploadOutlined />
               </p>
-              <p style={{ fontSize: 14, color: '#475569' }}>点击或拖拽文件到这里上传</p>
-              <p style={{ fontSize: 12, color: '#94a3b8' }}>支持 CSV、Excel、PDF、Word、JSON 等格式</p>
+              <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>点击或拖拽文件到这里</p>
+              <p style={{ fontSize: 11, color: colors.textMuted, margin: '4px 0 0' }}>支持 CSV、Excel、PDF、Word、JSON 等格式</p>
             </Upload.Dragger>
-            {uploadedCount > 0 && (
-              <Text style={{ display: 'block', textAlign: 'center', marginBottom: 12, color: '#10b981' }}>
-                已上传 {uploadedCount} 个文件
-              </Text>
+
+            {/* Uploaded file list */}
+            {uploadedFiles.length > 0 && (
+              <div style={{ marginBottom: 16, maxHeight: 120, overflow: 'auto' }}>
+                {uploadedFiles.map(name => (
+                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${colors.borderLight}` }}>
+                    <FileTextOutlined style={{ color: colors.primary, fontSize: 12 }} />
+                    <Text style={{ fontSize: 12, flex: 1 }} ellipsis>{name}</Text>
+                    <CheckCircleOutlined style={{ color: colors.success, fontSize: 12 }} />
+                  </div>
+                ))}
+              </div>
             )}
+
             <Button
-              type="primary"
-              block
-              size="large"
-              onClick={() => setStep(3)}
-              disabled={uploadedCount === 0}
+              type="primary" block size="large"
+              onClick={() => onComplete(spaceId)}
+              style={{ borderRadius: radius.md, height: 44 }}
             >
-              {uploadedCount > 0 ? '继续' : '请先上传至少一个文件'}
-            </Button>
-            <Button type="link" block onClick={() => setStep(3)} style={{ marginTop: 4 }}>
-              稍后再上传
+              {uploadedFiles.length > 0 ? `开始分析（${uploadedFiles.length} 个文件）` : '跳过，稍后上传'}
             </Button>
           </div>
         )}
-
-        {step === 3 && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
-            <Title level={4}>一切就绪！</Title>
-            <Paragraph style={{ color: '#64748b' }}>
-              {uploadedCount > 0
-                ? `已上传 ${uploadedCount} 个文件，AI 正在处理中。你现在可以开始对话分析了。`
-                : '项目已创建，你可以随时上传数据并开始分析。'}
-            </Paragraph>
-            <Button type="primary" size="large" onClick={() => onComplete(spaceId)}>
-              开始对话分析
-            </Button>
-          </div>
-        )}
-      </Card>
-    </div>
-  )
-}
-
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div style={{ width: 140, padding: 12, borderRadius: 10, background: '#f8fafc', textAlign: 'center' }}>
-      <div style={{ fontSize: 20, color: '#4f46e5', marginBottom: 6 }}>{icon}</div>
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{title}</div>
-      <div style={{ fontSize: 11, color: '#94a3b8' }}>{desc}</div>
+      </div>
     </div>
   )
 }

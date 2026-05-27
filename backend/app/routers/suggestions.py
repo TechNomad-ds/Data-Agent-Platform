@@ -36,7 +36,7 @@ async def get_suggestions(
     profiles = profiles_result.scalars().all()
 
     if not profiles:
-        return {"suggestions": ["上传数据文件开始分析"], "summary": None}
+        return {"suggestions": ["这份数据有哪些字段，各自是什么含义？", "帮我概述一下数据的整体情况"], "summary": None}
 
     suggestions = []
     summary_parts = []
@@ -76,19 +76,13 @@ async def get_suggestions(
                 suggestions.append(f"有些列缺失率较高（{', '.join(high_null_cols[:3])}），帮我分析一下原因")
                 break
 
-        # Check for numeric columns -> suggest visualization
-        has_numeric = any(
-            any(c.get("stats") for c in tf["columns"])
-            for tf in tabular_files
-        )
-        if has_numeric:
-            suggestions.append("帮我生成数据分布的可视化图表")
+        suggestions.append("数据中有哪些值得关注的趋势或规律？")
 
         # Multiple tables -> suggest relationship analysis
         if len(tabular_files) > 1:
             suggestions.append("这几个表之间有什么关联？帮我分析一下")
 
-        suggestions.append("数据有什么异常或值得关注的模式？")
+        suggestions.append("数据有什么异常值或需要清洗的地方？")
 
     if text_files:
         suggestions.append("帮我总结一下文档的主要内容")

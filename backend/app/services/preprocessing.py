@@ -18,7 +18,7 @@ from app.services import embedding as embed_svc
 
 
 async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[str, Any]:
-    """预处理单个文件，生成数据画像"""
+    """预处理单个文件，生成数据画像。向量索引在后台异步完成，不阻塞状态。"""
     async with get_session_factory()() as db:
         result = await db.execute(select(File).where(File.id == file_id))
         file = result.scalar_one_or_none()
@@ -39,11 +39,15 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
                 profile_data = _profile_sqlite(file_path)
                 profile_type = "database"
             elif ext in ("txt", "md", "py", "sql", "html", "xml", "yaml", "yml", "log", "r", "ipynb"):
-                profile_data = await _profile_text(file_path, str(file_id), str(data_space_id), file.filename)
+                profile_data = _profile_text_fast(file_path)
                 profile_type = "text"
+                import asyncio
+                asyncio.ensure_future(_embed_text_background(file_path, str(file_id), str(data_space_id), file.filename))
             elif ext in ("pdf", "docx"):
-                profile_data = await _profile_document(file_path, ext, str(file_id), str(data_space_id), file.filename)
+                profile_data = _profile_document_fast(file_path, ext)
                 profile_type = "document"
+                import asyncio
+                asyncio.ensure_future(_embed_document_background(file_path, ext, str(file_id), str(data_space_id), file.filename))
             elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
                 profile_data = _profile_image(file_path)
                 profile_type = "image"
@@ -195,38 +199,37 @@ def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
     return profile
 
 
-async def _profile_text(
-    file_path: Path, file_id: str, data_space_id: str, filename: str
-) -> Dict[str, Any]:
-    """生成文本文件画像并建立向量索引（图谱抽取延迟到用户查看时触发）"""
+def _profile_text_fast(file_path: Path) -> Dict[str, Any]:
+    """快速生成文本文件画像（不做 embedding）"""
     content = file_path.read_text(encoding="utf-8", errors="ignore")
     lines = content.split("\n")
-
-    chunks = greedy_chunk(content, max_size=1000, overlap=200)
-    chunk_count = embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
-
-    # 重建 BM25 索引
-    try:
-        from app.services.retrieval import invalidate_cache
-        invalidate_cache(data_space_id)
-    except Exception:
-        pass
-
     return {
         "char_count": len(content),
         "line_count": len(lines),
         "word_count": len(content.split()),
-        "chunk_count": chunk_count,
-        "graph_status": "pending",
-        "bm25_indexed": True,
         "preview": content[:500],
     }
 
 
-async def _profile_document(
-    file_path: Path, ext: str, file_id: str, data_space_id: str, filename: str
-) -> Dict[str, Any]:
-    """生成 PDF/DOCX 文件画像（图谱抽取延迟到用户查看时触发）"""
+async def _embed_text_background(
+    file_path: Path, file_id: str, data_space_id: str, filename: str
+) -> None:
+    """后台异步执行文本 embedding"""
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        chunks = greedy_chunk(content, max_size=1000, overlap=200)
+        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+        try:
+            from app.services.retrieval import invalidate_cache
+            invalidate_cache(data_space_id)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _profile_document_fast(file_path: Path, ext: str) -> Dict[str, Any]:
+    """快速生成文档画像（不做 embedding）"""
     text = ""
     page_count = 0
 
@@ -250,24 +253,46 @@ async def _profile_document(
         except ImportError:
             text = file_path.read_text(encoding="utf-8", errors="ignore")
 
-    chunks = greedy_chunk(text, max_size=1000, overlap=200)
-    chunk_count = embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
-
-    # 重建 BM25 索引
-    try:
-        from app.services.retrieval import invalidate_cache
-        invalidate_cache(data_space_id)
-    except Exception:
-        pass
-
     return {
         "char_count": len(text),
         "page_count": page_count,
-        "chunk_count": chunk_count,
-        "graph_status": "pending",
-        "bm25_indexed": True,
         "preview": text[:500],
     }
+
+
+async def _embed_document_background(
+    file_path: Path, ext: str, file_id: str, data_space_id: str, filename: str
+) -> None:
+    """后台异步执行文档 embedding"""
+    try:
+        text = ""
+        if ext == "pdf":
+            try:
+                import fitz
+                doc = fitz.open(str(file_path))
+                for page in doc:
+                    text += page.get_text() + "\n"
+                doc.close()
+            except ImportError:
+                text = file_path.read_text(encoding="utf-8", errors="ignore")
+        elif ext == "docx":
+            try:
+                from docx import Document
+                doc = Document(str(file_path))
+                for para in doc.paragraphs:
+                    text += para.text + "\n"
+            except ImportError:
+                text = file_path.read_text(encoding="utf-8", errors="ignore")
+
+        chunks = greedy_chunk(text, max_size=1000, overlap=200)
+        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+        try:
+            from app.services.retrieval import invalidate_cache
+            invalidate_cache(data_space_id)
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def _load_json_df(file_path: Path) -> pd.DataFrame:
