@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Modal } from 'antd'
 import { useAuthStore } from '@/stores/authStore'
 import { dataSpacesApi } from '@/api/dataSpaces'
 import { chatApi } from '@/api/chat'
@@ -17,6 +18,7 @@ export default function MainLayout() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [checkingSpaces, setCheckingSpaces] = useState(true)
   const [spaceLockedByConversation, setSpaceLockedByConversation] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
   const { user, fetchUser } = useAuthStore()
 
   useEffect(() => {
@@ -43,6 +45,10 @@ export default function MainLayout() {
     setShowOnboarding(false)
     setSelectedSpaceId(spaceId)
     setCurrentView('chat')
+    if (!localStorage.getItem('guide_seen')) {
+      setShowGuide(true)
+      localStorage.setItem('guide_seen', '1')
+    }
   }, [])
 
   const handleNewChat = useCallback(() => {
@@ -130,6 +136,29 @@ export default function MainLayout() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={showGuide}
+        onCancel={() => setShowGuide(false)}
+        onOk={() => setShowGuide(false)}
+        okText="知道了"
+        cancelButtonProps={{ style: { display: 'none' } }}
+        centered
+        width={420}
+      >
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 16 }}>开始使用 Data Agent</div>
+          <div style={{ textAlign: 'left', fontSize: 14, color: '#475569', lineHeight: 2.2 }}>
+            <div><strong>① 数据管理</strong> — 左侧进入数据管理，创建数据空间并上传文件</div>
+            <div><strong>② 新建对话</strong> — 点击"新对话"，在顶部选择数据空间和模型</div>
+            <div><strong>③ 开始提问</strong> — 用自然语言问关于你数据的任何问题</div>
+          </div>
+          <div style={{ marginTop: 16, fontSize: 12, color: '#94a3b8' }}>
+            模型随时可切换，历史对话会按数据空间分组显示在左侧
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

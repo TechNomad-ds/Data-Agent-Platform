@@ -60,7 +60,7 @@ class AgentLoop:
                 api_key=settings.openai_api_key,
                 base_url=settings.openai_api_base,
             )
-        self.max_iterations = 10
+        self.max_iterations = 30
 
     async def _get_data_space_info(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
         """获取数据空间的上下文信息"""
