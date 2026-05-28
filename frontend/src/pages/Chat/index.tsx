@@ -50,7 +50,7 @@ export default function ChatView() {
   }, [selectedSpace])
 
   useEffect(() => {
-    if (conversationId) loadConversation(conversationId)
+    if (conversationId && !isStreaming) loadConversation(conversationId)
   }, [conversationId])
 
   useEffect(() => {
@@ -231,6 +231,7 @@ export default function ChatView() {
       setAbortController(null)
       resetStream()
       loadConversations()
+      loadConversation(convId)
     }
   }
 

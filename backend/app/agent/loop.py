@@ -20,6 +20,8 @@ from app.agent.tools import get_tool_definitions, execute_tool
 
 SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助手。你帮助用户理解、查询和分析他们的数据。用通俗易懂的语言解释分析结果。
 
+{data_space_info}
+
 {schema_context}
 
 {knowledge_context}
@@ -29,7 +31,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助�
 ## 可用工具
 
 - search_data_space: 混合语义搜索（BM25 + 向量融合）
-- read_file: 读取文件内容
+- read_file: 读取文件内容（支持所有文件类型：代码、文本、表格等）
 - inspect_data: 查看数据结构和跨文件 join 关系
 - pandas_query: 对数据执行 pandas 查询
 - sqlite_query: 用 SQL 查询数据（表名=文件名去扩展名小写）
@@ -41,10 +43,11 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助�
 
 1. 数据结构已在上方预注入，无需再调用 inspect_data（除非需要更详细信息）
 2. 对于表格数据优先用 read_file 或 pandas_query 直接操作，这些工具不依赖索引
-3. 对于简单查询用 pandas_query，复杂多表查询用 sqlite_query 或 nl2sql
-4. search_data_space 适合在大量文本中搜索相关内容，如果搜索无结果可直接用 read_file
-5. 用通俗语言解释发现，引用数据来源
-6. 如果发现重要模式或用户偏好，用 save_memory 记住"""
+3. 对于代码文件（.py, .sql, .r 等）和文本文件（.txt, .md 等），用 read_file 读取内容
+4. 对于简单查询用 pandas_query，复杂多表查询用 sqlite_query 或 nl2sql
+5. search_data_space 适合在大量文本中搜索相关内容，如果搜索无结果可直接用 read_file
+6. 用通俗语言解释发现，引用数据来源
+7. 如果发现重要模式或用户偏好，用 save_memory 记住"""
 
 
 class AgentLoop:
@@ -284,7 +287,26 @@ class AgentLoop:
                         "charge_credits": False,
                         "multiplier": 0,
                     }
-        # 默认用平台配置
+
+        # 查找平台模型配置
+        if model_id:
+            async with get_session_factory()() as db:
+                from app.models.llm_model import LLMModel
+                result = await db.execute(
+                    select(LLMModel).where(LLMModel.id == model_id, LLMModel.is_active == True)
+                )
+                model = result.scalar_one_or_none()
+                if model:
+                    return {
+                        "provider": model.provider,
+                        "api_key": model.api_key_encrypted,
+                        "model_name": model.model_name,
+                        "api_base": model.api_base,
+                        "charge_credits": True,
+                        "multiplier": float(model.credit_multiplier),
+                    }
+
+        # 兜底：用 .env 配置
         return {
             "provider": self.backend,
             "api_key": settings.anthropic_api_key if self.backend == "anthropic" else settings.openai_api_key,
@@ -325,7 +347,8 @@ class AgentLoop:
                 yield {"type": "error", "message": "额度不足，请充值或等待每日免费额度发放"}
                 return
 
-        # 构建系统提示（含 schema 预注入 + knowledge.md + 记忆）
+        # 构建系统提示（含文件列表 + schema 预注入 + knowledge.md + 记忆）
+        data_space_info = await self._get_data_space_info(data_space_id, user_id)
         schema_context = await self._build_schema_context(data_space_id, user_id)
         knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
 
@@ -340,6 +363,7 @@ class AgentLoop:
             pass
 
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            data_space_info=data_space_info,
             schema_context=schema_context,
             knowledge_context=knowledge_context,
             memory_context=memory_context,
@@ -418,6 +442,10 @@ class AgentLoop:
                         delta = chunk.choices[0].delta if chunk.choices else None
                         if not delta:
                             continue
+                        # 处理推理模型的 reasoning_content（如 DeepSeek）
+                        reasoning = getattr(delta, 'reasoning_content', None)
+                        if reasoning:
+                            yield {"type": "thinking", "content": reasoning}
                         if delta.content:
                             full_text += delta.content
                             yield {"type": "text", "delta": delta.content}
@@ -435,13 +463,14 @@ class AgentLoop:
                         if hasattr(chunk, "usage") and chunk.usage:
                             total_usage["input_tokens"] += chunk.usage.prompt_tokens or 0
                             total_usage["output_tokens"] += chunk.usage.completion_tokens or 0
-                    # 转换为统一的 tool_uses 格式
+                    # 转换为统一的 tool_uses 格式（过滤掉无效的 tool_call）
                     for tc in tool_calls_data:
-                        tool_uses.append({
-                            "id": tc["id"],
-                            "name": tc["function"]["name"],
-                            "input_json": tc["function"]["arguments"],
-                        })
+                        if tc["id"] and tc["function"]["name"]:
+                            tool_uses.append({
+                                "id": tc["id"],
+                                "name": tc["function"]["name"],
+                                "input_json": tc["function"]["arguments"],
+                            })
 
                 # 没有工具调用 → Agent 完成
                 if not tool_uses:
