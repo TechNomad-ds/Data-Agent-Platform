@@ -71,7 +71,7 @@ async def upload_files(
         # 读取文件内容
         content = await upload_file.read()
         if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(50MB)")
+            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(200MB)")
 
         # zip 文件：解压后逐个入库
         if file_type == "zip":
@@ -197,6 +197,32 @@ async def get_file(
     return file
 
 
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """下载文件"""
+    from fastapi.responses import FileResponse as FastAPIFileResponse
+    result = await db.execute(
+        select(File).where(File.id == file_id, File.user_id == current_user.id)
+    )
+    file = result.scalar_one_or_none()
+    if not file:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    file_path = Path(settings.storage_root) / file.storage_path
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不在磁盘上")
+
+    return FastAPIFileResponse(
+        path=str(file_path),
+        filename=file.original_filename or file.filename,
+        media_type=file.mime_type or "application/octet-stream",
+    )
+
+
 @router.delete("/{file_id}", status_code=204)
 async def delete_file(
     file_id: uuid.UUID,
@@ -210,6 +236,18 @@ async def delete_file(
     file = result.scalar_one_or_none()
     if not file:
         raise HTTPException(status_code=404, detail="文件不存在")
+
+    # 清理关联的向量嵌入
+    from app.models.data_space import DataSpaceFile
+    dsf_result = await db.execute(
+        select(DataSpaceFile).where(DataSpaceFile.file_id == file_id)
+    )
+    for dsf in dsf_result.scalars().all():
+        try:
+            from app.services.embedding import delete_file_embeddings
+            delete_file_embeddings(str(dsf.data_space_id), str(file_id))
+        except Exception:
+            pass
 
     # 删除物理文件
     file_path = Path(settings.storage_root) / file.storage_path

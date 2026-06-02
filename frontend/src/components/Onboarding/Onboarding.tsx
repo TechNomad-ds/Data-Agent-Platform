@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Typography, Button, Upload, Input, message } from 'antd'
-import { CloudUploadOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { CloudUploadOutlined, FileTextOutlined, CheckCircleOutlined, BarChartOutlined, TeamOutlined, WalletOutlined, LineChartOutlined } from '@ant-design/icons'
 import { dataSpacesApi } from '@/api/dataSpaces'
 import { colors, radius, shadow } from '@/styles/tokens'
+import Logo from '@/components/Layout/Logo'
 
 const { Title, Text } = Typography
 
@@ -11,10 +12,10 @@ interface Props {
 }
 
 const TEMPLATES = [
-  { label: '销售分析', icon: '📊' },
-  { label: '客户数据', icon: '👥' },
-  { label: '财务报表', icon: '💰' },
-  { label: '运营监控', icon: '📈' },
+  { label: '销售分析', icon: <BarChartOutlined /> },
+  { label: '客户数据', icon: <TeamOutlined /> },
+  { label: '财务报表', icon: <WalletOutlined /> },
+  { label: '运营监控', icon: <LineChartOutlined /> },
 ]
 
 export default function Onboarding({ onComplete }: Props) {
@@ -52,28 +53,19 @@ export default function Onboarding({ onComplete }: Props) {
   }
 
   return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: `linear-gradient(135deg, ${colors.bg} 0%, ${colors.primaryLight} 100%)`,
-      padding: 32,
-    }}>
+    <div className="auth-page" style={{ padding: 32 }}>
       <div style={{
         maxWidth: 480, width: '100%', borderRadius: radius.xl,
         background: colors.surface, boxShadow: shadow.lg, padding: '40px 36px',
+        border: `1px solid ${colors.border}`,
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: radius.lg, margin: '0 auto 14px',
-            background: `linear-gradient(135deg, ${colors.primary}, #7c3aed)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, color: '#fff', fontWeight: 700,
-          }}>D</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <Logo size={36} withText={false} />
+          </div>
           <Title level={4} style={{ marginBottom: 4 }}>
-            {step === 0 ? '创建你的分析项目' : '上传数据文件'}
+            {step === 0 ? '创建你的数据空间' : '上传数据文件'}
           </Title>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
             {step === 0 ? '给你的数据分析起个名字，方便管理' : '上传后即可开始和 AI 对话分析'}
@@ -107,7 +99,7 @@ export default function Onboarding({ onComplete }: Props) {
                     transition: 'all 0.15s',
                   }}
                 >
-                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <span style={{ fontSize: 16, color: spaceName === t.label ? colors.primary : colors.textMuted }}>{t.icon}</span>
                   <span style={{ fontSize: 13, color: colors.textPrimary }}>{t.label}</span>
                 </div>
               ))}
@@ -126,7 +118,7 @@ export default function Onboarding({ onComplete }: Props) {
               onClick={handleCreateSpace} loading={creating}
               style={{ borderRadius: radius.md, height: 44 }}
             >
-              创建项目
+              创建数据空间
             </Button>
           </div>
         )}
@@ -137,7 +129,7 @@ export default function Onboarding({ onComplete }: Props) {
               multiple
               showUploadList={false}
               beforeUpload={handleUpload}
-              accept=".csv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.tsv"
+              accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
               style={{ marginBottom: 16, borderRadius: radius.lg, border: `1px dashed ${colors.border}` }}
             >
               <p style={{ fontSize: 28, color: colors.primary, marginBottom: 6 }}>

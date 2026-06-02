@@ -14,7 +14,7 @@ class UserRegister(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=1)
     password: str
 
 
@@ -44,4 +44,14 @@ class UserResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
+    research_consent: Optional[bool] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class UpdateProfileRequest(BaseModel):
+    username: Optional[str] = Field(None, min_length=2, max_length=100)
     research_consent: Optional[bool] = None

@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Form, Input, Button, Typography, Checkbox, message, ConfigProvider } from 'antd'
+import { Form, Input, Button, Typography, Checkbox, Modal, message, ConfigProvider } from 'antd'
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { lightThemeConfig } from '@/theme/themeConfig'
+import AuthBrand from '@/components/Layout/AuthBrand'
+import { colors } from '@/styles/tokens'
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
 export default function Register() {
   const [loading, setLoading] = useState(false)
+  const [legalOpen, setLegalOpen] = useState(false)
   const navigate = useNavigate()
 
   const onFinish = async (values: any) => {
@@ -31,62 +34,147 @@ export default function Register() {
 
   return (
     <ConfigProvider theme={lightThemeConfig}>
-      <div className="auth-page">
-        <div className="auth-card" style={{ width: 440 }}>
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24, color: '#fff', fontWeight: 700,
-              boxShadow: '0 4px 16px rgba(79,70,229,0.2)',
-            }}>
-              D
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+        <AuthBrand />
+
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '36px 72px',
+            background: '#ffffff',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{ maxWidth: 380, width: '100%', margin: '0 auto' }}>
+            <div style={{ marginBottom: 28 }}>
+              <Title level={3} style={{ marginBottom: 6, color: colors.textPrimary, fontWeight: 600, letterSpacing: -0.3 }}>
+                创建 DataMind 账号
+              </Title>
+              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+                注册以开始数据分析
+              </Text>
             </div>
-            <Title level={3} style={{ marginBottom: 4, color: '#1e293b' }}>注册账号</Title>
-            <Text style={{ color: '#64748b' }}>创建你的 Data Agent 账号</Text>
-          </div>
 
-          <Form layout="vertical" onFinish={onFinish} size="large">
-            <Form.Item name="email" rules={[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '邮箱格式不正确' }]}>
-              <Input prefix={<MailOutlined style={{ color: '#94a3b8' }} />} placeholder="邮箱" />
-            </Form.Item>
-            <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }, { min: 2, message: '用户名至少2个字符' }]}>
-              <Input prefix={<UserOutlined style={{ color: '#94a3b8' }} />} placeholder="用户名" />
-            </Form.Item>
-            <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6个字符' }]}>
-              <Input.Password prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="密码" />
-            </Form.Item>
-            <Form.Item
-              name="confirm"
-              dependencies={['password']}
-              rules={[
-                { required: true, message: '请确认密码' },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (!value || getFieldValue('password') === value) return Promise.resolve()
-                    return Promise.reject(new Error('两次密码不一致'))
-                  },
-                }),
-              ]}
-            >
-              <Input.Password prefix={<LockOutlined style={{ color: '#94a3b8' }} />} placeholder="确认密码" />
-            </Form.Item>
-            <Form.Item name="agreement" valuePropName="checked" rules={[{ validator: (_, v) => v ? Promise.resolve() : Promise.reject('请同意用户协议') }]}>
-              <Checkbox>我已阅读并同意 <a style={{ color: '#4f46e5' }}>用户协议</a> 和 <a style={{ color: '#4f46e5' }}>隐私政策</a></Checkbox>
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 44 }}>注册</Button>
-            </Form.Item>
-          </Form>
+            <Form layout="vertical" onFinish={onFinish} size="large">
+              <Form.Item
+                name="email"
+                rules={[
+                  { required: true, message: '请输入邮箱' },
+                  { type: 'email', message: '邮箱格式不正确' },
+                ]}
+              >
+                <Input prefix={<MailOutlined style={{ color: colors.textMuted }} />} placeholder="邮箱" autoComplete="email" />
+              </Form.Item>
+              <Form.Item
+                name="username"
+                rules={[
+                  { required: true, message: '请输入用户名' },
+                  { min: 2, message: '用户名至少 2 个字符' },
+                ]}
+              >
+                <Input prefix={<UserOutlined style={{ color: colors.textMuted }} />} placeholder="用户名" autoComplete="username" />
+              </Form.Item>
+              <Form.Item
+                name="password"
+                rules={[
+                  { required: true, message: '请输入密码' },
+                  { min: 6, message: '密码至少 6 个字符' },
+                ]}
+              >
+                <Input.Password prefix={<LockOutlined style={{ color: colors.textMuted }} />} placeholder="密码" autoComplete="new-password" />
+              </Form.Item>
+              <Form.Item
+                name="confirm"
+                dependencies={['password']}
+                rules={[
+                  { required: true, message: '请确认密码' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('password') === value) return Promise.resolve()
+                      return Promise.reject(new Error('两次密码不一致'))
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password prefix={<LockOutlined style={{ color: colors.textMuted }} />} placeholder="确认密码" autoComplete="new-password" />
+              </Form.Item>
+              <Form.Item
+                name="agreement"
+                valuePropName="checked"
+                rules={[{ validator: (_, v) => v ? Promise.resolve() : Promise.reject('请同意用户协议与隐私政策') }]}
+              >
+                <Checkbox>
+                  我已阅读并同意{' '}
+                  <a onClick={(e) => { e.preventDefault(); setLegalOpen(true) }} style={{ color: colors.primary }}>
+                    用户协议与隐私政策
+                  </a>
+                </Checkbox>
+              </Form.Item>
+              <Form.Item style={{ marginBottom: 16 }}>
+                <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 44, fontWeight: 500 }}>
+                  注册
+                </Button>
+              </Form.Item>
+            </Form>
 
-          <div style={{ textAlign: 'center' }}>
-            <Text style={{ color: '#64748b' }}>
-              已有账号？<Link to="/login" style={{ color: '#4f46e5' }}>立即登录</Link>
-            </Text>
+            <div style={{ textAlign: 'center', fontSize: 13.5 }}>
+              <Text style={{ color: colors.textMuted }}>
+                已有账号？
+                <Link to="/login" style={{ color: colors.primary, fontWeight: 500, marginLeft: 4 }}>立即登录</Link>
+              </Text>
+            </div>
           </div>
         </div>
       </div>
+
+      <Modal
+        title="用户协议与隐私政策"
+        open={legalOpen}
+        onCancel={() => setLegalOpen(false)}
+        footer={<Button type="primary" onClick={() => setLegalOpen(false)}>我已知悉</Button>}
+        width={640}
+        centered
+        styles={{ body: { maxHeight: '60vh', overflow: 'auto' } }}
+      >
+        <LegalContent />
+      </Modal>
     </ConfigProvider>
+  )
+}
+
+function LegalContent() {
+  return (
+    <div style={{ fontSize: 13.5, lineHeight: 1.8, color: colors.textSecondary }}>
+      <Title level={4}>一、服务说明</Title>
+      <Paragraph>
+        DataMind Platform（以下简称"本平台"）是一个基于人工智能的数据分析平台，提供数据上传、智能对话分析、可视化图表生成等服务。注册或使用本平台即表示您同意接受本协议的全部条款。
+      </Paragraph>
+      <Title level={4}>二、账户与安全</Title>
+      <Paragraph>
+        注册时请提供真实、准确的信息，并妥善保管账户密码。因个人保管不当导致的安全问题由您自行承担。每位用户限注册一个账户，平台有权对异常注册行为进行限制。
+      </Paragraph>
+      <Title level={4}>三、数据与隐私</Title>
+      <Paragraph>
+        您上传的数据文件归您所有。平台采用用户隔离存储，密码经加盐哈希处理，敏感凭据加密保存。我们不会未经授权访问、使用或向第三方披露您的数据，亦不会将您的信息出售或出租。
+      </Paragraph>
+      <Paragraph>
+        使用分析功能时，相关数据会发送至 AI 模型进行处理。若您配置了自有 API Key，数据将直接发送至您指定的服务端点，平台不做中转。
+      </Paragraph>
+      <Title level={4}>四、使用规范</Title>
+      <Paragraph>请确保上传的数据合法合规、不侵犯他人权益。禁止利用本平台从事违法活动、反向工程或恶意攻击。</Paragraph>
+      <Title level={4}>五、AI 分析免责</Title>
+      <Paragraph>AI 分析结果由大语言模型生成，仅供参考，不构成任何专业建议。内容可能存在偏差，请在做出重要决策前自行核实关键信息。</Paragraph>
+      <Title level={4}>六、额度</Title>
+      <Paragraph>平台为每位用户提供每日免费分析额度，也支持配置自有 API Key 使用，后者不消耗平台额度，费用由对应服务商收取。</Paragraph>
+      <Title level={4}>七、学术研究</Title>
+      <Paragraph>为持续改进平台服务与推动数据分析领域的发展，您的交互数据在经过严格匿名化处理后，可能被用于学术研究。研究数据不包含任何可识别个人身份的信息。</Paragraph>
+      <Title level={4}>八、数据删除与账户注销</Title>
+      <Paragraph>您可随时删除数据空间、文件或对话记录，删除操作不可撤销。账户注销后，所有关联数据将被永久清除。</Paragraph>
+      <Title level={4}>九、协议修订</Title>
+      <Paragraph>本平台保留修订本协议的权利，修订后将在平台公布。继续使用即视为同意修订内容。涉及重大变更时，我们将以显著方式另行通知。</Paragraph>
+    </div>
   )
 }

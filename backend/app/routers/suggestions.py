@@ -1,17 +1,23 @@
-"""智能建议路由 - 基于数据画像生成分析建议"""
+"""智能建议路由 - 返回通用分析建议"""
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
-from app.models.data_space import DataSpace
-from app.models.data_profile import DataProfile
+from app.models.data_space import DataSpace, DataSpaceFile
 
 router = APIRouter()
+
+DEFAULT_SUGGESTIONS = [
+    "帮我看看数据空间里有什么文件",
+    "帮我概述一下数据的整体情况",
+    "帮我做一个关键指标的统计摘要",
+    "数据中有哪些值得关注的趋势或规律？",
+]
 
 
 @router.get("/{space_id}/suggestions")
@@ -20,77 +26,23 @@ async def get_suggestions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """基于数据画像生成智能分析建议"""
+    """返回通用分析建议"""
     result = await db.execute(
         select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
     )
-    if not result.scalar_one_or_none():
+    space = result.scalar_one_or_none()
+    if not space:
         raise HTTPException(status_code=404, detail="数据空间不存在")
 
-    profiles_result = await db.execute(
-        select(DataProfile).where(
-            DataProfile.data_space_id == space_id,
-            DataProfile.status == "ready",
-        )
+    # 只统计文件数量用于 summary，不依赖画像
+    file_count_result = await db.execute(
+        select(func.count()).select_from(DataSpaceFile).where(DataSpaceFile.data_space_id == space_id)
     )
-    profiles = profiles_result.scalars().all()
+    file_count = file_count_result.scalar() or 0
 
-    if not profiles:
-        return {"suggestions": ["这份数据有哪些字段，各自是什么含义？", "帮我概述一下数据的整体情况"], "summary": None}
-
-    suggestions = []
-    summary_parts = []
-    total_rows = 0
-    total_files = len(profiles)
-    tabular_files = []
-    text_files = []
-
-    for p in profiles:
-        data = p.profile_data or {}
-        if p.profile_type == "tabular":
-            rows = data.get("row_count", 0)
-            cols = data.get("column_count", 0)
-            total_rows += rows
-            tabular_files.append({
-                "rows": rows,
-                "cols": cols,
-                "columns": data.get("columns", []),
-            })
-        elif p.profile_type in ("text", "document"):
-            text_files.append(data)
-
-    summary_parts.append(f"共 {total_files} 个文件")
-    if tabular_files:
-        summary_parts.append(f"{len(tabular_files)} 个表格文件（共 {total_rows} 行）")
-    if text_files:
-        summary_parts.append(f"{len(text_files)} 个文档")
-
-    # Generate smart suggestions based on data characteristics
-    if tabular_files:
-        suggestions.append("帮我概述一下这些数据的整体情况")
-
-        # Check for high missing values
-        for tf in tabular_files:
-            high_null_cols = [c["name"] for c in tf["columns"] if c.get("null_pct", 0) > 20]
-            if high_null_cols:
-                suggestions.append(f"有些列缺失率较高（{', '.join(high_null_cols[:3])}），帮我分析一下原因")
-                break
-
-        suggestions.append("数据中有哪些值得关注的趋势或规律？")
-
-        # Multiple tables -> suggest relationship analysis
-        if len(tabular_files) > 1:
-            suggestions.append("这几个表之间有什么关联？帮我分析一下")
-
-        suggestions.append("数据有什么异常值或需要清洗的地方？")
-
-    if text_files:
-        suggestions.append("帮我总结一下文档的主要内容")
-
-    if total_rows > 1000:
-        suggestions.append("帮我做一个完整的数据质量报告")
+    summary = f"共 {file_count} 个文件" if file_count > 0 else None
 
     return {
-        "suggestions": suggestions[:6],
-        "summary": "、".join(summary_parts),
+        "suggestions": DEFAULT_SUGGESTIONS,
+        "summary": summary,
     }

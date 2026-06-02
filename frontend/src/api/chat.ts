@@ -26,7 +26,7 @@ export interface ConversationDetail extends Conversation {
 }
 
 export interface SSEEvent {
-  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'error' | 'done'
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'error' | 'done' | 'saved' | 'conversation_deleted'
   delta?: string
   name?: string
   input?: Record<string, unknown>
@@ -37,6 +37,7 @@ export interface SSEEvent {
   credits_used?: number
   tool_calls_log?: Array<{ name: string; input: Record<string, unknown>; output_preview: string }>
   id?: string
+  message_id?: string
 }
 
 export const chatApi = {
@@ -45,6 +46,8 @@ export const chatApi = {
   createConversation: (data: { data_space_id?: string; model_id: string; title?: string }) =>
     api.post<Conversation>('/chat/conversations', data),
   deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
+  renameConversation: (id: string, title: string) =>
+    api.patch<Conversation>(`/chat/conversations/${id}`, { title }),
 
   sendMessage: async (conversationId: string, content: string, signal?: AbortSignal, modelId?: string): Promise<Response> => {
     const token = await getValidToken()

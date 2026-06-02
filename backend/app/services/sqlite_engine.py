@@ -2,8 +2,10 @@
 import uuid
 import sqlite3
 import tempfile
+import time
+import threading
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 import pandas as pd
 from sqlalchemy import select
@@ -14,14 +16,19 @@ from app.models.file import File
 from app.models.data_space import DataSpaceFile
 
 
-_cache: Dict[str, str] = {}
+_cache: Dict[str, dict] = {}
+_cache_lock = threading.Lock()
+CACHE_TTL = 300  # 5 分钟后重建
 
 
 async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> str:
     """将数据空间的表格文件加载到 SQLite，返回数据库路径"""
     cache_key = str(data_space_id)
-    if cache_key in _cache and Path(_cache[cache_key]).exists():
-        return _cache[cache_key]
+
+    with _cache_lock:
+        entry = _cache.get(cache_key)
+        if entry and Path(entry["path"]).exists() and time.time() - entry["ts"] < CACHE_TTL:
+            return entry["path"]
 
     async with get_session_factory()() as db:
         result = await db.execute(
@@ -31,7 +38,9 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
         )
         files = result.scalars().all()
 
-    db_path = tempfile.mktemp(suffix=".db", prefix="space_")
+    fd, db_path = tempfile.mkstemp(suffix=".db", prefix="space_")
+    import os
+    os.close(fd)
     conn = sqlite3.connect(db_path)
 
     for f in files:
@@ -40,18 +49,21 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
         if not file_path.exists():
             continue
 
-        # SQLite files: attach directly
         if ext in ("sqlite", "db", "sqlite3"):
             try:
                 src_conn = sqlite3.connect(str(file_path))
                 src_cursor = src_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 for (tbl,) in src_cursor.fetchall():
-                    src_data = src_conn.execute(f"SELECT * FROM '{tbl}'")
+                    quoted_tbl = '"' + tbl.replace('"', '""') + '"'
+                    pragma = src_conn.execute(f"PRAGMA table_info({quoted_tbl})").fetchall()
+                    col_defs = ",".join(
+                        f'"{row[1]}" {row[2] if row[2] else "TEXT"}' for row in pragma
+                    )
+                    src_data = src_conn.execute(f"SELECT * FROM {quoted_tbl}")
                     cols = [d[0] for d in src_data.description]
                     rows = src_data.fetchall()
                     if cols and rows:
                         placeholders = ",".join(["?"] * len(cols))
-                        col_defs = ",".join(f'"{c}" TEXT' for c in cols)
                         conn.execute(f'CREATE TABLE IF NOT EXISTS "{tbl}" ({col_defs})')
                         conn.executemany(f'INSERT INTO "{tbl}" VALUES ({placeholders})', rows)
                 src_conn.close()
@@ -59,31 +71,19 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
                 continue
             continue
 
-        if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather"):
+        if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
             continue
 
-        table_name = f.filename.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
+        base_name = f.filename.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
+        table_name = base_name
+        existing_tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if table_name in existing_tables:
+            table_name = f"{base_name}_{ext}"
 
         try:
-            if ext == "csv":
-                from app.services.preprocessing import _detect_encoding
-                encoding = _detect_encoding(file_path)
-                df = pd.read_csv(file_path, encoding=encoding, on_bad_lines="skip")
-            elif ext == "tsv":
-                from app.services.preprocessing import _detect_encoding
-                encoding = _detect_encoding(file_path)
-                df = pd.read_csv(file_path, sep="\t", encoding=encoding, on_bad_lines="skip")
-            elif ext in ("xlsx", "xls"):
-                df = pd.read_excel(file_path)
-            elif ext == "json":
-                df = _load_json(file_path)
-            elif ext == "jsonl":
-                df = pd.read_json(file_path, lines=True)
-            elif ext == "parquet":
-                df = pd.read_parquet(file_path)
-            elif ext == "feather":
-                df = pd.read_feather(file_path)
-            else:
+            from app.services.file_loader import load_dataframe
+            df = load_dataframe(file_path, ext)
+            if df.empty:
                 continue
 
             df.to_sql(table_name, conn, if_exists="replace", index=False)
@@ -91,7 +91,16 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
             continue
 
     conn.close()
-    _cache[cache_key] = db_path
+
+    with _cache_lock:
+        old = _cache.get(cache_key)
+        if old:
+            try:
+                Path(old["path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
+        _cache[cache_key] = {"path": db_path, "ts": time.time()}
+
     return db_path
 
 
@@ -128,9 +137,10 @@ def list_tables(db_path: str) -> List[Dict[str, Any]]:
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = []
         for (name,) in cursor.fetchall():
-            info_cursor = conn.execute(f"PRAGMA table_info('{name}')")
+            quoted = '"' + name.replace('"', '""') + '"'
+            info_cursor = conn.execute(f"PRAGMA table_info({quoted})")
             columns = [{"name": row[1], "type": row[2]} for row in info_cursor.fetchall()]
-            count_cursor = conn.execute(f"SELECT COUNT(*) FROM '{name}'")
+            count_cursor = conn.execute(f"SELECT COUNT(*) FROM {quoted}")
             row_count = count_cursor.fetchone()[0]
             tables.append({"name": name, "columns": columns, "row_count": row_count})
         return tables
@@ -138,25 +148,25 @@ def list_tables(db_path: str) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def cleanup_all() -> None:
+    """清理所有缓存的 SQLite 临时文件"""
+    with _cache_lock:
+        for entry in _cache.values():
+            try:
+                Path(entry["path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
+        _cache.clear()
+
+
 def invalidate_cache(data_space_id: str) -> None:
     """清除缓存"""
-    cache_key = data_space_id
-    if cache_key in _cache:
-        path = _cache.pop(cache_key)
-        try:
-            Path(path).unlink(missing_ok=True)
-        except Exception:
-            pass
+    with _cache_lock:
+        entry = _cache.pop(data_space_id, None)
+        if entry:
+            try:
+                Path(entry["path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
-def _load_json(file_path: Path) -> pd.DataFrame:
-    import json
-    content = file_path.read_text(encoding="utf-8")
-    data = json.loads(content)
-    if isinstance(data, list):
-        return pd.DataFrame(data)
-    elif isinstance(data, dict) and "records" in data:
-        return pd.DataFrame(data["records"])
-    elif isinstance(data, dict):
-        return pd.DataFrame([data])
-    return pd.DataFrame()

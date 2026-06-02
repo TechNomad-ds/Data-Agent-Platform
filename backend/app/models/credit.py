@@ -17,7 +17,7 @@ class CreditAccount(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False
     )
     balance: Mapped[int] = mapped_column(Integer, default=0)
-    daily_free_allowance: Mapped[int] = mapped_column(Integer, default=100)
+    daily_free_allowance: Mapped[int] = mapped_column(Integer, default=20)
     last_daily_reset: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

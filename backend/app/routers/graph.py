@@ -97,10 +97,13 @@ async def build_graph(
     if space_key in _building_spaces:
         return {"status": "building", "message": "图谱正在构建中，请稍候..."}
 
-    # 查找该 space 下所有文本/文档类型的文件
+    # 查找该 space 下所有文本/文档类型的文件（通过关联表）
+    from app.models.data_space import DataSpaceFile
     result = await db.execute(
-        select(File).where(
-            File.data_space_id == space_id,
+        select(File)
+        .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
+        .where(
+            DataSpaceFile.data_space_id == space_id,
             File.file_type.in_(["txt", "md", "pdf", "docx", "py", "sql", "html", "xml", "yaml", "yml"]),
         )
     )
@@ -120,6 +123,9 @@ async def build_graph(
 
     # 后台异步构建
     _building_spaces.add(space_key)
+
+    import logging
+    logger = logging.getLogger("graph")
 
     async def _do_build():
         try:
@@ -154,14 +160,20 @@ async def build_graph(
                 if len(text.strip()) < 100:
                     continue
 
-                result = await gs.extract_triples_from_text(
-                    text[:5000], max_triples=settings.graph_max_triples_per_file
-                )
-                total_triples += result.get("added", 0)
+                try:
+                    result = await gs.extract_triples_from_text(
+                        text[:5000], max_triples=settings.graph_max_triples_per_file
+                    )
+                    total_triples += result.get("added", 0)
+                except Exception as e:
+                    logger.error(f"图谱抽取失败 ({f.filename}): {e}", exc_info=True)
+            logger.info(f"图谱构建完成: space={space_key}, triples={total_triples}")
+        except Exception as e:
+            logger.error(f"图谱构建异常: {e}", exc_info=True)
         finally:
             _building_spaces.discard(space_key)
 
-    asyncio.ensure_future(_do_build())
+    asyncio.create_task(_do_build())
 
     return {
         "status": "building",

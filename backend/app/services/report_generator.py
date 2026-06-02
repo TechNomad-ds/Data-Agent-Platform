@@ -103,6 +103,6 @@ def _build_markdown(conv, messages, space_name: str) -> str:
             lines.append("")
 
     lines.append("")
-    lines.append("*本报告由 Data Agent Platform 自动生成*")
+    lines.append("*本报告由 DataMind Platform 自动生成*")
 
     return "\n".join(lines)

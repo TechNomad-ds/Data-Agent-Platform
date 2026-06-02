@@ -33,4 +33,8 @@ export const authApi = {
   getMe: () => api.get<UserInfo>('/auth/me'),
   refresh: (refreshToken: string) =>
     api.post<TokenResponse>('/auth/refresh', { refresh_token: refreshToken }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    api.put('/auth/password', { old_password: oldPassword, new_password: newPassword }),
+  updateProfile: (data: { username?: string; research_consent?: boolean }) =>
+    api.put<UserInfo>('/auth/profile', data),
 }

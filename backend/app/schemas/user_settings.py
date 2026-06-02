@@ -5,9 +5,9 @@ from datetime import datetime
 
 
 class ApiKeyCreate(BaseModel):
-    provider: str = Field(..., pattern="^(anthropic|openai)$")
+    provider: str = Field(default="openai", pattern="^(anthropic|openai)$")
     api_key: str = Field(..., min_length=5)
-    api_base_url: Optional[str] = None
+    api_base_url: str = Field(..., min_length=1)
     model_name: str = Field(..., min_length=1)
     display_name: str = Field(..., min_length=1)
 

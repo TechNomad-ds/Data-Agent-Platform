@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class ConversationCreate(BaseModel):
-    data_space_id: uuid.UUID
+    data_space_id: Optional[uuid.UUID] = None
     model_id: str = Field(min_length=1)
     title: Optional[str] = None
 
@@ -25,7 +25,7 @@ class ConversationResponse(BaseModel):
 
 
 class MessageCreate(BaseModel):
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=20000)
     model_id: Optional[str] = None
 
 

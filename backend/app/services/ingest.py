@@ -109,7 +109,7 @@ class IngestService:
         finally:
             conn.close()
 
-        sqlite_invalidate(self.data_space_id)
+        sqlite_invalidate(str(self.data_space_id))
 
         return {
             "filename": filename,
@@ -118,8 +118,3 @@ class IngestService:
             "column_count": len(df.columns),
         }
 
-    async def graph_extract_from_text(self, text: str, max_triples: int = 30) -> dict:
-        """从文本中抽取知识图谱三元组"""
-        from app.services.graph import GraphService
-        gs = GraphService(str(self.user_id), str(self.data_space_id))
-        return await gs.extract_triples_from_text(text, max_triples=max_triples)

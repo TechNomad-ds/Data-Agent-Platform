@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Input, Button, Select, Typography, Spin, message } from 'antd'
-import { SendOutlined, RobotOutlined, StopOutlined, LockOutlined, DatabaseOutlined } from '@ant-design/icons'
+import { Input, Button, Select, Typography, Spin, message, Tooltip } from 'antd'
+import {
+  SendOutlined,
+  StopOutlined,
+  LockOutlined,
+  DatabaseOutlined,
+} from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
@@ -12,39 +17,82 @@ import MessageContent from '@/components/Chat/MessageContent'
 import ThinkingBlock from '@/components/Chat/ThinkingBlock'
 import ExportButton from '@/components/Chat/ExportButton'
 import api from '@/api/client'
+import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
 const { TextArea } = Input
 
 const FALLBACK_MODELS: ModelOption[] = [
   { id: 'deepseek-v4-flash', display_name: 'DeepSeek V4 Flash', model_name: 'deepseek-v4-flash', provider: 'deepseek', source: 'platform', credit_multiplier: 1.0 },
-  { id: 'qwen3.5-flash', display_name: 'Qwen 3.5 Flash', model_name: 'qwen3.5-flash', provider: 'qwen', source: 'platform', credit_multiplier: 1.5 },
-  { id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5', model_name: 'claude-haiku-4-5-20251001', provider: 'anthropic', source: 'platform', credit_multiplier: 3.0 },
-  { id: 'gpt-4o-mini', display_name: 'GPT-4o Mini', model_name: 'gpt-4o-mini', provider: 'openai', source: 'platform', credit_multiplier: 2.0 },
-  { id: 'deepseek-r1', display_name: 'DeepSeek R1', model_name: 'deepseek-r1', provider: 'deepseek', source: 'platform', credit_multiplier: 2.0 },
 ]
 
 const DEFAULT_SUGGESTIONS = [
-  '这份数据有哪些字段，各自是什么含义？',
-  '数据整体质量如何，有没有缺失或异常值？',
+  '帮我看看数据空间里有什么文件',
+  '帮我概述一下数据的整体情况',
   '帮我做一个关键指标的统计摘要',
   '数据中有哪些值得关注的趋势或规律？',
 ]
+
+const READING_WIDTH = 760
 
 interface Props {
   selectedSpaceId: string | undefined
   conversationId: string | undefined
   onConversationCreated: (id: string) => void
+  onConversationDeleted?: () => void
   onSpaceChange: (id: string | undefined) => void
   spaceLockedByConversation?: boolean
 }
 
-export default function ChatView({ selectedSpaceId, conversationId, onConversationCreated, onSpaceChange, spaceLockedByConversation = false }: Props) {
+// AI 大头像 — 用于空状态
+function HeroMark() {
+  return (
+    <div
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        background: colors.aiAvatar,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: '0 auto 18px',
+        boxShadow: '0 6px 20px rgba(79, 70, 229, 0.22)',
+      }}
+    >
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 2.5L13.5 9L20 10.5L13.5 12L12 18.5L10.5 12L4 10.5L10.5 9L12 2.5Z"
+          fill="#ffffff"
+        />
+        <circle cx="12" cy="20.5" r="1.5" fill="#ffffff" opacity="0.7" />
+      </svg>
+    </div>
+  )
+}
+
+export default function ChatView({
+  selectedSpaceId,
+  conversationId,
+  onConversationCreated,
+  onConversationDeleted,
+  onSpaceChange,
+  spaceLockedByConversation = false,
+}: Props) {
   const {
     setCurrentConversation,
-    messages, setMessages, segments, thinkingText,
-    isStreaming, setIsStreaming, appendStreamDelta, addToolEvent,
-    setThinkingText, resetStream, setAbortController, stopStreaming,
+    messages,
+    setMessages,
+    segments,
+    thinkingText,
+    isStreaming,
+    setIsStreaming,
+    appendStreamDelta,
+    addToolEvent,
+    setThinkingText,
+    resetStream,
+    setAbortController,
+    stopStreaming,
   } = useChatStore()
 
   const [spaces, setSpaces] = useState<DataSpace[]>([])
@@ -52,18 +100,48 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [inputFocused, setInputFocused] = useState(false)
+  const [loadingConversation, setLoadingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sseBufferRef = useRef('')
+  const savedMsgIdRef = useRef<string | null>(null)
+  const creditsUsedRef = useRef<number | null>(null)
 
-  useEffect(() => { loadSpaces(); loadModels() }, [])
+  useEffect(() => {
+    loadSpaces()
+    loadModels()
+  }, [])
+
   useEffect(() => {
     if (conversationId) loadConversation(conversationId)
-    else { setCurrentConversation(null); setMessages([]) }
+    else {
+      setCurrentConversation(null)
+      setMessages([])
+    }
   }, [conversationId])
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, segments])
-  useEffect(() => { if (selectedSpaceId) loadSuggestions(); else setSuggestions([]) }, [selectedSpaceId])
 
-  const loadSpaces = async () => { try { setSpaces((await dataSpacesApi.list()).data) } catch {} }
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, segments])
+
+  useEffect(() => {
+    if (selectedSpaceId) {
+      loadSpaces()
+      loadSuggestions()
+    } else {
+      setSuggestions(DEFAULT_SUGGESTIONS)
+    }
+  }, [selectedSpaceId])
+
+
+  const loadSpaces = async (retry = 2) => {
+    try {
+      setSpaces((await dataSpacesApi.list()).data)
+    } catch {
+      if (retry > 0) setTimeout(() => loadSpaces(retry - 1), 2000)
+    }
+  }
+
   const loadModels = async () => {
     try {
       const res = await settingsApi.listModels()
@@ -75,42 +153,69 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
       if (!selectedModel) setSelectedModel(FALLBACK_MODELS[0].id)
     }
   }
+
   const loadConversation = async (id: string) => {
+    setLoadingConversation(true)
     try {
       const res = await chatApi.getConversation(id)
       setCurrentConversation(res.data)
       setMessages(res.data.messages)
       setSelectedModel(res.data.model_id)
     } catch {}
+    finally { setLoadingConversation(false) }
   }
+
   const loadSuggestions = async () => {
     try {
       const res = await api.get(`/data-spaces/${selectedSpaceId}/suggestions`)
       const items = res.data.suggestions || []
       setSuggestions(items.length > 0 ? items : DEFAULT_SUGGESTIONS)
-    } catch { setSuggestions(DEFAULT_SUGGESTIONS) }
+    } catch {
+      setSuggestions(DEFAULT_SUGGESTIONS)
+    }
   }
 
-  const parseSSELine = useCallback((line: string) => {
-    if (!line.startsWith('data: ')) return
-    const data = line.slice(6)
-    if (data === '[DONE]') return
-    try {
-      const event: SSEEvent = JSON.parse(data)
-      switch (event.type) {
-        case 'text': if (event.delta) appendStreamDelta(event.delta); break
-        case 'thinking': if (event.content) setThinkingText(event.content); break
-        case 'tool_use': case 'tool_result': addToolEvent(event); break
-        case 'error': message.error(event.message || 'Agent 执行出错'); break
-      }
-    } catch {}
-  }, [appendStreamDelta, setThinkingText, addToolEvent])
+  const parseSSELine = useCallback(
+    (line: string) => {
+      if (!line.startsWith('data: ')) return
+      const data = line.slice(6)
+      if (data === '[DONE]') return
+      try {
+        const event: SSEEvent = JSON.parse(data)
+        switch (event.type) {
+          case 'text':
+            if (event.delta) appendStreamDelta(event.delta)
+            break
+          case 'thinking':
+            if (event.content) setThinkingText(event.content)
+            break
+          case 'tool_use':
+          case 'tool_result':
+            addToolEvent(event)
+            break
+          case 'done':
+            if (event.credits_used != null) creditsUsedRef.current = event.credits_used
+            break
+          case 'saved':
+            if (event.message_id) savedMsgIdRef.current = event.message_id
+            break
+          case 'error':
+            message.error(event.message || 'Agent 执行出错')
+            break
+          case 'conversation_deleted':
+            setMessages([])
+            setCurrentConversation(null)
+            onConversationDeleted?.()
+            break
+        }
+      } catch {}
+    },
+    [appendStreamDelta, setThinkingText, addToolEvent, setMessages, setCurrentConversation, onConversationDeleted]
+  )
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || isStreaming) return
-    if (!selectedSpaceId) { message.warning('请先选择数据空间'); return }
+  const handleSendWithContent = async (content: string) => {
+    if (!content.trim() || isStreaming) return
     if (!selectedModel) { message.warning('请先选择模型'); return }
-
     let convId = conversationId
     if (!convId) {
       try {
@@ -120,21 +225,68 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
         convId = res.data.id
       } catch { message.error('创建对话失败'); return }
     }
+    await sendMessage(convId, content)
+  }
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || isStreaming) return
+    if (!selectedModel) {
+      message.warning('请先选择模型')
+      return
+    }
+
+    let convId = conversationId
+    if (!convId) {
+      try {
+        const res = await chatApi.createConversation({
+          data_space_id: selectedSpaceId,
+          model_id: selectedModel,
+        })
+        setCurrentConversation(res.data)
+        onConversationCreated(res.data.id)
+        convId = res.data.id
+      } catch {
+        message.error('创建对话失败')
+        return
+      }
+    }
     await sendMessage(convId, inputValue)
   }
 
-  const sendMessage = async (convId: string, content: string) => {
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content, tool_calls: null, token_usage: null, credits_used: null, created_at: new Date().toISOString() }
-    setMessages([...useChatStore.getState().messages, userMsg])
+  const sendMessage = async (convId: string, content: string, skipAddUserMsg = false) => {
+    if (!skipAddUserMsg) {
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content,
+        tool_calls: null,
+        token_usage: null,
+        credits_used: null,
+        created_at: new Date().toISOString(),
+      }
+      setMessages([...useChatStore.getState().messages, userMsg])
+    }
     setInputValue('')
     resetStream()
     setIsStreaming(true)
+    savedMsgIdRef.current = null
+    creditsUsedRef.current = null
     const controller = new AbortController()
     setAbortController(controller)
 
     try {
-      const response = await chatApi.sendMessage(convId, content, controller.signal, selectedModel)
-      if (!response.ok) { if (response.status === 401) { useAuthStore.getState().logout() }; throw new Error() }
+      const response = await chatApi.sendMessage(
+        convId,
+        content,
+        controller.signal,
+        selectedModel
+      )
+      if (!response.ok) {
+        if (response.status === 401) {
+          useAuthStore.getState().logout()
+        }
+        throw new Error()
+      }
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       if (!reader) return
@@ -145,145 +297,231 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
         sseBufferRef.current += decoder.decode(value, { stream: true })
         const lines = sseBufferRef.current.split('\n\n')
         sseBufferRef.current = lines.pop() || ''
-        for (const block of lines) { for (const line of block.split('\n')) { parseSSELine(line.trim()) } }
+        for (const block of lines) {
+          for (const line of block.split('\n')) {
+            parseSSELine(line.trim())
+          }
+        }
       }
       sseBufferRef.current += decoder.decode()
-      if (sseBufferRef.current.trim()) { for (const line of sseBufferRef.current.split('\n')) { parseSSELine(line.trim()) } }
+      if (sseBufferRef.current.trim()) {
+        for (const line of sseBufferRef.current.split('\n')) {
+          parseSSELine(line.trim())
+        }
+      }
+      sseBufferRef.current = ''
 
       const state = useChatStore.getState()
-      const finalContent = state.segments.filter(s => s.type === 'text').map(s => s.content || '').join('')
-      if (finalContent) {
-        const assistantMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: finalContent, tool_calls: state.segments, token_usage: null, credits_used: null, created_at: new Date().toISOString() }
+      const finalContent = state.segments
+        .filter((s) => s.type === 'text')
+        .map((s) => s.content || '')
+        .join('')
+      // 即便没有 text 段（只有工具调用），也要把 tool_calls 留下，避免内容丢失
+      if (finalContent || state.segments.length > 0) {
+        const assistantMsg: Message = {
+          id: savedMsgIdRef.current || (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: finalContent,
+          tool_calls: state.segments,
+          token_usage: null,
+          credits_used: creditsUsedRef.current,
+          created_at: new Date().toISOString(),
+        }
         setMessages([...useChatStore.getState().messages, assistantMsg])
       }
-    } catch (err: any) { if (err.name !== 'AbortError') message.error('发送失败') }
-    finally { setIsStreaming(false); setAbortController(null); resetStream() }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') message.error('发送失败')
+    } finally {
+      setIsStreaming(false)
+      setAbortController(null)
+      resetStream()
+    }
   }
 
+  const handleRegenerate = useCallback(() => {
+    if (isStreaming || !conversationId) return
+    const currentMessages = useChatStore.getState().messages
+    const userMessages = currentMessages.filter((m) => m.role === 'user')
+    const lastUserMsg = userMessages[userMessages.length - 1]
+    if (!lastUserMsg?.content) return
+    const newMessages = currentMessages.slice(0, currentMessages.lastIndexOf(lastUserMsg) + 1)
+    setMessages(newMessages)
+    sendMessage(conversationId, lastUserMsg.content, true)
+  }, [isStreaming, conversationId, selectedModel])
+
+  const handleFeedback = useCallback(
+    async (messageId: string, rating: number) => {
+      try {
+        await api.post('/feedback', { message_id: messageId, rating })
+      } catch {}
+    },
+    []
+  )
+
+  const showEmpty = messages.length === 0 && !isStreaming
+  const inputDisabled = isStreaming
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f8fafc' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        background: colors.bg,
+      }}
+    >
       {/* Top bar */}
-      <div style={{ padding: '10px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div
+        style={{
+          padding: '10px 24px',
+          borderBottom: `1px solid ${colors.border}`,
+          background: colors.surface,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 56,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {spaceLockedByConversation && selectedSpaceId ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', borderRadius: 6, background: '#f1f5f9', border: '1px solid #e2e8f0',
-            }}>
-              <DatabaseOutlined style={{ fontSize: 12, color: '#64748b' }} />
-              <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
-                {spaces.find(s => s.id === selectedSpaceId)?.name || '数据空间'}
-              </span>
-              <LockOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-            </div>
+            <Tooltip title="此对话已绑定数据空间，不可切换" placement="bottom">
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: colors.bgSubtle,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                <DatabaseOutlined
+                  style={{ fontSize: 12, color: colors.textSecondary }}
+                />
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: colors.textPrimary,
+                    fontWeight: 500,
+                  }}
+                >
+                  {spaces.find((s) => s.id === selectedSpaceId)?.name ||
+                    '数据空间'}
+                </span>
+                <LockOutlined
+                  style={{ fontSize: 10, color: colors.textMuted }}
+                />
+              </div>
+            </Tooltip>
           ) : (
             <Select
-              value={selectedSpaceId}
+              value={spaces.some((s) => s.id === selectedSpaceId) ? selectedSpaceId : undefined}
               onChange={onSpaceChange}
-              placeholder="选择数据空间"
-              style={{ width: 180 }}
+              placeholder="数据空间"
+              style={{ minWidth: 140 }}
               popupMatchSelectWidth={false}
-              options={spaces.map(s => ({
-                label: s.name,
-                value: s.id,
-              }))}
+              variant="borderless"
+              options={spaces.map((s) => ({ label: s.name, value: s.id }))}
             />
           )}
+          <span style={{ color: colors.border }}>|</span>
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
-            placeholder="选择模型"
-            style={{ width: 180 }}
-            options={[
-              {
-                label: '平台模型',
-                options: models.filter(m => m.source === 'platform').map(m => ({
-                  label: m.display_name,
-                  value: m.id,
-                })),
-              },
-              ...(models.some(m => m.source === 'user') ? [{
-                label: '我的模型',
-                options: models.filter(m => m.source === 'user').map(m => ({
-                  label: m.display_name,
-                  value: m.id,
-                })),
-              }] : []),
-            ]}
+            placeholder="模型"
+            style={{ minWidth: 160, maxWidth: 320 }}
+            variant="borderless"
+            popupMatchSelectWidth={false}
+            optionLabelProp="label"
+            options={models.map((m) => ({
+              label: m.display_name,
+              value: m.id,
+            }))}
           />
         </div>
-        <ExportButton conversationId={conversationId} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ExportButton conversationId={conversationId} />
+        </div>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px 0' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
-          {messages.length === 0 && !isStreaming ? (
-            <div style={{ textAlign: 'center', paddingTop: 80 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <RobotOutlined style={{ fontSize: 24, color: '#fff' }} />
-              </div>
-              <Text style={{ fontSize: 18, fontWeight: 600, color: '#1e293b', display: 'block', marginBottom: 4 }}>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <div
+          style={{
+            maxWidth: READING_WIDTH,
+            margin: '0 auto',
+            padding: showEmpty ? '0 24px' : '32px 24px 24px',
+          }}
+        >
+          {loadingConversation ? (
+            <div style={{ textAlign: 'center', paddingTop: 120 }}>
+              <Spin />
+              <div style={{ marginTop: 12, color: colors.textMuted, fontSize: 13 }}>加载对话...</div>
+            </div>
+          ) : showEmpty ? (
+            <div style={{ textAlign: 'center', paddingTop: 96 }}>
+              <HeroMark />
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  display: 'block',
+                  marginBottom: 6,
+                  letterSpacing: -0.3,
+                }}
+              >
                 有什么可以帮你分析的？
               </Text>
-              <Text style={{ fontSize: 13, color: '#94a3b8', display: 'block', marginBottom: 28 }}>
-                {selectedSpaceId ? '基于你的数据，试试下面的问题' : '选择一个数据空间开始'}
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.textMuted,
+                  display: 'block',
+                  marginBottom: 36,
+                }}
+              >
+                {selectedSpaceId
+                  ? '基于你的数据，试试下面这些方向'
+                  : '选择数据空间后可分析数据，也可以直接提问'}
               </Text>
 
-              {!selectedSpaceId && spaces.length > 0 ? (
-                <div style={{ maxWidth: 400, margin: '0 auto' }}>
-                  {spaces.slice(0, 4).map(s => (
-                    <div
-                      key={s.id}
-                      onClick={() => onSpaceChange(s.id)}
-                      style={{
-                        padding: '12px 16px', borderRadius: 10, marginBottom: 8,
-                        border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#a5b4fc'; e.currentTarget.style.background = '#f8faff' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff' }}
-                    >
-                      <DatabaseOutlined style={{ fontSize: 16, color: '#4f46e5' }} />
-                      <div>
-                        <div style={{ fontSize: 13, color: '#1e293b', fontWeight: 500 }}>{s.name}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{s.file_count} 个文件</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : suggestions.length > 0 ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 12,
-                  maxWidth: 560,
-                  margin: '0 auto',
-                }}>
-                  {suggestions.slice(0, 4).map(q => (
+              {suggestions.length > 0 ? (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: 10,
+                    maxWidth: 600,
+                    margin: '0 auto',
+                  }}
+                >
+                  {suggestions.slice(0, 4).map((q) => (
                     <div
                       key={q}
-                      onClick={() => setInputValue(q)}
+                      onClick={() => { if (!isStreaming && selectedModel) { setInputValue(''); handleSendWithContent(q) } else { setInputValue(q) } }}
                       style={{
                         padding: '14px 16px',
-                        borderRadius: 10,
-                        border: '1px solid #e2e8f0',
-                        background: '#fff',
+                        borderRadius: 12,
+                        border: `1px solid ${colors.border}`,
+                        background: colors.surface,
                         cursor: 'pointer',
                         textAlign: 'left',
-                        fontSize: 13,
-                        color: '#334155',
-                        lineHeight: 1.5,
+                        fontSize: 13.5,
+                        color: colors.textSecondary,
+                        lineHeight: 1.55,
                         transition: 'all 0.15s',
                       }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.borderColor = '#a5b4fc'
-                        e.currentTarget.style.background = '#f8faff'
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = colors.borderStrong
+                        e.currentTarget.style.background = colors.bgMuted
+                        e.currentTarget.style.color = colors.textPrimary
                       }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.borderColor = '#e2e8f0'
-                        e.currentTarget.style.background = '#fff'
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = colors.border
+                        e.currentTarget.style.background = colors.surface
+                        e.currentTarget.style.color = colors.textSecondary
                       }}
                     >
                       {q}
@@ -294,22 +532,107 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
             </div>
           ) : (
             <>
-              {messages.map(msg => <div key={msg.id} style={{ marginBottom: 20 }}><MessageContent message={msg} /></div>)}
+              {messages.map((msg, idx) => (
+                <div key={msg.id} style={{ marginBottom: 28 }}>
+                  <MessageContent
+                    message={msg}
+                    onRegenerate={
+                      msg.role === 'assistant' && idx === messages.length - 1 && !isStreaming
+                        ? handleRegenerate
+                        : undefined
+                    }
+                    onFeedback={msg.role === 'assistant' ? handleFeedback : undefined}
+                  />
+                </div>
+              ))}
               {isStreaming && (
-                <div style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <RobotOutlined style={{ color: '#fff', fontSize: 13 }} />
+                <div
+                  style={{
+                    marginBottom: 24,
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: colors.aiAvatar,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)',
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M12 2.5L13.5 9L20 10.5L13.5 12L12 18.5L10.5 12L4 10.5L10.5 9L12 2.5Z"
+                        fill="#ffffff"
+                      />
+                    </svg>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {segments.length === 0 && !thinkingText && <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}><Spin size="small" /><Text style={{ fontSize: 13, color: '#64748b' }}>思考中...</Text></div>}
-                    {thinkingText && segments.length === 0 && <Text style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>{thinkingText}</Text>}
-                    {segments.map((seg, i) => seg.type === 'text' ? (
-                      <div key={i} className="markdown-body" style={{ fontSize: 14, lineHeight: 1.7, padding: '8px 12px', borderRadius: 8, background: '#fff', border: '1px solid #e2e8f0', marginBottom: 6 }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{seg.content || ''}</ReactMarkdown>
+                    {segments.length === 0 && !thinkingText && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '6px 0',
+                        }}
+                      >
+                        <Spin size="small" />
+                        <Text
+                          style={{ fontSize: 13, color: colors.textSecondary }}
+                        >
+                          思考中…
+                        </Text>
                       </div>
-                    ) : (
-                      <div key={i} style={{ marginBottom: 6 }}><ThinkingBlock toolEvents={seg.events || []} defaultExpanded={true} /></div>
-                    ))}
+                    )}
+                    {thinkingText && segments.length === 0 && (
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          color: colors.textMuted,
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        {thinkingText}
+                      </Text>
+                    )}
+                    {segments.map((seg, i) =>
+                      seg.type === 'text' ? (
+                        <div
+                          key={i}
+                          className="markdown-body"
+                          style={{ marginBottom: 8 }}
+                        >
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {seg.content || ''}
+                          </ReactMarkdown>
+                          {/* 流式中显示输入光标 */}
+                          {i === segments.length - 1 && (
+                            <span className="typing-dot" />
+                          )}
+                        </div>
+                      ) : (
+                        <div key={i} style={{ marginBottom: 10 }}>
+                          <ThinkingBlock
+                            toolEvents={seg.events || []}
+                            defaultExpanded={true}
+                          />
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -320,23 +643,102 @@ export default function ChatView({ selectedSpaceId, conversationId, onConversati
       </div>
 
       {/* Input */}
-      <div style={{ padding: '12px 24px 20px' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '10px 14px', display: 'flex', alignItems: 'flex-end', gap: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ padding: '8px 24px 22px', background: colors.bg }}>
+        <div
+          style={{
+            maxWidth: READING_WIDTH,
+            margin: '0 auto',
+            background: colors.surface,
+            borderRadius: 18,
+            border: `1px solid ${
+              inputFocused ? colors.borderStrong : colors.border
+            }`,
+            padding: '8px 8px 8px 16px',
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 6,
+            boxShadow: inputFocused
+              ? '0 4px 16px rgba(15, 23, 42, 0.06)'
+              : '0 1px 3px rgba(15, 23, 42, 0.04)',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
+          }}
+        >
           <TextArea
             value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            placeholder={selectedSpaceId ? '输入你的问题...  Enter 发送，Shift+Enter 换行' : '请先选择数据空间'}
-            autoSize={{ minRows: 1, maxRows: 5 }}
-            onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); handleSend() } }}
-            disabled={isStreaming || !selectedSpaceId}
+            onChange={(e) => setInputValue(e.target.value)}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            placeholder={
+              selectedSpaceId
+                ? '向 DataMind 提问…  Enter 发送，Shift+Enter 换行'
+                : '选择数据空间后可分析数据，或直接提问…'
+            }
+            autoSize={{ minRows: 1, maxRows: 6 }}
+            onPressEnter={(e) => {
+              if (!e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            disabled={inputDisabled}
             variant="borderless"
-            style={{ flex: 1, resize: 'none', fontSize: 14 }}
+            style={{
+              flex: 1,
+              resize: 'none',
+              fontSize: 14.5,
+              padding: '8px 0',
+              lineHeight: 1.55,
+            }}
           />
           {isStreaming ? (
-            <Button danger icon={<StopOutlined />} onClick={stopStreaming} style={{ borderRadius: 8, height: 34, width: 34 }} />
+            <Tooltip title="停止生成">
+              <Button
+                shape="circle"
+                icon={<StopOutlined />}
+                onClick={() => {
+                  stopStreaming()
+                  if (conversationId) {
+                    api.post(`/chat/conversations/${conversationId}/abort`).catch(() => {})
+                  }
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: colors.textPrimary,
+                  borderColor: colors.textPrimary,
+                  color: '#fff',
+                }}
+              />
+            </Tooltip>
           ) : (
-            <Button type="primary" icon={<SendOutlined />} onClick={handleSend} disabled={!inputValue.trim() || !selectedSpaceId} style={{ borderRadius: 8, height: 34, width: 34 }} />
+            <Tooltip title={inputValue.trim() ? '发送' : '请输入内容'}>
+              <Button
+                shape="circle"
+                icon={<SendOutlined />}
+                onClick={handleSend}
+                disabled={!inputValue.trim()}
+                style={{
+                  width: 36,
+                  height: 36,
+                  background: inputValue.trim()
+                    ? colors.textPrimary
+                    : colors.borderStrong,
+                  borderColor: 'transparent',
+                  color: '#fff',
+                }}
+              />
+            </Tooltip>
           )}
+        </div>
+        <div
+          style={{
+            textAlign: 'center',
+            fontSize: 11,
+            color: colors.textMuted,
+            marginTop: 8,
+          }}
+        >
+          AI 生成的内容仅供参考，请核实关键数据后再使用
         </div>
       </div>
     </div>

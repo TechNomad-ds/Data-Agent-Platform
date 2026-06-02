@@ -7,9 +7,11 @@ import Sidebar from '@/components/Sidebar/Sidebar'
 import ChatView from '@/components/Chat/ChatView'
 import DataManager from '@/components/DataManager/DataManager'
 import SettingsPage from '@/pages/Settings'
+import CreditsPage from '@/pages/Credits'
+import AdminPage from '@/pages/Admin'
 import Onboarding from '@/components/Onboarding/Onboarding'
 
-export type MainView = 'chat' | 'data' | 'settings'
+export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin'
 
 export default function MainLayout() {
   const [currentView, setCurrentView] = useState<MainView>('chat')
@@ -64,8 +66,11 @@ export default function MainLayout() {
       const res = await chatApi.getConversation(id)
       if (res.data.data_space_id) {
         setSelectedSpaceId(res.data.data_space_id)
+        setSpaceLockedByConversation(true)
+      } else {
+        setSelectedSpaceId(undefined)
+        setSpaceLockedByConversation(false)
       }
-      setSpaceLockedByConversation(true)
     } catch {
       setSpaceLockedByConversation(true)
     }
@@ -74,15 +79,25 @@ export default function MainLayout() {
   const handleSpaceChange = useCallback((id: string | undefined) => {
     if (!spaceLockedByConversation) {
       setSelectedSpaceId(id)
+      setCurrentConvId(undefined)
     }
   }, [spaceLockedByConversation])
 
   const handleOpenDataManager = useCallback(() => {
+    setSelectedSpaceId(undefined)
     setCurrentView('data')
   }, [])
 
   const handleOpenSettings = useCallback(() => {
     setCurrentView('settings')
+  }, [])
+
+  const handleOpenCredits = useCallback(() => {
+    setCurrentView('credits')
+  }, [])
+
+  const handleOpenAdmin = useCallback(() => {
+    setCurrentView('admin')
   }, [])
 
   const handleConversationCreated = useCallback((id: string) => {
@@ -112,6 +127,8 @@ export default function MainLayout() {
             onSelectConversation={handleSelectConversation}
             onOpenDataManager={handleOpenDataManager}
             onOpenSettings={handleOpenSettings}
+            onOpenCredits={handleOpenCredits}
+            onOpenAdmin={handleOpenAdmin}
             currentView={currentView}
           />
 
@@ -121,6 +138,7 @@ export default function MainLayout() {
                 selectedSpaceId={selectedSpaceId}
                 conversationId={currentConvId}
                 onConversationCreated={handleConversationCreated}
+                onConversationDeleted={handleNewChat}
                 onSpaceChange={handleSpaceChange}
                 spaceLockedByConversation={spaceLockedByConversation}
               />
@@ -130,6 +148,18 @@ export default function MainLayout() {
                 onSpaceChange={setSelectedSpaceId}
                 onStartChat={handleStartChat}
               />
+            ) : currentView === 'credits' ? (
+              <div style={{ height: '100vh', overflow: 'auto', background: '#f8fafc', padding: 32 }}>
+                <div style={{ maxWidth: 900, margin: '0 auto' }}>
+                  <CreditsPage />
+                </div>
+              </div>
+            ) : currentView === 'admin' ? (
+              <div style={{ height: '100vh', overflow: 'auto', background: '#f8fafc', padding: 32 }}>
+                <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+                  <AdminPage />
+                </div>
+              </div>
             ) : (
               <SettingsPage />
             )}
@@ -148,7 +178,7 @@ export default function MainLayout() {
       >
         <div style={{ textAlign: 'center', padding: '12px 0' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 16 }}>开始使用 Data Agent</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 16 }}>开始使用 DataMind</div>
           <div style={{ textAlign: 'left', fontSize: 14, color: '#475569', lineHeight: 2.2 }}>
             <div><strong>① 数据管理</strong> — 左侧进入数据管理，创建数据空间并上传文件</div>
             <div><strong>② 新建对话</strong> — 点击"新对话"，在顶部选择数据空间和模型</div>

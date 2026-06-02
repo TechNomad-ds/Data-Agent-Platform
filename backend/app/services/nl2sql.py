@@ -31,22 +31,30 @@ SQL："""
 async def generate_sql(
     question: str,
     schemas: list[dict],
-    client: AsyncAnthropic | None = None,
 ) -> str:
-    """从自然语言生成 SQL"""
-    if client is None:
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-
+    """从自然语言生成 SQL（支持 Anthropic 和 OpenAI 兼容接口）"""
     schema_text = _format_schemas(schemas)
     prompt = NL2SQL_PROMPT.format(schema=schema_text, question=question)
 
-    response = await client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    sql = response.content[0].text.strip()
+    if settings.llm_backend == "anthropic" and settings.anthropic_api_key:
+        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        response = await client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        sql = response.content[0].text.strip()
+    elif settings.openai_api_base and settings.openai_api_key:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_api_base)
+        response = await client.chat.completions.create(
+            model=settings.openai_model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        sql = response.choices[0].message.content.strip()
+    else:
+        raise ValueError("未配置可用的 LLM 后端，请在 .env 中配置 Anthropic 或 OpenAI API")
     if sql.startswith("```"):
         sql = sql.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 

@@ -3,7 +3,7 @@ import {
   Button, Table, Tag, Space, Typography, Upload, message, Popconfirm, Card,
 } from 'antd'
 import {
-  ArrowLeftOutlined, InboxOutlined, DeleteOutlined, ThunderboltOutlined,
+  ArrowLeftOutlined, InboxOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
@@ -20,8 +20,6 @@ interface Props {
 export default function SpaceDetail({ space, onBack }: Props) {
   const [files, setFiles] = useState<FileInSpace[]>([])
   const [loading, setLoading] = useState(false)
-  const [indexLoading, setIndexLoading] = useState(false)
-  const [indexStatus, setIndexStatus] = useState(space.index_status)
 
   useEffect(() => {
     loadDetail()
@@ -32,7 +30,7 @@ export default function SpaceDetail({ space, onBack }: Props) {
     try {
       const res = await dataSpacesApi.get(space.id)
       setFiles(res.data.files)
-      setIndexStatus(res.data.index_status)
+      // index_status removed
     } catch {
       message.error('加载数据空间详情失败')
     } finally {
@@ -47,20 +45,6 @@ export default function SpaceDetail({ space, onBack }: Props) {
       loadDetail()
     } catch {
       message.error('移除失败')
-    }
-  }
-
-  const handleBuildIndex = async () => {
-    setIndexLoading(true)
-    try {
-      await dataSpacesApi.buildIndex(space.id)
-      message.success('索引构建完成')
-      setIndexStatus('ready')
-    } catch {
-      message.error('索引构建失败')
-      setIndexStatus('error')
-    } finally {
-      setIndexLoading(false)
     }
   }
 
@@ -88,19 +72,6 @@ export default function SpaceDetail({ space, onBack }: Props) {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  const statusColor: Record<string, string> = {
-    empty: 'default',
-    building: 'processing',
-    ready: 'success',
-    error: 'error',
-  }
-  const statusText: Record<string, string> = {
-    empty: '未索引',
-    building: '构建中',
-    ready: '已就绪',
-    error: '索引失败',
   }
 
   const columns = [
@@ -144,16 +115,8 @@ export default function SpaceDetail({ space, onBack }: Props) {
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回</Button>
           <Title level={4} style={{ margin: 0 }}>{space.name}</Title>
-          <Tag color={statusColor[indexStatus]}>{statusText[indexStatus]}</Tag>
+          <Tag color="success">就绪</Tag>
         </Space>
-        <Button
-          type="primary"
-          icon={<ThunderboltOutlined />}
-          loading={indexLoading}
-          onClick={handleBuildIndex}
-        >
-          {indexStatus === 'ready' ? '重建索引' : '构建索引'}
-        </Button>
       </div>
 
       {space.description && (

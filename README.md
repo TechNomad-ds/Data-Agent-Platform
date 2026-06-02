@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="image.png" alt="Data Agent Platform" width="120" />
+  <img src="image.png" alt="DataMind Platform" width="120" />
 </p>
 
-<h1 align="center">Data Agent Platform</h1>
+<h1 align="center">DataMind Platform</h1>
 
 <p align="center">
   <b>面向业务的智能数据交互平台</b><br/>
@@ -21,15 +21,15 @@
 
 ---
 
-## 为什么需要 Data Agent Platform
+## 为什么需要 DataMind Platform
 
-传统数据分析有两道门槛：**会用 SQL/Python** 和 **看得懂业务**。Data Agent Platform 把这两道门槛同时拆掉——
+传统数据分析有两道门槛：**会用 SQL/Python** 和 **看得懂业务**。DataMind Platform 把这两道门槛同时拆掉——
 
 - **不会写 SQL 的业务人员**：上传 Excel/CSV，直接用中文提问"哪些客户复购率最高？画个折线图看每月销售趋势"，Agent 自动完成分析、出图、给结论。
 - **数据团队**：把临时取数、报告制作、可视化等重复劳动交给 Agent，团队聚焦在数据建模和深度洞察上。
 - **管理层**：跨多个数据空间隔离，每个项目/部门一个空间，权限、配额、记忆各自独立，对话即报告。
 
-> Data Agent 不是一个被动的 SQL 工具，而是一个会主动 **理解数据 → 制定方案 → 执行代码 → 检查结果 → 修正策略** 的 Agent。配合 14 个内置工具（搜索、SQL、Pandas、可视化、知识图谱、记忆等），它能在数十轮交互中持续解决复杂分析问题。
+> DataMind 不是一个被动的 SQL 工具，而是一个会主动 **理解数据 → 制定方案 → 执行代码 → 检查结果 → 修正策略** 的 Agent。配合 14 个内置工具（搜索、SQL、Pandas、可视化、知识图谱、记忆等），它能在数十轮交互中持续解决复杂分析问题。
 
 ---
 
@@ -90,8 +90,8 @@ brew services start redis
 createdb data_agent
 
 # 2. 克隆并配置
-git clone <your-repo-url> Data-Agent-Platform
-cd Data-Agent-Platform
+git clone <your-repo-url> DataMind-Platform
+cd DataMind-Platform
 cp .env.example .env
 # 编辑 .env：填入 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
 
@@ -196,7 +196,7 @@ OPENAI_MODEL=deepseek-chat
 
 ## Agent 工具
 
-后端为 Agent 暴露了 **14 个工具**，覆盖搜索、查询、计算、可视化、记忆、图谱五大类：
+后端为 Agent 暴露了 **14 个工具**（含 3 个知识图谱工具），覆盖搜索、查询、计算、可视化、记忆、图谱五大类：
 
 | 类别 | 工具 | 说明 |
 |------|------|------|
@@ -264,7 +264,7 @@ OPENAI_MODEL=deepseek-chat
 ## 项目结构
 
 ```
-Data-Agent-Platform/
+DataMind-Platform/
 ├── backend/
 │   ├── app/
 │   │   ├── agent/          # Agent 主循环 + 14 个工具实现

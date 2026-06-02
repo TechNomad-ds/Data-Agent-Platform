@@ -38,9 +38,16 @@ async def query_external_database(
     conn_info = data.connection
     sql = data.sql.strip()
 
-    sql_upper = sql.upper()
-    if any(kw in sql_upper for kw in ("INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE")):
-        raise HTTPException(status_code=400, detail="只允许 SELECT 查询")
+    import re
+    sql_upper = sql.upper().strip()
+    # 只允许以 SELECT 或 WITH 开头的语句
+    if not re.match(r'^(SELECT|WITH)\b', sql_upper):
+        raise HTTPException(status_code=400, detail="只允许 SELECT/WITH 查询")
+    # 额外检查：拒绝包含破坏性关键词的语句（防止 CTE 中嵌入写操作）
+    destructive = {"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "REPLACE", "ATTACH", "DETACH"}
+    tokens = set(re.findall(r'\b[A-Z]+\b', sql_upper))
+    if tokens & destructive:
+        raise HTTPException(status_code=400, detail="只允许 SELECT 查询，不能包含写操作")
 
     try:
         if conn_info.db_type == "mysql":
@@ -79,7 +86,10 @@ async def list_external_tables(
 
 
 async def _query_mysql(conn: DatabaseConnection, sql: str, max_rows: int) -> dict:
-    import aiomysql
+    try:
+        import aiomysql
+    except ImportError:
+        raise HTTPException(status_code=400, detail="当前不支持 MySQL 连接，请将数据导出为 CSV 后上传")
     connection = await aiomysql.connect(
         host=conn.host or "localhost",
         port=conn.port or 3306,
@@ -142,7 +152,10 @@ def _query_sqlite_file(conn: DatabaseConnection, sql: str, max_rows: int) -> dic
 
 
 async def _list_mysql_tables(conn: DatabaseConnection) -> dict:
-    import aiomysql
+    try:
+        import aiomysql
+    except ImportError:
+        raise HTTPException(status_code=400, detail="当前不支持 MySQL 连接，请将数据导出为 CSV 后上传")
     connection = await aiomysql.connect(
         host=conn.host or "localhost", port=conn.port or 3306,
         user=conn.username or "root", password=conn.password or "", db=conn.database,

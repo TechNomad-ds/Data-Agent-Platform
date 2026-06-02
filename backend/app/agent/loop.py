@@ -16,9 +16,29 @@ from app.models.file import File
 from app.models.data_space import DataSpace, DataSpaceFile
 from app.models.credit import CreditAccount, CreditTransaction
 from app.agent.tools import get_tool_definitions, execute_tool
+from app.core.security import decrypt_api_key
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助手。你帮助用户理解、查询和分析他们的数据。用通俗易懂的语言解释分析结果。
+_client_cache: dict[str, Any] = {}
+
+
+def _get_client(provider: str, api_key: str, api_base: str | None = None):
+    """复用 SDK client，避免每次请求创建新连接"""
+    cache_key = f"{provider}:{api_key[:16]}"
+    if cache_key in _client_cache:
+        return _client_cache[cache_key]
+
+    if provider == "anthropic":
+        client = AsyncAnthropic(api_key=api_key)
+    else:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=api_key, base_url=api_base)
+
+    _client_cache[cache_key] = client
+    return client
+
+
+SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手。你帮助用户理解、查询和分析他们的数据。
 
 {data_space_info}
 
@@ -28,42 +48,76 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Data Agent，一个专业的数据分析助�
 
 {memory_context}
 
-## 可用工具
-
-- search_data_space: 混合语义搜索（BM25 + 向量融合）
-- read_file: 读取文件内容（支持所有文件类型：代码、文本、表格等）
-- inspect_data: 查看数据结构和跨文件 join 关系
-- pandas_query: 对数据执行 pandas 查询
-- sqlite_query: 用 SQL 查询数据（表名=文件名去扩展名小写）
-- execute_python: 执行 Python 代码分析数据
-- save_memory: 保存重要发现到记忆系统
-- nl2sql: 用自然语言直接生成并执行 SQL 查询
-
-## 数据分析策略
+## 工具选择策略
 
 1. 数据结构已在上方预注入，无需再调用 inspect_data（除非需要更详细信息）
-2. 对于表格数据优先用 read_file 或 pandas_query 直接操作，这些工具不依赖索引
-3. 对于代码文件（.py, .sql, .r 等）和文本文件（.txt, .md 等），用 read_file 读取内容
-4. 对于简单查询用 pandas_query，复杂多表查询用 sqlite_query 或 nl2sql
-5. search_data_space 适合在大量文本中搜索相关内容，如果搜索无结果可直接用 read_file
-6. 用通俗语言解释发现，引用数据来源
-7. 如果发现重要模式或用户偏好，用 save_memory 记住"""
+2. 表格数据优先用 pandas_query（支持多行代码）或 sqlite_query 直接操作，不依赖索引
+3. pandas_query 适合单表分析，支持多行代码（赋值给 result 变量返回结果）
+4. sqlite_query 适合跨表 JOIN、GROUP BY 等 SQL 擅长的操作
+5. read_file 可读取任何文件（CSV/Excel/PDF/Word/代码/数据库都支持）
+6. execute_python 适合需要复杂逻辑、循环、多步计算的场景
+7. generate_chart 生成可视化图表，善用它让数据直观呈现
+8. search_data_space 适合在大量文本中搜索相关内容
+9. nl2sql 适合用户的自然语言问题直接转 SQL 查询
+10. graph_search 搜索知识图谱中的实体和关系
+11. graph_traverse 从实体出发发现多跳关系路径
+12. graph_extract_from_text 从文本中抽取三元组构建知识图谱
+
+## 输出格式要求（非常重要）
+
+1. **先给结论，再展示数据**：用 1-2 句话总结发现，然后附上支撑数据
+2. **善用 Markdown 表格**：展示数据对比时用表格而不是纯文本
+3. **关键数字加粗**：用 **粗体** 突出最重要的数字和发现
+4. **主动生成图表**：当数据有趋势、分布、对比关系时，用 generate_chart 输出可视化
+5. **分点列出**：多个发现用编号列表组织，不要写成大段落
+6. **引用数据来源**：说明"根据 xxx.csv 的数据"或"从表 xxx 中查询到"
+7. **给出建议**：分析后如果有可执行的建议或后续分析方向，主动提出
+8. **语言通俗**：避免技术术语，用业务语言解释
+
+## 注意事项
+
+- 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，列出所有文件，不要遗漏任何一个
+- 代码文件（.py/.sql/.r 等）也是数据空间的重要组成部分，可能包含数据处理逻辑或分析脚本
+- 如果工具调用失败，立即换一种方法。例如 pandas_query 失败可以试 execute_python 或 sqlite_query，read_file 失败可以试 execute_python 直接读。不要把错误信息原样转述给用户，直接换方法解决
+- 如果发现重要模式或用户偏好，用 save_memory 记住
+- 用户没有指定分析维度时，主动从最有价值的角度切入
+
+## 没有数据空间时
+
+如果用户没有选择数据空间，你仍然可以：
+1. 回答数据分析方法论问题
+2. 帮助用户规划分析思路
+3. 解释统计概念
+4. 建议用户创建数据空间并上传数据
+
+## 错误恢复策略
+
+当工具调用失败时，按以下优先级尝试替代方案：
+1. pandas_query 失败 → 尝试 execute_python 或 sqlite_query
+2. sqlite_query 失败 → 尝试 pandas_query
+3. read_file 失败 → 尝试 execute_python 直接读取
+4. search_data_space 失败 → 尝试 read_file 逐文件查找
+5. 如果所有方法都失败，诚实告知用户并建议替代方案"""
 
 
 class AgentLoop:
     """支持 Anthropic / OpenAI 双后端的 ReAct Agent 循环"""
 
-    def __init__(self):
-        self.backend = settings.llm_backend  # "anthropic" | "openai"
-        if self.backend == "anthropic":
-            self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-        else:
-            from openai import AsyncOpenAI
-            self.client = AsyncOpenAI(
-                api_key=settings.openai_api_key,
-                base_url=settings.openai_api_base,
-            )
+    def __init__(self, abort_check=None):
         self.max_iterations = 30
+        self._abort_check = abort_check or (lambda: False)
+
+    _FILE_TYPE_LABELS = {
+        "csv": "表格数据", "tsv": "表格数据", "xlsx": "Excel表格", "xls": "Excel表格",
+        "json": "JSON数据", "jsonl": "JSON数据", "parquet": "列式数据", "feather": "列式数据",
+        "dta": "Stata数据", "sav": "SPSS数据", "sas7bdat": "SAS数据",
+        "sqlite": "SQLite数据库", "db": "SQLite数据库", "sqlite3": "SQLite数据库",
+        "py": "Python代码", "r": "R代码", "sql": "SQL脚本", "ipynb": "Jupyter笔记本",
+        "txt": "文本文件", "md": "Markdown文档", "log": "日志文件",
+        "html": "HTML文件", "xml": "XML文件", "yaml": "配置文件", "yml": "配置文件",
+        "pdf": "PDF文档", "docx": "Word文档",
+        "png": "图片", "jpg": "图片", "jpeg": "图片", "gif": "图片", "bmp": "图片", "webp": "图片",
+    }
 
     async def _get_data_space_info(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
         """获取数据空间的上下文信息"""
@@ -85,58 +139,164 @@ class AgentLoop:
             )
             files = file_result.scalars().all()
 
+            def _format_size(n: int) -> str:
+                if n > 1024 * 1024:
+                    return f"{n / 1024 / 1024:.1f}MB"
+                return f"{n / 1024:.0f}KB"
+
             file_list = "\n".join(
-                f"  - {f.filename} ({f.file_type}, {f.file_size} bytes)"
+                f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
                 for f in files
             )
 
             return f"""数据空间名称: {space.name}
 描述: {space.description or '无'}
-文件列表:
+共 {len(files)} 个文件:
 {file_list or '  (空)'}"""
 
     async def _build_schema_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
-        """预注入 schema 信息（来自 KDD-CUP 策略，省去 agent 调用 inspect_data 的一轮）"""
+        """预注入 schema + 质量信息。
+        合并策略：已有 profile 的文件用 profile 数据，还没处理完的用实时加载兜底。
+        保证所有文件都出现在 Agent 视野中。"""
         if not data_space_id:
             return ""
 
         try:
+            from app.models.data_profile import DataProfile
             from app.agent.tools import _get_space_files, _load_df
             import pandas as pd
+            import asyncio
 
-            files = await _get_space_files(user_id, data_space_id)
-            tabular = [f for f in files if f.file_type in ("csv", "xlsx", "xls", "json", "jsonl", "parquet")]
-            if not tabular:
+            # 获取所有文件
+            all_files = await _get_space_files(user_id, data_space_id)
+            if not all_files:
                 return ""
 
-            lines = ["## 数据结构概览（自动预注入）\n"]
+            # 获取已完成的 profiles
+            async with get_session_factory()() as db:
+                result = await db.execute(
+                    select(DataProfile).where(
+                        DataProfile.data_space_id == data_space_id,
+                    )
+                )
+                all_profiles = result.scalars().all()
+
+            profile_map = {}
+            for p in all_profiles:
+                profile_map[str(p.file_id)] = p
+
+
+            lines = ["## 数据概览\n"]
             all_columns: dict[str, dict[str, set]] = {}
+            MAX_SCHEMA_COLS = 30
+            TABULAR_EXTS = {"csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"}
 
-            for f in tabular[:10]:
-                fp = Path(settings.storage_root) / f.storage_path
-                if not fp.exists():
-                    continue
-                try:
-                    df = _load_df(fp, f.file_type)
-                    col_info = []
-                    for col in df.columns:
-                        non_null = int(df[col].notna().sum())
-                        unique = int(df[col].nunique())
-                        dtype = str(df[col].dtype)
-                        samples = df[col].dropna().unique()[:5].tolist()
+
+            # 遍历所有文件
+            for f in all_files[:15]:
+                fid = str(f.id)
+                profile = profile_map.get(fid)
+
+                # 有 profile 且已就绪 → 用 profile 的丰富信息
+                if profile and profile.status == "ready" and profile.profile_type == "tabular":
+                    data = profile.profile_data or {}
+                    row_count = data.get("row_count", "?")
+                    col_count = data.get("column_count", "?")
+                    columns = data.get("columns", [])
+
+                    lines.append(f"### {f.filename}  rows={row_count}  cols={col_count}")
+                    for c in columns[:MAX_SCHEMA_COLS]:
+                        name = c.get("name", "?")
+                        dtype = c.get("dtype", "?")
+                        unique = c.get("unique_count", "?")
+                        null_pct = c.get("null_pct", 0)
+                        samples = c.get("sample_values", [])[:3]
                         samples_str = ", ".join(str(s)[:20] for s in samples)
-                        col_info.append(f"    - {col} ({dtype}) unique={unique} ex=[{samples_str}]")
+                        extra = ""
+                        if null_pct > 5:
+                            extra += f" null={null_pct}%"
+                        stats = c.get("stats")
+                        if stats and stats.get("mean") is not None:
+                            extra += f" mean={stats['mean']}"
+                        top = c.get("top_values")
+                        if top:
+                            extra += f" top=[{', '.join(f'{k}:{v}' for k,v in list(top.items())[:3])}]"
+                        lines.append(f"    - {name} ({dtype}) unique={unique} ex=[{samples_str}]{extra}")
+                        if name not in all_columns:
+                            all_columns[name] = {}
+                        all_columns[name][f.filename] = set(str(s) for s in samples)
 
-                        if col not in all_columns:
-                            all_columns[col] = {}
-                        all_columns[col][f.filename] = set(df[col].dropna().astype(str).head(500).tolist())
+                    if len(columns) > MAX_SCHEMA_COLS:
+                        lines.append(f"    ...（还有 {len(columns) - MAX_SCHEMA_COLS} 列）")
 
-                    lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}")
-                    lines.extend(col_info)
+                    quality = data.get("quality", {})
+                    qp = []
+                    if quality.get("duplicate_pct", 0) > 1: qp.append(f"重复率{quality['duplicate_pct']}%")
+                    if quality.get("complete_pct", 100) < 95: qp.append(f"完整率{quality['complete_pct']}%")
+                    if quality.get("outlier_columns"): qp.append(f"{len(quality['outlier_columns'])}列有异常值")
+                    if quality.get("type_suggestions"): qp.append(f"{len(quality['type_suggestions'])}列可转类型")
+                    if qp:
+                        lines.append(f"    ⚠️ {', '.join(qp)}")
                     lines.append("")
-                except Exception:
-                    continue
 
+                elif profile and profile.status == "ready" and profile.profile_type in ("text", "document"):
+                    data = profile.profile_data or {}
+                    chars = data.get("char_count", 0)
+                    line_count = data.get("line_count", 0)
+                    preview = data.get("preview", "")[:200]
+                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
+                    size_info = f"{chars}字" + (f", {line_count}行" if line_count else "")
+                    lines.append(f"### {f.filename} ({type_label}, {size_info})")
+                    lines.append(f"    内容预览: {preview}")
+                    lines.append("")
+
+                elif profile and profile.status == "ready" and profile.profile_type == "database":
+                    data = profile.profile_data or {}
+                    tables = data.get("tables", [])
+                    lines.append(f"### {f.filename} (数据库, {len(tables)}张表)")
+                    for t in tables[:5]:
+                        cols = ", ".join(c["name"] for c in t.get("columns", [])[:8])
+                        lines.append(f"    - {t['name']} ({t.get('row_count', '?')}行): {cols}")
+                    lines.append("")
+
+                elif f.file_type in TABULAR_EXTS:
+                    # 没有 profile 或正在处理 → 实时加载基础 schema（线程池避免阻塞）
+                    fp = Path(settings.storage_root) / f.storage_path
+                    if fp.exists():
+                        try:
+                            loop = asyncio.get_event_loop()
+                            df = await loop.run_in_executor(None, _load_df, fp, f.file_type)
+                            lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}")
+                            for col in list(df.columns)[:MAX_SCHEMA_COLS]:
+                                unique = int(df[col].nunique())
+                                dtype = str(df[col].dtype)
+                                samples = ", ".join(str(s)[:20] for s in df[col].dropna().unique()[:3])
+                                lines.append(f"    - {col} ({dtype}) unique={unique} ex=[{samples}]")
+                                if col not in all_columns:
+                                    all_columns[col] = {}
+                                all_columns[col][f.filename] = set(str(s) for s in df[col].dropna().unique()[:50].tolist())
+                            lines.append("")
+                        except Exception:
+                            lines.append(f"### {f.filename} ({f.file_type}, 加载中...)")
+                            lines.append("")
+                else:
+                    # 非表格文件且无 profile — 尽量给出有意义的描述
+                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
+                    def _fmt_size(n: int) -> str:
+                        return f"{n/1024/1024:.1f}MB" if n > 1024*1024 else f"{n/1024:.0f}KB"
+                    lines.append(f"### {f.filename} ({type_label}, {_fmt_size(f.file_size)})")
+                    # 尝试快速读取文件开头给 Agent 更多上下文
+                    if f.file_type in ("txt", "md", "py", "sql", "r", "html", "xml", "yaml", "yml", "log", "ipynb"):
+                        try:
+                            fp = Path(settings.storage_root) / f.storage_path
+                            if fp.exists():
+                                raw = fp.read_text(encoding="utf-8", errors="ignore")[:300]
+                                lines.append(f"    内容预览: {raw}")
+                        except Exception:
+                            pass
+                    lines.append("")
+
+            # JOIN 检测
             joins = self._detect_joins_for_schema(all_columns)
             if joins:
                 lines.append("### 潜在 JOIN 关系")
@@ -209,7 +369,8 @@ class AgentLoop:
         return ""
 
     async def _get_conversation_history(self, conversation_id: uuid.UUID) -> list[dict]:
-        """获取对话历史，转为 Anthropic 格式"""
+        """获取对话历史，转为 Anthropic 格式。
+        恢复工具调用上下文摘要，让 Agent 在续对话时知道自己之前分析了什么。"""
         async with get_session_factory()() as db:
             result = await db.execute(
                 select(Message)
@@ -222,8 +383,24 @@ class AgentLoop:
             for msg in messages:
                 if msg.role == "user":
                     history.append({"role": "user", "content": msg.content})
-                elif msg.role == "assistant" and msg.content:
-                    history.append({"role": "assistant", "content": msg.content})
+                elif msg.role == "assistant":
+                    content_parts = []
+                    if msg.content:
+                        content_parts.append(msg.content)
+                    # 从 tool_calls (segments) 中提取工具调用摘要
+                    if msg.tool_calls and isinstance(msg.tool_calls, list):
+                        tool_summary = []
+                        for seg in msg.tool_calls:
+                            if isinstance(seg, dict) and seg.get("type") == "tools":
+                                for ev in seg.get("events", []):
+                                    if ev.get("type") == "tool_use":
+                                        name = ev.get("name", "")
+                                        input_str = json.dumps(ev.get("input", {}), ensure_ascii=False)[:100]
+                                        tool_summary.append(f"[调用了 {name}: {input_str}]")
+                        if tool_summary and not content_parts:
+                            content_parts.append("\n".join(tool_summary))
+                    if content_parts:
+                        history.append({"role": "assistant", "content": "\n".join(content_parts)})
 
             return history
 
@@ -237,8 +414,11 @@ class AgentLoop:
 
     async def _deduct_credits(self, user_id: uuid.UUID, credits: int, model_name: str) -> None:
         async with get_session_factory()() as db:
+            # 使用 FOR UPDATE 加行级锁防止并发透支
             result = await db.execute(
-                select(CreditAccount).where(CreditAccount.user_id == user_id)
+                select(CreditAccount)
+                .where(CreditAccount.user_id == user_id)
+                .with_for_update()
             )
             account = result.scalar_one_or_none()
             if not account:
@@ -269,20 +449,35 @@ class AgentLoop:
         return anthropic_tools
 
     async def _resolve_model_config(self, model_id: str, user_id: uuid.UUID) -> dict:
-        """解析模型配置：平台模型 or 用户自带 key"""
-        if model_id and model_id.startswith("user_"):
-            key_id = model_id[5:]
+        """解析模型配置：根据用户偏好选择平台模型或用户自己的 API"""
+        from app.core.redis_client import get_redis
+        from app.models.user_api_key import UserApiKey
+
+        # 检查用户偏好：own_api 模式时用用户自己的 API
+        try:
+            redis = await get_redis()
+            api_mode = await redis.get(f"user_pref:{user_id}:api_mode")
+        except Exception:
+            api_mode = None
+
+        if api_mode == "own_api":
             async with get_session_factory()() as db:
-                from app.models.user_api_key import UserApiKey
                 result = await db.execute(
-                    select(UserApiKey).where(UserApiKey.id == key_id, UserApiKey.user_id == user_id, UserApiKey.is_active == True)
+                    select(UserApiKey).where(UserApiKey.user_id == user_id, UserApiKey.is_active == True)
                 )
                 key = result.scalar_one_or_none()
                 if key:
+                    # 优先用映射表的模型名，没有映射则直接用平台模型名
+                    model_name = (key.model_mappings or {}).get(model_id) if model_id else None
+                    if not model_name and model_id:
+                        from app.models.llm_model import LLMModel
+                        m = await db.execute(select(LLMModel).where(LLMModel.id == model_id))
+                        platform_model = m.scalar_one_or_none()
+                        model_name = platform_model.model_name if platform_model else model_id
                     return {
-                        "provider": key.provider,
+                        "provider": "openai",
                         "api_key": key.api_key_encrypted,
-                        "model_name": key.model_name,
+                        "model_name": model_name or "default",
                         "api_base": key.api_base_url,
                         "charge_credits": False,
                         "multiplier": 0,
@@ -308,10 +503,10 @@ class AgentLoop:
 
         # 兜底：用 .env 配置
         return {
-            "provider": self.backend,
-            "api_key": settings.anthropic_api_key if self.backend == "anthropic" else settings.openai_api_key,
-            "model_name": settings.anthropic_model if self.backend == "anthropic" else settings.openai_model,
-            "api_base": settings.openai_api_base if self.backend == "openai" else None,
+            "provider": settings.llm_backend,
+            "api_key": settings.anthropic_api_key if settings.llm_backend == "anthropic" else settings.openai_api_key,
+            "model_name": settings.anthropic_model if settings.llm_backend == "anthropic" else settings.openai_model,
+            "api_base": settings.openai_api_base if settings.llm_backend == "openai" else None,
             "charge_credits": True,
             "multiplier": 1.0,
         }
@@ -323,28 +518,28 @@ class AgentLoop:
         data_space_id: uuid.UUID | None,
         model_id: str,
         user_message: str,
+        is_admin: bool = False,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """执行 Agent 循环，流式返回事件"""
         # 解析模型配置（平台模型 or 用户自带）
         model_config = await self._resolve_model_config(model_id, user_id)
-        charge_credits = model_config["charge_credits"]
+        charge_credits = model_config["charge_credits"] and not is_admin
         credit_multiplier = model_config["multiplier"]
         model_name = model_config["model_name"]
 
-        # 根据模型配置动态创建 client
-        if model_config["provider"] == "anthropic":
-            from anthropic import AsyncAnthropic
-            client = AsyncAnthropic(api_key=model_config["api_key"])
-            active_backend = "anthropic"
-        else:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=model_config["api_key"], base_url=model_config["api_base"])
-            active_backend = "openai"
+        # 复用 SDK client（按 provider + api_key 缓存）
+        try:
+            api_key = decrypt_api_key(model_config["api_key"])
+        except ValueError:
+            yield {"type": "error", "message": "模型 API 密钥解密失败，请在管理后台重新配置模型或在设置中重新配置 API Key。"}
+            return
+        active_backend = model_config["provider"]
+        client = _get_client(active_backend, api_key, model_config.get("api_base"))
 
         if charge_credits:
             balance = await self._check_balance(user_id)
             if balance <= 0:
-                yield {"type": "error", "message": "额度不足，请充值或等待每日免费额度发放"}
+                yield {"type": "error", "message": "额度不足。每日免费额度会在次日自动发放，你也可以在「额度中心」查看详情，或在「设置」中配置自己的 API Key 免费使用。"}
                 return
 
         # 构建系统提示（含文件列表 + schema 预注入 + knowledge.md + 记忆）
@@ -389,9 +584,8 @@ class AgentLoop:
         yield {"type": "thinking", "content": "正在分析问题..."}
 
         for iteration in range(self.max_iterations):
-            current_credits = self._calculate_credits(total_usage, credit_multiplier)
-            if current_credits >= settings.max_credits_per_run:
-                yield {"type": "text", "delta": "\n\n[已达到本次最大额度消耗上限，自动停止]"}
+            if self._abort_check():
+                yield {"type": "text", "delta": "\n\n[已被用户中断]"}
                 break
 
             try:
@@ -521,10 +715,24 @@ class AgentLoop:
                     except json.JSONDecodeError:
                         tool_args = {}
 
+                    # 发送给前端的 input 做脱敏：去除代码、路径等内部细节
+                    safe_input = {}
+                    for k, v in tool_args.items():
+                        if k == "code":
+                            continue
+                        elif k == "sql":
+                            continue
+                        elif k == "expression":
+                            continue
+                        elif k == "text" and len(str(v)) > 50:
+                            safe_input[k] = str(v)[:50] + "..."
+                        else:
+                            safe_input[k] = v
+
                     yield {
                         "type": "tool_use",
                         "name": tu["name"],
-                        "input": tool_args,
+                        "input": safe_input,
                         "id": tu["id"],
                     }
 
@@ -552,10 +760,13 @@ class AgentLoop:
                         "output_preview": result_str[:200],
                     })
 
+                    # 脱敏：移除存储路径
+                    display_result = result_str[:2000].replace(settings.storage_root, "[数据]")
+
                     yield {
                         "type": "tool_result",
                         "name": tu["name"],
-                        "content": result_str[:500],
+                        "content": display_result,
                         "is_error": is_error,
                     }
 
@@ -597,8 +808,4 @@ class AgentLoop:
         yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log}
 
     def _calculate_credits(self, usage: dict, multiplier: float = 1.0) -> int:
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
-        total_tokens = input_tokens + output_tokens
-        base_credits = total_tokens // 1000
-        return max(1, int(base_credits * multiplier))
+        return 1

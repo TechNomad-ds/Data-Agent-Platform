@@ -40,3 +40,29 @@ def decode_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+import base64
+import hashlib
+
+def _get_fernet_key() -> bytes:
+    """从 secret_key 派生一个合法的 Fernet key"""
+    digest = hashlib.sha256(settings.secret_key.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def encrypt_api_key(plain_key: str) -> str:
+    from cryptography.fernet import Fernet
+    f = Fernet(_get_fernet_key())
+    return f.encrypt(plain_key.encode()).decode()
+
+
+def decrypt_api_key(encrypted_key: str) -> str:
+    from cryptography.fernet import Fernet
+    try:
+        f = Fernet(_get_fernet_key())
+        return f.decrypt(encrypted_key.encode()).decode()
+    except Exception:
+        import logging
+        logging.getLogger("security").error("API key decryption failed — key may be corrupted or secret_key changed")
+        raise ValueError("无法解密 API 密钥，请重新配置")

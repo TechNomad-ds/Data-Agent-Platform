@@ -5,6 +5,8 @@ import shutil
 import zipfile
 from pathlib import Path
 
+import aiofiles
+
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File as FastAPIFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -32,6 +34,14 @@ async def create_data_space(
     db: AsyncSession = Depends(get_db),
 ):
     """创建数据空间"""
+    # 检查数量上限（管理员不限）
+    if current_user.role != "admin":
+        count_result = await db.execute(
+            select(func.count()).select_from(DataSpace).where(DataSpace.user_id == current_user.id)
+        )
+        if (count_result.scalar() or 0) >= settings.max_spaces_per_user:
+            raise HTTPException(status_code=400, detail=f"数据空间数量已达上限({settings.max_spaces_per_user}个)")
+
     # 检查同名
     result = await db.execute(
         select(DataSpace).where(DataSpace.user_id == current_user.id, DataSpace.name == data.name)
@@ -45,7 +55,7 @@ async def create_data_space(
 
     return DataSpaceResponse(
         id=space.id, name=space.name, description=space.description,
-        index_status=space.index_status, file_count=0,
+        file_count=0,
         created_at=space.created_at, updated_at=space.updated_at,
     )
 
@@ -56,25 +66,28 @@ async def list_data_spaces(
     db: AsyncSession = Depends(get_db),
 ):
     """获取当前用户的数据空间列表"""
-    result = await db.execute(
-        select(DataSpace).where(DataSpace.user_id == current_user.id).order_by(DataSpace.updated_at.desc())
+    from sqlalchemy import literal_column
+    file_count_subq = (
+        select(func.count())
+        .select_from(DataSpaceFile)
+        .where(DataSpaceFile.data_space_id == DataSpace.id)
+        .correlate(DataSpace)
+        .scalar_subquery()
     )
-    spaces = result.scalars().all()
+    result = await db.execute(
+        select(DataSpace, file_count_subq.label("file_count"))
+        .where(DataSpace.user_id == current_user.id)
+        .order_by(DataSpace.updated_at.desc())
+    )
 
-    # 查询每个空间的文件数
-    responses = []
-    for space in spaces:
-        count_result = await db.execute(
-            select(func.count()).select_from(DataSpaceFile).where(DataSpaceFile.data_space_id == space.id)
-        )
-        file_count = count_result.scalar()
-        responses.append(DataSpaceResponse(
+    return [
+        DataSpaceResponse(
             id=space.id, name=space.name, description=space.description,
-            index_status=space.index_status, file_count=file_count,
+            file_count=file_count or 0,
             created_at=space.created_at, updated_at=space.updated_at,
-        ))
-
-    return responses
+        )
+        for space, file_count in result.all()
+    ]
 
 
 @router.get("/{space_id}", response_model=DataSpaceDetailResponse)
@@ -108,7 +121,7 @@ async def get_data_space(
 
     return DataSpaceDetailResponse(
         id=space.id, name=space.name, description=space.description,
-        index_status=space.index_status, file_count=len(files_in_space),
+        file_count=len(files_in_space),
         created_at=space.created_at, updated_at=space.updated_at,
         files=files_in_space,
     )
@@ -141,7 +154,7 @@ async def update_data_space(
 
     return DataSpaceResponse(
         id=space.id, name=space.name, description=space.description,
-        index_status=space.index_status, file_count=file_count,
+        file_count=file_count,
         created_at=space.created_at, updated_at=space.updated_at,
     )
 
@@ -159,6 +172,35 @@ async def delete_data_space(
     space = result.scalar_one_or_none()
     if not space:
         raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    import logging
+    _logger = logging.getLogger("data_spaces")
+
+    # 清理 ChromaDB collection
+    try:
+        from app.services.embedding import get_chroma_client
+        client = get_chroma_client()
+        col_name = f"space_{str(space_id).replace('-', '')}"
+        try:
+            client.delete_collection(col_name)
+        except Exception:
+            pass
+    except Exception as e:
+        _logger.warning(f"清理 ChromaDB 失败: {e}")
+
+    # 清理 SQLite 缓存
+    try:
+        from app.services.sqlite_engine import invalidate_cache
+        invalidate_cache(str(space_id))
+    except Exception as e:
+        _logger.warning(f"清理 SQLite 缓存失败: {e}")
+
+    # 清理检索缓存
+    try:
+        from app.services.retrieval import invalidate_cache as invalidate_retrieval_cache
+        invalidate_retrieval_cache(str(space_id))
+    except Exception as e:
+        _logger.warning(f"清理检索缓存失败: {e}")
 
     await db.delete(space)
 
@@ -195,12 +237,6 @@ async def add_files_to_space(
         if not existing.scalar_one_or_none():
             db.add(DataSpaceFile(data_space_id=space_id, file_id=file_id))
 
-    # 更新索引状态为需要重建
-    space_result = await db.execute(select(DataSpace).where(DataSpace.id == space_id))
-    space = space_result.scalar_one()
-    if space.index_status == "ready":
-        space.index_status = "empty"
-
     return {"message": "文件已添加到数据空间"}
 
 
@@ -228,29 +264,6 @@ async def remove_file_from_space(
         await db.delete(link)
 
 
-@router.post("/{space_id}/index/build")
-async def build_index(
-    space_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """触发数据空间索引构建"""
-    result = await db.execute(
-        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
-    )
-    space = result.scalar_one_or_none()
-    if not space:
-        raise HTTPException(status_code=404, detail="数据空间不存在")
-
-    space.index_status = "building"
-
-    # TODO: 触发异步索引构建任务
-    # 暂时直接标记为 ready（后续接入实际索引逻辑）
-    space.index_status = "ready"
-
-    return {"message": "索引构建已启动", "status": space.index_status}
-
-
 @router.post("/{space_id}/upload", response_model=list[FileResponse], status_code=201)
 async def upload_files_to_space(
     space_id: uuid.UUID,
@@ -266,6 +279,18 @@ async def upload_files_to_space(
     if not space:
         raise HTTPException(status_code=404, detail="数据空间不存在")
 
+    # 检查文件数量上限（管理员不限）
+    if current_user.role != "admin":
+        file_count_result = await db.execute(
+            select(func.count()).select_from(DataSpaceFile).where(DataSpaceFile.data_space_id == space_id)
+        )
+        current_file_count = file_count_result.scalar() or 0
+        if current_file_count >= settings.max_files_per_space:
+            raise HTTPException(status_code=400, detail=f"该数据空间文件数已达上限({settings.max_files_per_space}个)")
+
+    if len(files) > 20:
+        raise HTTPException(status_code=400, detail="单次最多上传 20 个文件")
+
     uploaded = []
     user_storage = get_user_storage_path(current_user.id)
 
@@ -274,20 +299,44 @@ async def upload_files_to_space(
         if file_type not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail=f"不支持的文件类型: {file_type}")
 
-        content = await upload_file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(50MB)")
+        # 流式写入临时文件，避免大文件占满内存
+        temp_path = user_storage / f"_upload_tmp_{uuid.uuid4()}"
+        file_size = 0
+        try:
+            async with aiofiles.open(temp_path, "wb") as tmp:
+                while chunk := await upload_file.read(1024 * 1024):
+                    file_size += len(chunk)
+                    if file_size > MAX_FILE_SIZE:
+                        raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(200MB)")
+                    await tmp.write(chunk)
+        except HTTPException:
+            temp_path.unlink(missing_ok=True)
+            raise
 
         # ZIP 文件：解压后每个子文件单独入库并关联到数据空间
         if file_type == "zip":
+            MAX_ZIP_FILES = 100
+            MAX_ZIP_TOTAL_SIZE = 500 * 1024 * 1024  # 500MB 解压上限
             tmp_dir = user_storage / f"_zip_tmp_{uuid.uuid4()}"
             tmp_dir.mkdir(parents=True, exist_ok=True)
             try:
-                zf = zipfile.ZipFile(io.BytesIO(content), "r")
+                zf = zipfile.ZipFile(str(temp_path), "r")
+                # 安全检查：路径遍历、文件数量、总大小
+                total_uncompressed = 0
+                valid_count = 0
                 for info in zf.infolist():
                     if info.filename.startswith('/') or '..' in info.filename:
                         shutil.rmtree(tmp_dir, ignore_errors=True)
                         raise HTTPException(status_code=400, detail=f"zip 文件包含不安全的路径: {info.filename}")
+                    if not info.is_dir():
+                        valid_count += 1
+                        total_uncompressed += info.file_size
+                if valid_count > MAX_ZIP_FILES:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    raise HTTPException(status_code=400, detail=f"zip 文件包含过多文件({valid_count}个，上限{MAX_ZIP_FILES}个)")
+                if total_uncompressed > MAX_ZIP_TOTAL_SIZE:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    raise HTTPException(status_code=400, detail=f"zip 解压后总大小超过限制(500MB)")
                 zf.extractall(tmp_dir)
                 member_names = zf.namelist()
                 zf.close()
@@ -331,16 +380,16 @@ async def upload_files_to_space(
                 uploaded.append(file_record)
 
             shutil.rmtree(tmp_dir, ignore_errors=True)
+            temp_path.unlink(missing_ok=True)
             continue
 
-        # 普通文件：直接存储并关联
+        # 普通文件：直接 move 临时文件到目标位置（不读回内存）
         file_id = uuid.uuid4()
         file_dir = user_storage / str(file_id)
         file_dir.mkdir(parents=True, exist_ok=True)
         file_path = file_dir / upload_file.filename
 
-        with open(file_path, "wb") as f:
-            f.write(content)
+        shutil.move(str(temp_path), str(file_path))
 
         relative_path = str(file_path.relative_to(Path(settings.storage_root)))
         file_record = File(
@@ -349,7 +398,7 @@ async def upload_files_to_space(
             filename=upload_file.filename,
             original_filename=upload_file.filename,
             file_type=file_type,
-            file_size=len(content),
+            file_size=file_size,
             storage_path=relative_path,
             mime_type=upload_file.content_type,
         )
@@ -358,24 +407,96 @@ async def upload_files_to_space(
         db.add(DataSpaceFile(data_space_id=space_id, file_id=file_id))
         uploaded.append(file_record)
 
-    # 重置索引状态
-    if space.index_status == "ready":
-        space.index_status = "empty"
-
     await db.flush()
 
-    # 触发后台预处理
-    from fastapi import BackgroundTasks
+    # 后台异步预处理
     import asyncio
+    import logging
     from app.services.preprocessing import preprocess_file
+
+    logger = logging.getLogger("data_spaces")
 
     async def _run_preprocessing():
         for f in uploaded:
-            await preprocess_file(f.id, space_id)
+            try:
+                await preprocess_file(f.id, space_id)
+            except Exception as e:
+                logger.error(f"预处理文件 {f.filename} 失败: {e}", exc_info=True)
 
-    asyncio.ensure_future(_run_preprocessing())
+        # 自动为文本/文档类文件构建知识图谱（无感化，不阻塞用户）
+        if settings.graph_auto_extract:
+            text_files = [f for f in uploaded if f.file_type in ("txt", "md", "pdf", "docx")]
+            if text_files:
+                try:
+                    from app.services.graph import GraphService
+                    gs = GraphService(str(current_user.id), str(space_id))
+                    for f in text_files:
+                        file_path = Path(settings.storage_root) / f.storage_path
+                        if not file_path.exists():
+                            continue
+                        try:
+                            if f.file_type in ("txt", "md"):
+                                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                            elif f.file_type == "pdf":
+                                import fitz
+                                doc = fitz.open(str(file_path))
+                                text = "\n".join(p.get_text() for p in doc)
+                                doc.close()
+                            elif f.file_type == "docx":
+                                from docx import Document as DocxDoc
+                                doc = DocxDoc(str(file_path))
+                                text = "\n".join(p.text for p in doc.paragraphs)
+                            else:
+                                continue
+                            if len(text.strip()) >= 100:
+                                await gs.extract_triples_from_text(text[:5000], max_triples=settings.graph_max_triples_per_file)
+                        except Exception as e:
+                            logger.warning(f"图谱抽取跳过 {f.filename}: {e}")
+                except Exception as e:
+                    logger.error(f"图谱自动构建异常: {e}", exc_info=True)
+
+    asyncio.create_task(_run_preprocessing())
 
     return uploaded
+
+
+@router.get("/{space_id}/processing-status")
+async def get_processing_status(
+    space_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取数据空间的文件处理状态"""
+    from app.models.data_profile import DataProfile
+    result = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    # 统计文件总数
+    file_count_result = await db.execute(
+        select(func.count()).select_from(DataSpaceFile).where(DataSpaceFile.data_space_id == space_id)
+    )
+    total_files = file_count_result.scalar()
+
+    # 统计已完成的 profile 数
+    profile_result = await db.execute(
+        select(DataProfile).where(DataProfile.data_space_id == space_id)
+    )
+    profiles = profile_result.scalars().all()
+    ready = sum(1 for p in profiles if p.status == "ready")
+    processing = sum(1 for p in profiles if p.status in ("pending", "processing"))
+    error = sum(1 for p in profiles if p.status == "error")
+    no_profile = total_files - len(profiles)
+
+    return {
+        "total_files": total_files,
+        "ready": ready,
+        "processing": processing + no_profile,
+        "error": error,
+        "all_ready": ready == total_files and total_files > 0,
+    }
 
 
 @router.get("/{space_id}/profile")
@@ -455,22 +576,24 @@ async def preview_file_data(
     # SQLite database files
     if ext in ("sqlite", "db", "sqlite3"):
         import sqlite3
-        table_name = Query(default=None)
         conn = sqlite3.connect(str(file_path))
         try:
-            # List tables if no specific table requested
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
             if not tables:
                 return {"type": "database", "tables": [], "message": "数据库为空"}
 
-            # Use first table by default
             target_table = tables[0]
-            count_cursor = conn.execute(f"SELECT COUNT(*) FROM '{target_table}'")
+            # 使用参数化的方式安全引用表名（SQLite 不支持参数化表名，用白名单校验）
+            if target_table not in tables:
+                return {"type": "database", "tables": tables, "message": "表不存在"}
+
+            quoted_table = '"' + target_table.replace('"', '""') + '"'
+            count_cursor = conn.execute(f"SELECT COUNT(*) FROM {quoted_table}")
             total = count_cursor.fetchone()[0]
 
             offset = (page - 1) * page_size
-            data_cursor = conn.execute(f"SELECT * FROM '{target_table}' LIMIT {page_size} OFFSET {offset}")
+            data_cursor = conn.execute(f"SELECT * FROM {quoted_table} LIMIT ? OFFSET ?", (page_size, offset))
             col_names = [desc[0] for desc in data_cursor.description]
             rows_data = [list(str(v) if v is not None else "" for v in row) for row in data_cursor.fetchall()]
 
@@ -515,6 +638,12 @@ async def preview_file_data(
             return {"type": "text", "content": content[:2000], "total_chars": len(content)}
     elif ext == "jsonl":
         df = pd.read_json(file_path, lines=True, nrows=page * page_size)
+    elif ext == "dta":
+        df = pd.read_stata(file_path).head(page * page_size)
+    elif ext == "sav":
+        df = pd.read_spss(file_path).head(page * page_size)
+    elif ext == "sas7bdat":
+        df = pd.read_sas(file_path).head(page * page_size)
     elif ext in ("txt", "md", "py", "sql", "html", "xml", "yaml", "yml", "log", "r", "ipynb"):
         from app.services.preprocessing import _detect_encoding
         encoding = _detect_encoding(file_path)
@@ -529,6 +658,46 @@ async def preview_file_data(
             "page": page,
             "page_size": page_size,
         }
+    elif ext == "pdf":
+        try:
+            import fitz
+            doc = fitz.open(str(file_path))
+            text_parts = []
+            for i, pg in enumerate(doc):
+                text_parts.append(pg.get_text())
+            doc.close()
+            full_text = "\n\n".join(text_parts)
+            lines = full_text.split("\n")
+            start = (page - 1) * page_size
+            end = start + page_size
+            return {
+                "type": "text",
+                "content": "\n".join(lines[start:end]),
+                "total_lines": len(lines),
+                "page": page,
+                "page_size": page_size,
+                "filename": file.filename,
+            }
+        except ImportError:
+            return {"type": "unsupported", "message": "需要安装 PyMuPDF 才能预览 PDF"}
+    elif ext == "docx":
+        try:
+            from docx import Document
+            doc = Document(str(file_path))
+            full_text = "\n".join(p.text for p in doc.paragraphs)
+            lines = full_text.split("\n")
+            start = (page - 1) * page_size
+            end = start + page_size
+            return {
+                "type": "text",
+                "content": "\n".join(lines[start:end]),
+                "total_lines": len(lines),
+                "page": page,
+                "page_size": page_size,
+                "filename": file.filename,
+            }
+        except ImportError:
+            return {"type": "unsupported", "message": "需要安装 python-docx 才能预览 Word"}
     elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
         return {"type": "image", "filename": file.filename, "file_size_kb": round(file_path.stat().st_size / 1024, 1)}
     else:

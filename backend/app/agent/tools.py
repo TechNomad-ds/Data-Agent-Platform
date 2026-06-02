@@ -144,36 +144,6 @@ def get_tool_definitions() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "graph_search",
-                "description": "在知识图谱中搜索实体。返回匹配的节点及其关系数量",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "搜索关键词"},
-                        "top_k": {"type": "integer", "description": "返回结果数量", "default": 5},
-                    },
-                    "required": ["query"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "graph_traverse",
-                "description": "从指定实体出发，遍历知识图谱中的关系路径。用于探索实体之间的连接",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "start": {"type": "string", "description": "起始实体名称"},
-                        "max_hops": {"type": "integer", "description": "最大跳数", "default": 2},
-                    },
-                    "required": ["start"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "nl2sql",
                 "description": "用自然语言描述你想查询的内容，自动生成 SQL 并执行。适合复杂的多表查询场景",
                 "parameters": {
@@ -217,13 +187,43 @@ def get_tool_definitions() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "graph_extract_from_text",
-                "description": "从文本中提取知识图谱三元组（主体-关系-客体），存入当前数据空间的知识图谱",
+                "name": "graph_search",
+                "description": "在知识图谱中搜索实体。返回匹配的节点及其连接度",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "text": {"type": "string", "description": "要提取三元组的文本内容"},
-                        "max_triples": {"type": "integer", "description": "最大提取数量", "default": 30},
+                        "query": {"type": "string", "description": "搜索关键词"},
+                        "top_k": {"type": "integer", "description": "返回结果数量", "default": 5},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "graph_traverse",
+                "description": "从指定实体出发，遍历知识图谱中的关系路径。可发现多跳关系",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "entity": {"type": "string", "description": "起始实体名称"},
+                        "max_hops": {"type": "integer", "description": "最大遍历跳数", "default": 2},
+                    },
+                    "required": ["entity"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "graph_extract_from_text",
+                "description": "从文本中用 LLM 抽取实体关系三元组并存入知识图谱",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "description": "要抽取三元组的文本内容"},
+                        "max_triples": {"type": "integer", "description": "最多抽取的三元组数量", "default": 30},
                     },
                     "required": ["text"],
                 },
@@ -258,32 +258,8 @@ async def _get_space_files(user_id: uuid.UUID, data_space_id: uuid.UUID) -> list
 
 
 def _load_df(file_path: Path, ext: str) -> pd.DataFrame:
-    if ext == "csv":
-        from app.services.preprocessing import _detect_encoding
-        encoding = _detect_encoding(file_path)
-        return pd.read_csv(file_path, encoding=encoding, on_bad_lines="skip")
-    elif ext == "tsv":
-        from app.services.preprocessing import _detect_encoding
-        encoding = _detect_encoding(file_path)
-        return pd.read_csv(file_path, sep="\t", encoding=encoding, on_bad_lines="skip")
-    elif ext in ("xlsx", "xls"):
-        return pd.read_excel(file_path)
-    elif ext == "parquet":
-        return pd.read_parquet(file_path)
-    elif ext == "feather":
-        return pd.read_feather(file_path)
-    elif ext == "json":
-        content = file_path.read_text(encoding="utf-8")
-        data = json.loads(content)
-        if isinstance(data, list):
-            return pd.DataFrame(data)
-        elif isinstance(data, dict) and "records" in data:
-            return pd.DataFrame(data["records"])
-        elif isinstance(data, dict):
-            return pd.DataFrame([data])
-    elif ext == "jsonl":
-        return pd.read_json(file_path, lines=True)
-    return pd.DataFrame()
+    from app.services.file_loader import load_dataframe
+    return load_dataframe(file_path, ext)
 
 
 async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
@@ -297,11 +273,11 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
             "execute_python": _tool_execute_python,
             "generate_chart": lambda a, u, d: _tool_generate_chart(a),
             "save_memory": _tool_save_memory,
-            "graph_search": _tool_graph_search,
-            "graph_traverse": _tool_graph_traverse,
             "nl2sql": _tool_nl2sql,
             "kb_reindex_file": _tool_kb_reindex,
             "db_import_csv": _tool_db_import_csv,
+            "graph_search": _tool_graph_search,
+            "graph_traverse": _tool_graph_traverse,
             "graph_extract_from_text": _tool_graph_extract,
         }
         handler = handlers.get(tool_name)
@@ -361,8 +337,75 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():
         return f"文件 '{filename}' 不存在或无权访问"
+
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
     try:
-        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        # 表格文件：用 pandas 加载后输出为可读文本
+        if ext in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
+            df = _load_df(file_path, ext)
+            if df.empty:
+                return f"文件 '{filename}' 暂时无法以表格方式读取，请尝试用 execute_python 工具直接处理此文件"
+            total_rows = len(df)
+            end = min(start_line + max_lines, total_rows)
+            page = df.iloc[start_line:end]
+            header = f"文件: {filename} ({total_rows} 行, {len(df.columns)} 列，显示第 {start_line+1}-{end} 行)\n"
+            header += f"列: {', '.join(f'{c}({df[c].dtype})' for c in df.columns)}\n---\n"
+            return header + page.to_string()
+
+        # PDF 文件
+        if ext == "pdf":
+            try:
+                import fitz
+                doc = fitz.open(str(file_path))
+                pages = []
+                for i, page in enumerate(doc):
+                    pages.append(f"--- 第 {i+1} 页 ---\n{page.get_text()}")
+                doc.close()
+                content = "\n".join(pages)
+                lines = content.split("\n")
+                selected = lines[start_line:start_line + max_lines]
+                return f"文件: {filename} (PDF, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+            except ImportError:
+                pass
+
+        # Word 文件
+        if ext == "docx":
+            try:
+                from docx import Document
+                doc = Document(str(file_path))
+                content = "\n".join(p.text for p in doc.paragraphs)
+                lines = content.split("\n")
+                selected = lines[start_line:start_line + max_lines]
+                return f"文件: {filename} (Word, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+            except ImportError:
+                pass
+
+        # SQLite 数据库
+        if ext in ("sqlite", "db", "sqlite3"):
+            import sqlite3
+            conn = sqlite3.connect(str(file_path))
+            try:
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [r[0] for r in cursor.fetchall()]
+                output = [f"文件: {filename} (SQLite 数据库, {len(tables)} 个表)"]
+                for t in tables[:5]:
+                    count = conn.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+                    info = conn.execute(f'PRAGMA table_info("{t}")').fetchall()
+                    cols = ", ".join(f"{r[1]}({r[2]})" for r in info)
+                    output.append(f"\n表 {t} ({count} 行): {cols}")
+                    sample = conn.execute(f'SELECT * FROM "{t}" LIMIT 5').fetchall()
+                    if sample:
+                        col_names = [r[1] for r in info]
+                        output.append(pd.DataFrame(sample, columns=col_names).to_string())
+                return "\n".join(output)
+            finally:
+                conn.close()
+
+        # 文本文件：检测编码后读取
+        from app.services.preprocessing import _detect_encoding
+        encoding = _detect_encoding(file_path)
+        content = file_path.read_text(encoding=encoding, errors="ignore")
         lines = content.split("\n")
         selected = lines[start_line:start_line + max_lines]
         return f"文件: {filename} (共 {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
@@ -380,7 +423,7 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
         if not file_path or not file_path.exists():
             return f"文件 '{filename}' 不存在"
         ext = filename.rsplit(".", 1)[-1].lower()
-        if ext not in ("csv", "xlsx", "xls", "json"):
+        if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
             return f"不支持 inspect_data 的文件类型: {ext}"
         try:
             df = _load_df(file_path, ext)
@@ -396,7 +439,7 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
             return f"解析失败: {str(e)}"
 
     files = await _get_space_files(user_id, data_space_id)
-    tabular = [f for f in files if f.file_type in ("csv", "xlsx", "xls", "json")]
+    tabular = [f for f in files if f.file_type in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat")]
     if not tabular:
         return "数据空间中没有表格文件"
 
@@ -491,13 +534,21 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     filename = args.get("filename", "")
     expression = args.get("expression", "")
 
+    # 安全检查：AST 级别
     try:
-        tree = ast.parse(expression, mode="eval")
+        # 先尝试 eval 模式（单表达式），再尝试 exec 模式（多行）
+        try:
+            tree = ast.parse(expression, mode="eval")
+        except SyntaxError:
+            tree = ast.parse(expression, mode="exec")
         for node in ast.walk(tree):
-            if isinstance(node, ast.Import | ast.ImportFrom):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
                 return "安全限制：不允许 import"
             if isinstance(node, ast.Attribute) and isinstance(node.attr, str) and node.attr.startswith("__"):
                 return "安全限制：不允许访问 dunder 属性"
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                if node.func.id in ("exec", "eval", "compile", "open", "input", "breakpoint", "getattr", "setattr", "delattr"):
+                    return f"安全限制：不允许调用 '{node.func.id}'"
     except SyntaxError as e:
         return f"表达式语法错误: {e}"
 
@@ -508,8 +559,39 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     ext = filename.rsplit(".", 1)[-1].lower()
     try:
         df = _load_df(file_path, ext)
-        local_vars = {"df": df, "pd": pd, "np": np, "len": len, "min": min, "max": max, "sum": sum, "abs": abs, "round": round, "sorted": sorted, "set": set, "list": list}
-        result = eval(expression, {"__builtins__": {}}, local_vars)
+        local_vars = {"df": df, "pd": pd, "np": np, "len": len, "min": min, "max": max, "sum": sum, "abs": abs, "round": round, "sorted": sorted, "set": set, "list": list, "print": print}
+
+        # 尝试单表达式 eval（大多数场景）
+        try:
+            tree = ast.parse(expression, mode="eval")
+            result = eval(expression, {"__builtins__": {}}, local_vars)
+        except SyntaxError:
+            # 多行语句：exec 执行，取最后赋值的变量或 result 变量
+            import io
+            from contextlib import redirect_stdout
+            stdout_buf = io.StringIO()
+            exec_globals = {"__builtins__": {"print": print, "len": len, "min": min, "max": max, "sum": sum, "abs": abs, "round": round, "range": range, "sorted": sorted, "set": set, "list": list, "dict": dict, "int": int, "float": float, "str": str, "bool": bool, "enumerate": enumerate, "zip": zip, "True": True, "False": False, "None": None}}
+            exec_globals.update(local_vars)
+            with redirect_stdout(stdout_buf):
+                exec(expression, exec_globals)
+            stdout_output = stdout_buf.getvalue()
+            # 优先返回 result 变量
+            if "result" in exec_globals and exec_globals["result"] is not df:
+                result = exec_globals["result"]
+            elif stdout_output:
+                return stdout_output[:5000]
+            else:
+                # 找最后赋值的 DataFrame 变量
+                for var_name in reversed(list(exec_globals.keys())):
+                    if var_name.startswith("_") or var_name in local_vars or var_name == "__builtins__":
+                        continue
+                    val = exec_globals[var_name]
+                    if isinstance(val, (pd.DataFrame, pd.Series)):
+                        result = val
+                        break
+                else:
+                    return stdout_output if stdout_output else "执行完成（无返回值，可将结果赋给 result 变量）"
+
         if isinstance(result, pd.DataFrame):
             if len(result) > 50:
                 return f"结果共 {len(result)} 行，显示前50行:\n{result.head(50).to_string()}"
@@ -554,10 +636,28 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
 async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     code = args.get("code", "")
-    dangerous_patterns = ["import os", "import sys", "import subprocess", "import shutil", "os.system", "os.popen", "subprocess.", "__import__", "import socket", "import requests"]
-    for pattern in dangerous_patterns:
-        if pattern in code:
-            return f"安全限制：不允许使用 '{pattern}'"
+
+    # AST 级安全检查：比字符串匹配更可靠
+    try:
+        tree = ast.parse(code, mode="exec")
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                module_name = ""
+                if isinstance(node, ast.Import):
+                    module_name = node.names[0].name
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    module_name = node.module
+                ALLOWED_MODULES_CHECK = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime", "csv", "io", "struct", "decimal", "fractions", "operator", "string", "textwrap", "pathlib"}
+                if module_name.split(".")[0] not in ALLOWED_MODULES_CHECK:
+                    return f"安全限制：不允许导入 '{module_name}'"
+            if isinstance(node, ast.Attribute) and isinstance(node.attr, str):
+                if node.attr.startswith("__") and node.attr.endswith("__"):
+                    return f"安全限制：不允许访问 dunder 属性 '{node.attr}'"
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                if node.func.id in ("exec", "eval", "compile", "open", "input", "breakpoint", "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr"):
+                    return f"安全限制：不允许调用 '{node.func.id}'"
+    except SyntaxError as e:
+        return f"代码语法错误: {e}"
 
     file_paths = {}
     if data_space_id:
@@ -573,7 +673,7 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
 
-    ALLOWED_MODULES = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime"}
+    ALLOWED_MODULES = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime", "csv", "io", "struct", "decimal", "fractions", "operator", "string", "textwrap", "pathlib"}
 
     def _safe_import(name, *a, **kw):
         if name not in ALLOWED_MODULES:
@@ -610,18 +710,42 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
             pass
 
     try:
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            exec(code, exec_globals)
-        stdout = stdout_capture.getvalue()
-        stderr = stderr_capture.getvalue()
+        import signal
+        import threading
+
+        result_container = {"stdout": "", "stderr": "", "error": None}
+
+        def _run():
+            try:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    exec(code, exec_globals)
+                result_container["stdout"] = stdout_capture.getvalue()
+                result_container["stderr"] = stderr_capture.getvalue()
+            except Exception as e:
+                result_container["error"] = f"{type(e).__name__}: {str(e)}"
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        thread.join(timeout=30)
+
+        if thread.is_alive():
+            return "代码执行超时（限制 30 秒）"
+
+        if result_container["error"]:
+            return f"代码执行错误: {result_container['error']}"
+
         parts = []
-        if stdout:
-            parts.append(f"输出:\n{stdout}")
-        if stderr:
-            parts.append(f"警告:\n{stderr}")
+        stdout_text = result_container["stdout"]
+        stderr_text = result_container["stderr"]
+        if len(stdout_text) > 10000:
+            stdout_text = stdout_text[:10000] + "\n...(输出已截断)"
+        if stdout_text:
+            parts.append(f"输出:\n{stdout_text}")
+        if stderr_text:
+            parts.append(f"警告:\n{stderr_text[:2000]}")
         if not parts:
             parts.append("代码执行成功（无输出）")
-        return "\n".join(parts)[:5000]
+        return "\n".join(parts)[:12000]
     except Exception as e:
         return f"代码执行错误: {type(e).__name__}: {str(e)}"
 
@@ -653,49 +777,6 @@ async def _tool_save_memory(args: dict, user_id: uuid.UUID, data_space_id: uuid.
         data_space_id=data_space_id,
     )
     return f"已保存记忆 (ID: {memory_id})"
-
-
-async def _tool_graph_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    """知识图谱实体搜索"""
-    if not data_space_id:
-        return "未选择数据空间"
-    query = args.get("query", "")
-    top_k = args.get("top_k", 5)
-
-    from app.services.graph import GraphService
-    gs = GraphService(str(user_id), str(data_space_id))
-    results = await gs.search_entities(query, top_k=top_k)
-
-    if not results:
-        return f"知识图谱中未找到与 '{query}' 相关的实体"
-
-    output = [f"找到 {len(results)} 个相关实体："]
-    for r in results:
-        neighbors = await gs.neighbors(r["id"])
-        rel_summary = ", ".join(f"{n['relation']}→{n['entity']}" for n in neighbors[:3])
-        output.append(f"  - {r['label']} (类型: {r['type']}, 关系数: {r['degree']}) {rel_summary}")
-    return "\n".join(output)
-
-
-async def _tool_graph_traverse(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    """知识图谱路径遍历"""
-    if not data_space_id:
-        return "未选择数据空间"
-    start = args.get("start", "")
-    max_hops = args.get("max_hops", 2)
-
-    from app.services.graph import GraphService
-    gs = GraphService(str(user_id), str(data_space_id))
-    paths = await gs.traverse(start, max_hops=max_hops)
-
-    if not paths:
-        return f"从 '{start}' 出发未找到关系路径（实体可能不存在）"
-
-    output = [f"从 '{start}' 出发的关系路径（最大 {max_hops} 跳）："]
-    for p in paths[:20]:
-        steps = " → ".join(f"{s['from']} --[{s['relation']}]--> {s['to']}" for s in p["path"])
-        output.append(f"  深度{p['depth']}: {steps}")
-    return "\n".join(output)
 
 
 async def _tool_nl2sql(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
@@ -743,25 +824,68 @@ async def _tool_db_import_csv(args: dict, user_id: uuid.UUID, data_space_id: uui
     return f"已将 '{filename}' 导入为表 '{result['table_name']}'（{result['row_count']} 行, {result['column_count']} 列）。现在可以用 sqlite_query 查询该表。"
 
 
+async def _tool_graph_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """搜索知识图谱中的实体"""
+    if not data_space_id:
+        return "未选择数据空间，无法搜索图谱"
+    query = args.get("query", "")
+    top_k = args.get("top_k", 5)
+    if not query:
+        return "请提供搜索关键词"
+
+    from app.services.graph import GraphService
+    gs = GraphService(str(user_id), str(data_space_id))
+    results = await gs.search_entities(query, top_k=top_k)
+    if not results:
+        return f"图谱中未找到与 '{query}' 相关的实体"
+
+    lines = [f"找到 {len(results)} 个相关实体："]
+    for r in results:
+        neighbors = await gs.neighbors(r["id"])
+        neighbor_str = ", ".join(f"{n['relation']}→{n['entity']}" for n in neighbors[:3])
+        lines.append(f"  - {r['label']} (类型: {r['type']}, 连接: {r['degree']}){' | ' + neighbor_str if neighbor_str else ''}")
+    return "\n".join(lines)
+
+
+async def _tool_graph_traverse(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """从实体出发遍历知识图谱"""
+    if not data_space_id:
+        return "未选择数据空间"
+    entity = args.get("entity", "")
+    max_hops = args.get("max_hops", 2)
+    if not entity:
+        return "请指定起始实体名称"
+
+    from app.services.graph import GraphService
+    gs = GraphService(str(user_id), str(data_space_id))
+    paths = await gs.traverse(entity, max_hops=max_hops)
+    if not paths:
+        return f"图谱中未找到实体 '{entity}' 或该实体没有关系路径"
+
+    lines = [f"从 '{entity}' 出发，发现 {len(paths)} 条关系路径："]
+    for p in paths[:20]:
+        steps = " → ".join(f"{s['from']} --[{s['relation']}]--> {s['to']}" for s in p["path"])
+        lines.append(f"  [{p['depth']}跳] {steps}")
+    return "\n".join(lines)
+
+
 async def _tool_graph_extract(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    """从文本抽取知识图谱三元组"""
+    """从文本中抽取三元组存入图谱"""
     if not data_space_id:
         return "未选择数据空间"
     text = args.get("text", "")
     max_triples = args.get("max_triples", 30)
     if not text:
-        return "请提供文本内容"
+        return "请提供要抽取的文本内容"
 
-    from app.services.ingest import IngestService
-    svc = IngestService(user_id, data_space_id)
-    result = await svc.graph_extract_from_text(text, max_triples=max_triples)
-    if not result.get("triples"):
-        return "未能从文本中提取到三元组"
+    from app.services.graph import GraphService
+    gs = GraphService(str(user_id), str(data_space_id))
+    result = await gs.extract_triples_from_text(text, max_triples=max_triples)
+    added = result.get("added", 0)
+    if added == 0:
+        return "未从文本中抽取到三元组"
 
-    output = [f"已提取 {result['added']} 个三元组到知识图谱："]
-    for t in result["triples"][:10]:
-        output.append(f"  ({t['subject']}) --[{t['relation']}]--> ({t['object']})")
-    if len(result["triples"]) > 10:
-        output.append(f"  ... 共 {len(result['triples'])} 个")
-    output.append(f"图谱当前: {result.get('total_nodes', 0)} 节点, {result.get('total_edges', 0)} 条边")
-    return "\n".join(output)
+    lines = [f"已抽取 {added} 个三元组并存入图谱（共 {result.get('total_nodes', 0)} 节点, {result.get('total_edges', 0)} 条边）："]
+    for t in result.get("triples", [])[:10]:
+        lines.append(f"  - {t.get('subject', '?')} --[{t.get('relation', '?')}]--> {t.get('object', '?')}")
+    return "\n".join(lines)

@@ -16,9 +16,11 @@ router = APIRouter()
 
 
 async def _ensure_daily_credits(user_id: uuid.UUID, db: AsyncSession) -> None:
-    """确保今日额度已发放"""
+    """确保今日额度已发放（加行级锁防止并发重复发放）"""
     result = await db.execute(
-        select(CreditAccount).where(CreditAccount.user_id == user_id)
+        select(CreditAccount)
+        .where(CreditAccount.user_id == user_id)
+        .with_for_update()
     )
     account = result.scalar_one_or_none()
     if not account:
@@ -29,14 +31,14 @@ async def _ensure_daily_credits(user_id: uuid.UUID, db: AsyncSession) -> None:
 
     if last_reset != today:
         grant_amount = account.daily_free_allowance
-        account.balance += grant_amount
+        account.balance = grant_amount
         account.last_daily_reset = datetime.now(timezone.utc)
         transaction = CreditTransaction(
             user_id=user_id,
             amount=grant_amount,
             balance_after=account.balance,
             transaction_type="daily_grant",
-            description=f"每日免费额度发放 ({today.isoformat()})",
+            description=f"每日额度重置 ({today.isoformat()})",
         )
         db.add(transaction)
         await db.flush()

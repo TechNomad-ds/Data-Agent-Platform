@@ -2,6 +2,7 @@ import { Button, Dropdown, message } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { saveAs } from 'file-saver'
 import { reportsApi } from '@/api/reports'
+import { colors } from '@/styles/tokens'
 
 interface Props {
   conversationId: string | undefined
@@ -32,7 +33,7 @@ export default function ExportButton({ conversationId }: Props) {
       <Button
         type="text"
         icon={<DownloadOutlined />}
-        style={{ color: '#8888a0' }}
+        style={{ color: colors.textSecondary }}
         size="small"
       >
         导出

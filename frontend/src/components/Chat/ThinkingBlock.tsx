@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { Typography } from 'antd'
 import {
-  ThunderboltOutlined, DownOutlined, RightOutlined,
-  CheckCircleOutlined, LoadingOutlined,
-  SearchOutlined, FileTextOutlined, CodeOutlined,
-  BarChartOutlined, DatabaseOutlined,
+  ThunderboltOutlined,
+  DownOutlined,
+  RightOutlined,
+  SearchOutlined,
+  FileTextOutlined,
+  CodeOutlined,
+  BarChartOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import { SSEEvent } from '@/api/chat'
+import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
 
@@ -16,33 +21,99 @@ interface ThinkingBlockProps {
   defaultExpanded?: boolean
 }
 
-const toolMeta: Record<string, { label: string; icon: React.ReactNode }> = {
-  search_data_space: { label: '搜索数据空间', icon: <SearchOutlined /> },
-  read_file: { label: '读取文件', icon: <FileTextOutlined /> },
-  inspect_data: { label: '查看数据结构', icon: <DatabaseOutlined /> },
-  pandas_query: { label: '数据查询', icon: <BarChartOutlined /> },
-  execute_python: { label: '执行代码', icon: <CodeOutlined /> },
-  sqlite_query: { label: 'SQL 查询', icon: <DatabaseOutlined /> },
-  generate_chart: { label: '生成图表', icon: <BarChartOutlined /> },
-  generate_report: { label: '生成报告', icon: <FileTextOutlined /> },
+const toolMeta: Record<string, { label: string; icon: React.ReactNode; userHint: (input?: Record<string, unknown>) => string }> = {
+  search_data_space: { label: '搜索相关内容', icon: <SearchOutlined />, userHint: (i) => i?.query ? `搜索: ${String(i.query).slice(0, 30)}` : '' },
+  read_file: { label: '读取文件', icon: <FileTextOutlined />, userHint: (i) => i?.filename ? `${i.filename}` : '' },
+  inspect_data: { label: '分析数据结构', icon: <DatabaseOutlined />, userHint: (i) => i?.filename ? `${i.filename}` : '所有文件' },
+  pandas_query: { label: '查询数据', icon: <BarChartOutlined />, userHint: (i) => i?.filename ? `${i.filename}` : '' },
+  execute_python: { label: '计算分析', icon: <CodeOutlined />, userHint: () => '' },
+  sqlite_query: { label: '查询数据', icon: <DatabaseOutlined />, userHint: () => '' },
+  generate_chart: { label: '生成图表', icon: <BarChartOutlined />, userHint: (i) => i?.title ? `${i.title}` : '' },
+  generate_report: { label: '生成报告', icon: <FileTextOutlined />, userHint: () => '' },
+  save_memory: { label: '记住要点', icon: <FileTextOutlined />, userHint: () => '' },
+  nl2sql: { label: '查询数据', icon: <DatabaseOutlined />, userHint: (i) => i?.question ? `${String(i.question).slice(0, 30)}` : '' },
+  kb_reindex_file: { label: '更新文件', icon: <DatabaseOutlined />, userHint: (i) => i?.filename ? `${i.filename}` : '' },
+  db_import_csv: { label: '导入数据', icon: <DatabaseOutlined />, userHint: (i) => i?.filename ? `${i.filename}` : '' },
+  graph_search: { label: '搜索图谱', icon: <DatabaseOutlined />, userHint: (i) => i?.query ? `${String(i.query).slice(0, 30)}` : '' },
+  graph_traverse: { label: '遍历关系', icon: <DatabaseOutlined />, userHint: (i) => i?.entity ? `${i.entity}` : '' },
+  graph_extract_from_text: { label: '抽取知识', icon: <FileTextOutlined />, userHint: () => '' },
 }
 
-export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpanded = false }: ThinkingBlockProps) {
+function ToolResultBlock({ content, isError }: { content?: string; isError?: boolean }) {
+  const [resultExpanded, setResultExpanded] = useState(false)
+  if (!content) return null
+
+  if (isError) {
+    return (
+      <div style={{ padding: '2px 0 4px 17px', borderBottom: `1px solid ${colors.borderLight}` }}>
+        <Text style={{ fontSize: 11, color: colors.warning }}>
+          正在换一种方式尝试...
+        </Text>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '2px 0 4px 17px', borderBottom: `1px solid ${colors.borderLight}` }}>
+      {!resultExpanded ? (
+        <span
+          onClick={() => setResultExpanded(true)}
+          style={{ fontSize: 10, color: colors.textMuted, cursor: 'pointer', userSelect: 'none' }}
+        >
+          查看详情
+        </span>
+      ) : (
+        <>
+          <Text
+            style={{
+              fontSize: 11,
+              whiteSpace: 'pre-wrap',
+              display: 'block',
+              maxHeight: 300,
+              overflow: 'auto',
+              color: colors.textMuted,
+              fontFamily: "'SF Mono', SFMono-Regular, Menlo, Consolas, monospace",
+              lineHeight: 1.5,
+            }}
+          >
+            {content}
+          </Text>
+          <span
+            onClick={() => setResultExpanded(false)}
+            style={{ fontSize: 10, color: colors.primary, cursor: 'pointer', userSelect: 'none', marginTop: 2, display: 'inline-block' }}
+          >
+            收起
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function ThinkingBlock({
+  thinkingText,
+  toolEvents,
+  defaultExpanded = false,
+}: ThinkingBlockProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   if (!thinkingText && toolEvents.length === 0) return null
 
-  const toolUseCount = toolEvents.filter(e => e.type === 'tool_use').length
-  const toolResultCount = toolEvents.filter(e => e.type === 'tool_result').length
+  const toolUseCount = toolEvents.filter((e) => e.type === 'tool_use').length
+  const toolResultCount = toolEvents.filter(
+    (e) => e.type === 'tool_result'
+  ).length
   const allDone = toolUseCount > 0 && toolUseCount === toolResultCount
 
   return (
-    <div style={{
-      borderRadius: 10,
-      border: '1px solid #e2e8f0',
-      background: '#f8fafc',
-      overflow: 'hidden',
-    }}>
+    <div
+      style={{
+        borderRadius: 10,
+        border: `1px solid ${colors.border}`,
+        background: colors.bgSubtle,
+        overflow: 'hidden',
+      }}
+    >
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
@@ -54,54 +125,102 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
           userSelect: 'none',
         }}
       >
-        {expanded
-          ? <DownOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-          : <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
-        }
-        <ThunderboltOutlined style={{ color: '#f59e0b', fontSize: 13 }} />
-        <Text style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
+        {expanded ? (
+          <DownOutlined style={{ fontSize: 10, color: colors.textMuted }} />
+        ) : (
+          <RightOutlined style={{ fontSize: 10, color: colors.textMuted }} />
+        )}
+        <ThunderboltOutlined
+          style={{
+            color: allDone ? colors.success : colors.warning,
+            fontSize: 13,
+          }}
+        />
+        <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 500 }}>
           {allDone ? '已完成' : '执行中'}
         </Text>
         {toolUseCount > 0 && (
-          <Text style={{ fontSize: 11, color: '#94a3b8' }}>
+          <Text style={{ fontSize: 11, color: colors.textMuted }}>
             · {toolUseCount} 次工具调用
           </Text>
         )}
-        {allDone && <CheckCircleOutlined style={{ fontSize: 11, color: '#10b981', marginLeft: 'auto' }} />}
-        {!allDone && toolUseCount > 0 && <LoadingOutlined style={{ fontSize: 11, color: '#4f46e5', marginLeft: 'auto' }} />}
       </div>
       {expanded && (
-        <div style={{ padding: '0 12px 10px', borderTop: '1px solid #e2e8f0' }}>
+        <div
+          style={{
+            padding: '0 12px 10px',
+            borderTop: `1px solid ${colors.border}`,
+          }}
+        >
           {thinkingText && (
             <div style={{ padding: '8px 0' }}>
-              <Text style={{ fontSize: 12, fontStyle: 'italic', color: '#94a3b8' }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontStyle: 'italic',
+                  color: colors.textMuted,
+                }}
+              >
                 {thinkingText}
               </Text>
             </div>
           )}
           {toolEvents.map((event, i) => {
             const name = event.name || 'unknown'
-            const meta = toolMeta[name] || { label: name, icon: <CodeOutlined /> }
+            const meta = toolMeta[name] || {
+              label: name,
+              icon: <CodeOutlined />,
+            }
 
             if (event.type === 'tool_use') {
-              const hasResult = toolEvents.slice(i + 1).some(e => e.type === 'tool_result' && e.name === name)
+              const useId = event.id
+              const hasResult = toolEvents
+                .slice(i + 1)
+                .some(
+                  (e) =>
+                    e.type === 'tool_result' &&
+                    (useId ? e.id === useId : e.name === name)
+                )
+              const hint = meta.userHint?.(event.input as Record<string, unknown>) || ''
               return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '6px 0',
-                  borderBottom: '1px solid #f1f5f9',
-                }}>
-                  {hasResult
-                    ? <CheckCircleOutlined style={{ fontSize: 11, color: '#10b981' }} />
-                    : <LoadingOutlined style={{ fontSize: 11, color: '#4f46e5' }} />
-                  }
-                  <span style={{ fontSize: 12, color: hasResult ? '#10b981' : '#4f46e5' }}>{meta.icon}</span>
-                  <Text style={{ fontSize: 12, fontWeight: 500, color: '#475569' }}>{meta.label}</Text>
-                  {event.input && (
-                    <Text style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }} ellipsis>
-                      {Object.entries(event.input).map(([k, v]) =>
-                        `${k}: ${String(v).slice(0, 25)}`
-                      ).join(', ')}
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 0',
+                    borderBottom: `1px solid ${colors.borderLight}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: hasResult ? colors.success : colors.primary,
+                    }}
+                  >
+                    {meta.icon}
+                  </span>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: colors.textSecondary,
+                    }}
+                  >
+                    {meta.label}
+                  </Text>
+                  {hint && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: colors.textMuted,
+                        marginLeft: 'auto',
+                        maxWidth: '60%',
+                      }}
+                      ellipsis
+                    >
+                      {hint}
                     </Text>
                   )}
                 </div>
@@ -110,13 +229,7 @@ export default function ThinkingBlock({ thinkingText, toolEvents, defaultExpande
 
             if (event.type === 'tool_result') {
               return (
-                <div key={i} style={{ padding: '4px 0 6px 17px', borderBottom: '1px solid #f1f5f9' }}>
-                  {event.content && (
-                    <Text style={{ fontSize: 11, whiteSpace: 'pre-wrap', display: 'block', maxHeight: 60, overflow: 'hidden', color: '#94a3b8' }}>
-                      {event.content.slice(0, 150)}{event.content.length > 150 ? '...' : ''}
-                    </Text>
-                  )}
-                </div>
+                <ToolResultBlock key={i} content={event.content} isError={event.is_error} />
               )
             }
 

@@ -5,8 +5,8 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # 数据库
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/data_agent"
-    database_url_sync: str = "postgresql://postgres:postgres@localhost:5432/data_agent"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/datamind"
+    database_url_sync: str = "postgresql://postgres:postgres@localhost:5432/datamind"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-change-in-production"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+
+    def validate_secret_key(self) -> None:
+        if self.secret_key == "your-secret-key-change-in-production":
+            import warnings
+            warnings.warn(
+                "⚠️  SECRET_KEY 使用了默认值，请在 .env 中设置安全的随机密钥！"
+                "  生成方式: python -c \"import secrets; print(secrets.token_urlsafe(32))\"",
+                stacklevel=2,
+            )
 
     # Anthropic API (主 LLM 接口)
     anthropic_api_key: str = ""
@@ -34,24 +43,30 @@ class Settings(BaseSettings):
     rrf_k: int = 60
     multi_query_count: int = 3
 
-    # 知识图谱
-    graph_auto_extract: bool = True
-    graph_max_triples_per_file: int = 50
-
     # 文件存储
     storage_root: str = "./storage"
 
     # ChromaDB
     chroma_persist_dir: str = "./chroma_data"
 
+    # 知识图谱
+    graph_auto_extract: bool = True
+    graph_max_triples_per_file: int = 50
+
     # 额度
-    daily_free_credits: int = 100
+    daily_free_credits: int = 20
     max_credits_per_run: int = 50
+
+    # 资源上限（每用户）
+    max_spaces_per_user: int = 20
+    max_conversations_per_user: int = 200
+    max_files_per_space: int = 50
 
     # 服务
     backend_host: str = "0.0.0.0"
     backend_port: int = 8002
     frontend_url: str = "http://localhost:5173"
+    cors_origins: str = ""  # 逗号分隔的额外允许域名，如 "https://app.example.com,https://admin.example.com"
 
     class Config:
         env_file = "../.env"
@@ -59,3 +74,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+settings.validate_secret_key()

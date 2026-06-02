@@ -45,20 +45,6 @@ export default function DataSpaces() {
     }
   }
 
-  const statusColor: Record<string, string> = {
-    empty: 'default',
-    building: 'processing',
-    ready: 'success',
-    error: 'error',
-  }
-
-  const statusText: Record<string, string> = {
-    empty: '未索引',
-    building: '构建中',
-    ready: '已就绪',
-    error: '索引失败',
-  }
-
   if (selectedSpace) {
     return <SpaceDetail space={selectedSpace} onBack={() => { setSelectedSpace(null); loadSpaces() }} />
   }
@@ -107,9 +93,6 @@ export default function DataSpaces() {
                 <div style={{ marginTop: 16 }}>
                   <Space>
                     <Tag icon={<FileOutlined />}>{space.file_count} 个文件</Tag>
-                    <Tag color={statusColor[space.index_status]}>
-                      {statusText[space.index_status]}
-                    </Tag>
                   </Space>
                 </div>
               </Card>

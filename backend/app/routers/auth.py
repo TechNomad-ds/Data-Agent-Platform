@@ -8,8 +8,8 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.user import User
-from app.models.credit import CreditAccount, CreditTransaction
-from app.schemas import UserRegister, UserLogin, TokenResponse, TokenRefresh, UserResponse
+from app.models.credit import CreditAccount
+from app.schemas import UserRegister, UserLogin, TokenResponse, TokenRefresh, UserResponse, ChangePasswordRequest, UpdateProfileRequest
 from app.deps import get_current_user
 from app.config import settings
 
@@ -17,29 +17,9 @@ router = APIRouter()
 
 
 async def _check_daily_credit_reset(user_id, db: AsyncSession):
-    """检查并发放每日免费额度"""
-    result = await db.execute(
-        select(CreditAccount).where(CreditAccount.user_id == user_id)
-    )
-    account = result.scalar_one_or_none()
-    if not account:
-        return
-
-    today = datetime.now(timezone.utc).date()
-    last_reset = account.last_daily_reset.date() if account.last_daily_reset else None
-
-    if last_reset != today:
-        grant_amount = account.daily_free_allowance
-        account.balance += grant_amount
-        account.last_daily_reset = datetime.now(timezone.utc)
-        transaction = CreditTransaction(
-            user_id=user_id,
-            amount=grant_amount,
-            balance_after=account.balance,
-            transaction_type="daily_grant",
-            description=f"每日免费额度发放 ({today.isoformat()})",
-        )
-        db.add(transaction)
+    """检查并发放每日免费额度（委托给 credits 模块的统一实现）"""
+    from app.routers.credits import _ensure_daily_credits
+    await _ensure_daily_credits(user_id, db)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -83,14 +63,50 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     """用户登录"""
-    result = await db.execute(select(User).where(User.email == data.email))
+    # 检查账号是否被锁定（5次失败锁15分钟）
+    from app.core.redis_client import get_redis
+    try:
+        redis = await get_redis()
+        lock_key = f"login_lock:{data.email}"
+        fail_key = f"login_fail:{data.email}"
+        if await redis.get(lock_key):
+            raise HTTPException(status_code=429, detail="登录失败次数过多，请 15 分钟后再试")
+    except HTTPException:
+        raise
+    except Exception:
+        redis = None
+
+    # 支持邮箱或用户名登录
+    from sqlalchemy import or_
+    result = await db.execute(
+        select(User).where(or_(User.email == data.email, User.username == data.email))
+    )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
+        # 记录失败次数
+        if redis:
+            try:
+                fails = await redis.get(fail_key)
+                fail_count = int(fails) + 1 if fails else 1
+                await redis.set(fail_key, str(fail_count), ex=900)
+                if fail_count >= 5:
+                    await redis.set(lock_key, "1", ex=900)
+                    import logging
+                    logging.getLogger("security").warning(f"账号 {data.email} 因连续 {fail_count} 次登录失败被锁定 15 分钟")
+            except Exception:
+                pass
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用")
+
+    # 登录成功，清除失败计数
+    if redis:
+        try:
+            await redis.delete(fail_key, lock_key)
+        except Exception:
+            pass
 
     # 更新最后登录时间
     user.last_login_at = datetime.now(timezone.utc)
@@ -127,4 +143,39 @@ async def refresh_token(data: TokenRefresh, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """获取当前用户信息"""
+    return current_user
+
+
+@router.put("/password")
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """修改密码"""
+    if not verify_password(data.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="旧密码不正确")
+
+    current_user.password_hash = hash_password(data.new_password)
+    return {"message": "密码已修改"}
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新用户资料"""
+    if data.username is not None:
+        existing = await db.execute(
+            select(User).where(User.username == data.username, User.id != current_user.id)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="该用户名已被使用")
+        current_user.username = data.username
+
+    if data.research_consent is not None:
+        current_user.research_consent = data.research_consent
+
     return current_user

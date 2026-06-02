@@ -35,6 +35,10 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
             if ext in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
                 profile_data = _profile_tabular(file_path, ext)
                 profile_type = "tabular"
+                import asyncio
+                asyncio.create_task(
+                    _embed_tabular_background(profile_data, str(file_id), str(data_space_id), file.filename)
+                )
             elif ext in ("sqlite", "db", "sqlite3"):
                 profile_data = _profile_sqlite(file_path)
                 profile_type = "database"
@@ -42,12 +46,12 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
                 profile_data = _profile_text_fast(file_path)
                 profile_type = "text"
                 import asyncio
-                asyncio.ensure_future(_embed_text_background(file_path, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(_embed_text_background(file_path, str(file_id), str(data_space_id), file.filename))
             elif ext in ("pdf", "docx"):
                 profile_data = _profile_document_fast(file_path, ext)
                 profile_type = "document"
                 import asyncio
-                asyncio.ensure_future(_embed_document_background(file_path, ext, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(_embed_document_background(file_path, ext, str(file_id), str(data_space_id), file.filename))
             elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
                 profile_data = _profile_image(file_path)
                 profile_type = "image"
@@ -211,10 +215,51 @@ def _profile_text_fast(file_path: Path) -> Dict[str, Any]:
     }
 
 
+async def _embed_tabular_background(
+    profile_data: Dict[str, Any], file_id: str, data_space_id: str, filename: str
+) -> None:
+    """将表格文件的列信息和摘要嵌入为可搜索的文本块"""
+    import logging
+    logger = logging.getLogger("preprocessing")
+    try:
+        chunks = []
+        columns = profile_data.get("columns", [])
+        row_count = profile_data.get("row_count", 0)
+
+        col_names = [c["name"] for c in columns]
+        summary = f"表格文件 {filename}，共 {row_count} 行，{len(columns)} 列。列包括: {', '.join(col_names)}。"
+
+        for c in columns:
+            desc = f"列 {c['name']} (类型: {c['dtype']})"
+            if c.get("stats"):
+                s = c["stats"]
+                desc += f"，均值 {s.get('mean', '?')}，范围 {s.get('min', '?')} ~ {s.get('max', '?')}"
+            if c.get("top_values"):
+                top = list(c["top_values"].keys())[:5]
+                desc += f"，常见值: {', '.join(top)}"
+            if c.get("sample_values"):
+                desc += f"，示例: {', '.join(c['sample_values'][:3])}"
+            summary += " " + desc + "。"
+
+        chunks.append({"text": summary, "start_char": 0, "end_char": len(summary)})
+        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+
+        try:
+            from app.services.retrieval import invalidate_cache
+            invalidate_cache(data_space_id)
+        except Exception:
+            pass
+        logger.info(f"表格嵌入完成: {filename}")
+    except Exception as e:
+        logger.error(f"表格嵌入失败 ({filename}): {e}", exc_info=True)
+
+
 async def _embed_text_background(
     file_path: Path, file_id: str, data_space_id: str, filename: str
 ) -> None:
     """后台异步执行文本 embedding"""
+    import logging
+    logger = logging.getLogger("preprocessing")
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
         chunks = greedy_chunk(content, max_size=1000, overlap=200)
@@ -224,8 +269,9 @@ async def _embed_text_background(
             invalidate_cache(data_space_id)
         except Exception:
             pass
-    except Exception:
-        pass
+        logger.info(f"文本嵌入完成: {filename}, {len(chunks)} 个块")
+    except Exception as e:
+        logger.error(f"文本嵌入失败 ({filename}): {e}", exc_info=True)
 
 
 def _profile_document_fast(file_path: Path, ext: str) -> Dict[str, Any]:
@@ -264,6 +310,8 @@ async def _embed_document_background(
     file_path: Path, ext: str, file_id: str, data_space_id: str, filename: str
 ) -> None:
     """后台异步执行文档 embedding"""
+    import logging
+    logger = logging.getLogger("preprocessing")
     try:
         text = ""
         if ext == "pdf":
@@ -291,8 +339,9 @@ async def _embed_document_background(
             invalidate_cache(data_space_id)
         except Exception:
             pass
-    except Exception:
-        pass
+        logger.info(f"文档嵌入完成: {filename}, {len(chunks)} 个块")
+    except Exception as e:
+        logger.error(f"文档嵌入失败 ({filename}): {e}", exc_info=True)
 
 
 def _load_json_df(file_path: Path) -> pd.DataFrame:
@@ -349,6 +398,10 @@ def _load_tabular(file_path: Path, ext: str) -> Optional[pd.DataFrame]:
             return pd.read_spss(file_path)
         elif ext == "sas7bdat":
             return pd.read_sas(file_path)
+    except ImportError as e:
+        import logging
+        logging.getLogger("preprocessing").warning(f"缺少依赖库，无法加载 {ext}: {e}")
+        return None
     except Exception:
         return None
     return None
@@ -363,13 +416,14 @@ def _profile_sqlite(file_path: Path) -> Dict[str, Any]:
         tables = []
         total_rows = 0
         for (table_name,) in cursor.fetchall():
-            info_cursor = conn.execute(f"PRAGMA table_info('{table_name}')")
+            quoted = '"' + table_name.replace('"', '""') + '"'
+            info_cursor = conn.execute(f"PRAGMA table_info({quoted})")
             columns = [{"name": row[1], "type": row[2], "nullable": not row[3]} for row in info_cursor.fetchall()]
-            count_cursor = conn.execute(f"SELECT COUNT(*) FROM '{table_name}'")
+            count_cursor = conn.execute(f"SELECT COUNT(*) FROM {quoted}")
             row_count = count_cursor.fetchone()[0]
             total_rows += row_count
 
-            sample_cursor = conn.execute(f"SELECT * FROM '{table_name}' LIMIT 5")
+            sample_cursor = conn.execute(f"SELECT * FROM {quoted} LIMIT 5")
             sample_rows = [list(row) for row in sample_cursor.fetchall()]
 
             tables.append({
