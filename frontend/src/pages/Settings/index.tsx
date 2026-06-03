@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Card, Button, Form, Input, Modal, Switch, message } from 'antd'
+import { Typography, Card, Button, Form, Input, Modal, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/authStore'
@@ -17,16 +17,14 @@ export default function SettingsPage() {
       profileForm.setFieldsValue({
         username: user.username,
         email: user.email,
-        research_consent: user.research_consent,
       })
     }
   }, [user])
 
-  const handleProfileUpdate = async (values: { username: string; research_consent: boolean }) => {
+  const handleProfileUpdate = async (values: { username: string }) => {
     try {
       await authApi.updateProfile({
         username: values.username,
-        research_consent: values.research_consent,
       })
       message.success('资料已更新')
       await fetchUser()
@@ -84,9 +82,6 @@ export default function SettingsPage() {
               ]}
             >
               <Input />
-            </Form.Item>
-            <Form.Item label="参与研究授权" name="research_consent" valuePropName="checked">
-              <Switch checkedChildren="已同意" unCheckedChildren="未同意" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit">保存</Button>

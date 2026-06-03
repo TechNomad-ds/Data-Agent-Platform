@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
-  Button, Table, Tag, Space, Typography, Upload, message, Popconfirm, Card,
+  Button, Table, Tag, Space, Typography, Upload, message, Popconfirm, Card, Progress,
 } from 'antd'
 import {
-  ArrowLeftOutlined, InboxOutlined, DeleteOutlined,
+  ArrowLeftOutlined, InboxOutlined, DeleteOutlined, LoadingOutlined,
 } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
@@ -20,6 +20,7 @@ interface Props {
 export default function SpaceDetail({ space, onBack }: Props) {
   const [files, setFiles] = useState<FileInSpace[]>([])
   const [loading, setLoading] = useState(false)
+  const [processing, setProcessing] = useState<{ ready: number; total: number } | null>(null)
 
   useEffect(() => {
     loadDetail()
@@ -48,6 +49,32 @@ export default function SpaceDetail({ space, onBack }: Props) {
     }
   }
 
+  // 轮询后台解析进度
+  const pollProcessing = () => {
+    let tries = 0
+    const tick = async () => {
+      tries += 1
+      try {
+        const { data } = await dataSpacesApi.processingStatus(space.id)
+        setProcessing({ ready: data.ready, total: data.total_files })
+        const settled = data.ready + data.error >= data.total_files
+        if (data.all_ready || data.total_files === 0 || settled) {
+          setProcessing(null)
+          loadDetail()
+          if (data.error > 0) {
+            message.warning(`数据已就绪，但有 ${data.error} 个文件解析失败`)
+          } else {
+            message.success('数据已就绪')
+          }
+          return
+        }
+      } catch { /* 忽略单次失败 */ }
+      if (tries < 150) setTimeout(tick, 2000)
+      else setProcessing(null)
+    }
+    setTimeout(tick, 1500)
+  }
+
   const uploadProps: UploadProps = {
     name: 'files',
     multiple: true,
@@ -59,8 +86,9 @@ export default function SpaceDetail({ space, onBack }: Props) {
     },
     onChange(info) {
       if (info.file.status === 'done') {
-        message.success(`${info.file.name} 上传成功`)
+        message.success(`${info.file.name} 上传成功，正在后台解析...`)
         loadDetail()
+        pollProcessing()
       } else if (info.file.status === 'error') {
         message.error(`${info.file.name} 上传失败`)
       }
@@ -134,6 +162,22 @@ export default function SpaceDetail({ space, onBack }: Props) {
           </p>
         </Dragger>
       </Card>
+
+      {processing && (
+        <Card style={{ marginBottom: 16, background: '#fffbe6', borderColor: '#ffe58f' }} bodyStyle={{ padding: '12px 16px' }}>
+          <Space style={{ width: '100%' }}>
+            <LoadingOutlined style={{ color: '#d48806' }} />
+            <Text style={{ color: '#d48806' }}>
+              正在后台解析数据 {processing.ready}/{processing.total}，可继续操作
+            </Text>
+            <Progress
+              percent={processing.total ? Math.round((processing.ready / processing.total) * 100) : 0}
+              size="small" strokeColor="#d48806" showInfo={false}
+              style={{ width: 160 }}
+            />
+          </Space>
+        </Card>
+      )}
 
       <Table
         columns={columns}

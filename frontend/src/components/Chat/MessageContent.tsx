@@ -202,7 +202,8 @@ function MarkdownRaw({ content }: { content: string }) {
 
 function hasSegments(toolCalls: any[] | null): boolean {
   if (!toolCalls || toolCalls.length === 0) return false
-  return toolCalls[0]?.type === 'text' || toolCalls[0]?.type === 'tools'
+  const t = toolCalls[0]?.type
+  return t === 'text' || t === 'tools' || t === 'thinking'
 }
 
 function FeedbackButtons({
@@ -363,6 +364,22 @@ export default function MessageContent({ message, onRegenerate, onFeedback }: Me
               seg.type === 'text' ? (
                 <div key={i} style={{ marginBottom: 8 }}>
                   <MarkdownBlock content={seg.content || ''} />
+                </div>
+              ) : seg.type === 'thinking' ? (
+                <div
+                  key={i}
+                  style={{
+                    marginBottom: 10,
+                    paddingLeft: 10,
+                    borderLeft: `2px solid ${colors.border}`,
+                    fontSize: 12.5,
+                    color: colors.textMuted,
+                    fontStyle: 'italic',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {seg.content || ''}
                 </div>
               ) : (
                 <div key={i} style={{ marginBottom: 10 }}>

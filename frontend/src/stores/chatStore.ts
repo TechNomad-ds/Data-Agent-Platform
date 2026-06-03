@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { Conversation, Message, SSEEvent } from '@/api/chat'
 
 export interface StreamSegment {
-  type: 'text' | 'tools'
+  type: 'text' | 'tools' | 'thinking'
   content?: string
   events?: SSEEvent[]
 }
@@ -19,6 +19,7 @@ interface ChatState {
   setCurrentConversation: (conv: Conversation | null) => void
   setMessages: (messages: Message[]) => void
   appendStreamDelta: (delta: string) => void
+  appendThinkingDelta: (delta: string) => void
   addToolEvent: (event: SSEEvent) => void
   setThinkingText: (text: string) => void
   setIsStreaming: (v: boolean) => void
@@ -48,6 +49,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         segs[segs.length - 1] = { type: 'text', content: (last.content || '') + delta }
       } else {
         segs.push({ type: 'text', content: delta })
+      }
+      return { segments: segs }
+    }),
+
+  // 累积推理内容：作为一个 thinking segment 按出现顺序排入流
+  appendThinkingDelta: (delta) =>
+    set((state) => {
+      const segs = [...state.segments]
+      const last = segs[segs.length - 1]
+      if (last && last.type === 'thinking') {
+        segs[segs.length - 1] = { type: 'thinking', content: (last.content || '') + delta }
+      } else {
+        segs.push({ type: 'thinking', content: delta })
       }
       return { segments: segs }
     }),

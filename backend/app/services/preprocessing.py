@@ -123,7 +123,27 @@ def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
 
     numeric_cols = []
     for col in df.columns:
-        col_info: Dict[str, Any] = {
+        # 检测列是否含有不可哈希的嵌套值（dict/list），如 JSON 里的对象列
+        has_unhashable = df[col].dropna().apply(lambda v: isinstance(v, (dict, list))).any()
+
+        if has_unhashable:
+            # 嵌套对象列：转成 JSON 字符串后再统计，避免 unhashable type 崩溃
+            str_series = df[col].dropna().apply(
+                lambda v: json.dumps(v, ensure_ascii=False, default=str) if isinstance(v, (dict, list)) else str(v)
+            )
+            col_info: Dict[str, Any] = {
+                "name": col,
+                "dtype": "object(nested)",
+                "non_null_count": int(df[col].notna().sum()),
+                "null_count": int(df[col].isna().sum()),
+                "null_pct": round(float(df[col].isna().mean()) * 100, 1),
+                "unique_count": int(str_series.nunique()),
+            }
+            col_info["sample_values"] = [s[:200] for s in str_series.head(5).tolist()]
+            profile["columns"].append(col_info)
+            continue
+
+        col_info = {
             "name": col,
             "dtype": str(df[col].dtype),
             "non_null_count": int(df[col].notna().sum()),
@@ -151,13 +171,21 @@ def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
         col_info["sample_values"] = [str(v) for v in df[col].dropna().head(5).tolist()]
         profile["columns"].append(col_info)
 
-    # Data quality metrics
-    quality = {
-        "duplicate_rows": int(df.duplicated().sum()),
-        "duplicate_pct": round(float(df.duplicated().mean()) * 100, 1),
-        "complete_rows": int((~df.isna().any(axis=1)).sum()),
-        "complete_pct": round(float((~df.isna().any(axis=1)).mean()) * 100, 1),
-    }
+    # Data quality metrics（duplicated 也需可哈希，含嵌套列时降级跳过）
+    try:
+        quality = {
+            "duplicate_rows": int(df.duplicated().sum()),
+            "duplicate_pct": round(float(df.duplicated().mean()) * 100, 1),
+            "complete_rows": int((~df.isna().any(axis=1)).sum()),
+            "complete_pct": round(float((~df.isna().any(axis=1)).mean()) * 100, 1),
+        }
+    except TypeError:
+        quality = {
+            "duplicate_rows": 0,
+            "duplicate_pct": 0.0,
+            "complete_rows": int((~df.isna().any(axis=1)).sum()),
+            "complete_pct": round(float((~df.isna().any(axis=1)).mean()) * 100, 1),
+        }
 
     # Outlier detection for numeric columns (IQR method)
     outlier_cols = []
@@ -242,7 +270,7 @@ async def _embed_tabular_background(
             summary += " " + desc + "。"
 
         chunks.append({"text": summary, "start_char": 0, "end_char": len(summary)})
-        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+        await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
 
         try:
             from app.services.retrieval import invalidate_cache
@@ -263,7 +291,7 @@ async def _embed_text_background(
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
         chunks = greedy_chunk(content, max_size=1000, overlap=200)
-        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+        await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         try:
             from app.services.retrieval import invalidate_cache
             invalidate_cache(data_space_id)
@@ -333,7 +361,7 @@ async def _embed_document_background(
                 text = file_path.read_text(encoding="utf-8", errors="ignore")
 
         chunks = greedy_chunk(text, max_size=1000, overlap=200)
-        embed_svc.embed_chunks(data_space_id, chunks, file_id, filename)
+        await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         try:
             from app.services.retrieval import invalidate_cache
             invalidate_cache(data_space_id)

@@ -46,17 +46,21 @@ async def generate_report(
 
     md_content = _build_markdown(conv, messages, space_name)
 
+    # 文件名可能含中文，统一在路由层做 RFC 5987 编码；这里只产出原始名
+    safe_title = (conv.title or "analysis").strip().replace("/", "_").replace("\\", "_")
+    filename = f"report_{safe_title}_{datetime.now().strftime('%Y%m%d')}.md"
+
     if format == "markdown":
         return {
             "content": md_content,
-            "filename": f"report_{conv.title or 'analysis'}_{datetime.now().strftime('%Y%m%d')}.md",
-            "content_type": "text/markdown",
+            "filename": filename,
+            "content_type": "text/markdown; charset=utf-8",
         }
     else:
         return {
             "content": md_content,
-            "filename": f"report_{conv.title or 'analysis'}_{datetime.now().strftime('%Y%m%d')}.md",
-            "content_type": "text/markdown",
+            "filename": filename,
+            "content_type": "text/markdown; charset=utf-8",
         }
 
 

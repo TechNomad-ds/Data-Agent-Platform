@@ -21,9 +21,19 @@ export interface DataSpaceDetail extends DataSpace {
   files: FileInSpace[]
 }
 
+export interface ProcessingStatus {
+  total_files: number
+  ready: number
+  processing: number
+  error: number
+  all_ready: boolean
+}
+
 export const dataSpacesApi = {
   list: () => api.get<DataSpace[]>('/data-spaces'),
   get: (id: string) => api.get<DataSpaceDetail>(`/data-spaces/${id}`),
+  processingStatus: (id: string) =>
+    api.get<ProcessingStatus>(`/data-spaces/${id}/processing-status`),
   create: (data: { name: string; description?: string }) =>
     api.post<DataSpace>('/data-spaces', data),
   update: (id: string, data: { name?: string; description?: string }) =>

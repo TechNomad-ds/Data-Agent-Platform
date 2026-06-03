@@ -22,17 +22,42 @@ from app.core.security import decrypt_api_key
 _client_cache: dict[str, Any] = {}
 
 
+def _normalize_openai_base(api_base: str | None) -> str | None:
+    """规范化 OpenAI 兼容接口的 base_url。
+
+    OpenAI SDK 会在 base_url 后拼接 /chat/completions。多数中转站/官方接口
+    的实际路径是 /v1/chat/completions。如果管理员只填了 host:port（无任何路径），
+    SDK 会请求 /chat/completions，部分中转站对此返回空的 200 响应（无报错、无内容），
+    导致 Agent 拿到零输出、对话被当作空消息删除。
+
+    策略：仅当 base_url 不含任何路径段时才补 /v1；若管理员已显式写了路径
+    （/v1、/v4、/api 等），一律尊重原值，避免补错。
+    """
+    if not api_base:
+        return api_base
+    base = api_base.rstrip("/")
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(base)
+        # path 为空（仅 scheme://host:port）时才补 /v1
+        if not parsed.path:
+            return base + "/v1"
+    except Exception:
+        pass
+    return base
+
+
 def _get_client(provider: str, api_key: str, api_base: str | None = None):
     """复用 SDK client，避免每次请求创建新连接"""
-    cache_key = f"{provider}:{api_key[:16]}"
+    cache_key = f"{provider}:{api_key[:16]}:{api_base or ''}"
     if cache_key in _client_cache:
         return _client_cache[cache_key]
 
     if provider == "anthropic":
-        client = AsyncAnthropic(api_key=api_key)
+        client = AsyncAnthropic(api_key=api_key, base_url=api_base) if api_base else AsyncAnthropic(api_key=api_key)
     else:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=api_key, base_url=api_base)
+        client = AsyncOpenAI(api_key=api_key, base_url=_normalize_openai_base(api_base))
 
     _client_cache[cache_key] = client
     return client
@@ -78,7 +103,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 
 - 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，列出所有文件，不要遗漏任何一个
 - 代码文件（.py/.sql/.r 等）也是数据空间的重要组成部分，可能包含数据处理逻辑或分析脚本
-- 如果工具调用失败，立即换一种方法。例如 pandas_query 失败可以试 execute_python 或 sqlite_query，read_file 失败可以试 execute_python 直接读。不要把错误信息原样转述给用户，直接换方法解决
+- 如果工具调用失败，立即换一种方法。例如 pandas_query 失败可以试 sqlite_query 或先用 read_file 看清数据再分析。读取文件内容一律用 read_file 工具（支持 CSV/Excel/PDF/Word/代码/数据库等所有格式），不要在 execute_python 里用 open() 读文件——沙箱出于安全禁止 open。不要把错误信息原样转述给用户，直接换方法解决
 - 如果发现重要模式或用户偏好，用 save_memory 记住
 - 用户没有指定分析维度时，主动从最有价值的角度切入
 
@@ -93,11 +118,15 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 ## 错误恢复策略
 
 当工具调用失败时，按以下优先级尝试替代方案：
-1. pandas_query 失败 → 尝试 execute_python 或 sqlite_query
+1. pandas_query 失败 → 尝试 sqlite_query，或先用 read_file 看清数据结构再写表达式
 2. sqlite_query 失败 → 尝试 pandas_query
-3. read_file 失败 → 尝试 execute_python 直接读取
+3. read_file 失败 → 尝试 inspect_data 查看数据画像，或用 search_data_space 检索内容（切勿在 execute_python 里用 open 读文件，沙箱禁止）
 4. search_data_space 失败 → 尝试 read_file 逐文件查找
-5. 如果所有方法都失败，诚实告知用户并建议替代方案"""
+5. 如果所有方法都失败，诚实告知用户并建议替代方案
+
+## 代码执行约束（execute_python）
+
+execute_python 是受限沙箱，仅用于对**已加载的数据**做计算：可用 pandas/numpy 等白名单库，可用 df 变量。禁止 open、import 非白名单模块、exec/eval 等。需要文件内容时一律先用 read_file 获取，不要试图用 open 直接读取文件。"""
 
 
 class AgentLoop:
@@ -590,6 +619,7 @@ class AgentLoop:
 
             try:
                 full_text = ""
+                reasoning_text = ""  # 推理模型的思考内容（DeepSeek 等需回传）
                 tool_uses = []
 
                 if active_backend == "anthropic":
@@ -639,6 +669,7 @@ class AgentLoop:
                         # 处理推理模型的 reasoning_content（如 DeepSeek）
                         reasoning = getattr(delta, 'reasoning_content', None)
                         if reasoning:
+                            reasoning_text += reasoning
                             yield {"type": "thinking", "content": reasoning}
                         if delta.content:
                             full_text += delta.content
@@ -698,14 +729,18 @@ class AgentLoop:
                     messages.append({"role": "assistant", "content": assistant_content})
                 else:
                     # OpenAI 格式
-                    messages.append({
+                    assistant_msg = {
                         "role": "assistant",
                         "content": full_text or None,
                         "tool_calls": [
                             {"id": tu["id"], "type": "function", "function": {"name": tu["name"], "arguments": tu["input_json"]}}
                             for tu in tool_uses
                         ],
-                    })
+                    }
+                    # 推理模型（DeepSeek thinking 等）要求把 reasoning_content 原样回传，否则下一轮报 400
+                    if reasoning_text:
+                        assistant_msg["reasoning_content"] = reasoning_text
+                    messages.append(assistant_msg)
 
                 # 执行工具并收集结果
                 tool_results = []

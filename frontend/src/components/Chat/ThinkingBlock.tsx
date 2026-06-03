@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { SSEEvent } from '@/api/chat'
 import { colors } from '@/styles/tokens'
+import ChartMessage from '@/components/Charts/ChartMessage'
 
 const { Text } = Typography
 
@@ -105,7 +106,17 @@ export default function ThinkingBlock({
   ).length
   const allDone = toolUseCount > 0 && toolUseCount === toolResultCount
 
+  // 从工具结果中提取图表规格，始终在折叠块外渲染（不受展开/收起影响）
+  const charts: string[] = []
+  for (const e of toolEvents) {
+    if (e.type === 'tool_result' && e.content) {
+      const m = e.content.match(/```chart\n([\s\S]*?)```/)
+      if (m) charts.push(m[1].trim())
+    }
+  }
+
   return (
+    <>
     <div
       style={{
         borderRadius: 10,
@@ -228,6 +239,10 @@ export default function ThinkingBlock({
             }
 
             if (event.type === 'tool_result') {
+              // 图表规格已在折叠块外单独渲染，这里跳过，避免重复
+              if (event.content && /```chart\n[\s\S]*?```/.test(event.content)) {
+                return null
+              }
               return (
                 <ToolResultBlock key={i} content={event.content} isError={event.is_error} />
               )
@@ -238,5 +253,13 @@ export default function ThinkingBlock({
         </div>
       )}
     </div>
+    {charts.length > 0 && (
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {charts.map((c, i) => (
+          <ChartMessage key={i} chartJson={c} />
+        ))}
+      </div>
+    )}
+    </>
   )
 }

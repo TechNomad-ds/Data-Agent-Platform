@@ -5,6 +5,7 @@ import {
   StopOutlined,
   LockOutlined,
   DatabaseOutlined,
+  ArrowDownOutlined,
 } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -84,12 +85,11 @@ export default function ChatView({
     messages,
     setMessages,
     segments,
-    thinkingText,
     isStreaming,
     setIsStreaming,
     appendStreamDelta,
+    appendThinkingDelta,
     addToolEvent,
-    setThinkingText,
     resetStream,
     setAbortController,
     stopStreaming,
@@ -103,6 +103,10 @@ export default function ChatView({
   const [inputFocused, setInputFocused] = useState(false)
   const [loadingConversation, setLoadingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  // 用户是否贴在底部（决定流式时是否自动跟随滚动）
+  const stickToBottomRef = useRef(true)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   const sseBufferRef = useRef('')
   const savedMsgIdRef = useRef<string | null>(null)
   const creditsUsedRef = useRef<number | null>(null)
@@ -121,8 +125,37 @@ export default function ChatView({
   }, [conversationId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // 仅当用户贴在底部时才自动跟随；往上翻看历史时不打扰
+    if (stickToBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, segments])
+
+  // 切换对话时重置为贴底，并跳到最新消息
+  useEffect(() => {
+    stickToBottomRef.current = true
+    setShowScrollToBottom(false)
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+    })
+  }, [conversationId])
+
+  const BOTTOM_THRESHOLD = 80
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const atBottom = distanceFromBottom <= BOTTOM_THRESHOLD
+    stickToBottomRef.current = atBottom
+    setShowScrollToBottom(!atBottom)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    stickToBottomRef.current = true
+    setShowScrollToBottom(false)
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   useEffect(() => {
     if (selectedSpaceId) {
@@ -187,7 +220,7 @@ export default function ChatView({
             if (event.delta) appendStreamDelta(event.delta)
             break
           case 'thinking':
-            if (event.content) setThinkingText(event.content)
+            if (event.content) appendThinkingDelta(event.content)
             break
           case 'tool_use':
           case 'tool_result':
@@ -210,7 +243,7 @@ export default function ChatView({
         }
       } catch {}
     },
-    [appendStreamDelta, setThinkingText, addToolEvent, setMessages, setCurrentConversation, onConversationDeleted]
+    [appendStreamDelta, appendThinkingDelta, addToolEvent, setMessages, setCurrentConversation, onConversationDeleted]
   )
 
   const handleSendWithContent = async (content: string) => {
@@ -254,6 +287,9 @@ export default function ChatView({
   }
 
   const sendMessage = async (convId: string, content: string, skipAddUserMsg = false) => {
+    // 发送/重新生成时回到底部并恢复跟随
+    stickToBottomRef.current = true
+    setShowScrollToBottom(false)
     if (!skipAddUserMsg) {
       const userMsg: Message = {
         id: Date.now().toString(),
@@ -446,7 +482,11 @@ export default function ChatView({
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        style={{ flex: 1, overflow: 'auto', position: 'relative' }}
+      >
         <div
           style={{
             maxWidth: READING_WIDTH,
@@ -581,7 +621,7 @@ export default function ChatView({
                     </svg>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {segments.length === 0 && !thinkingText && (
+                    {segments.length === 0 && (
                       <div
                         style={{
                           display: 'flex',
@@ -598,17 +638,6 @@ export default function ChatView({
                         </Text>
                       </div>
                     )}
-                    {thinkingText && segments.length === 0 && (
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          color: colors.textMuted,
-                          fontStyle: 'italic',
-                        }}
-                      >
-                        {thinkingText}
-                      </Text>
-                    )}
                     {segments.map((seg, i) =>
                       seg.type === 'text' ? (
                         <div
@@ -623,6 +652,22 @@ export default function ChatView({
                           {i === segments.length - 1 && (
                             <span className="typing-dot" />
                           )}
+                        </div>
+                      ) : seg.type === 'thinking' ? (
+                        <div
+                          key={i}
+                          style={{
+                            marginBottom: 10,
+                            paddingLeft: 10,
+                            borderLeft: `2px solid ${colors.border}`,
+                            fontSize: 12.5,
+                            color: colors.textMuted,
+                            fontStyle: 'italic',
+                            whiteSpace: 'pre-wrap',
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {seg.content || ''}
                         </div>
                       ) : (
                         <div key={i} style={{ marginBottom: 10 }}>
@@ -643,7 +688,30 @@ export default function ChatView({
       </div>
 
       {/* Input */}
-      <div style={{ padding: '8px 24px 22px', background: colors.bg }}>
+      <div style={{ padding: '8px 24px 22px', background: colors.bg, position: 'relative' }}>
+        {/* 回到底部悬浮按钮 — 仅在未贴底时显示 */}
+        {showScrollToBottom && !showEmpty && (
+          <Tooltip title="回到底部">
+            <Button
+              shape="circle"
+              icon={<ArrowDownOutlined />}
+              onClick={scrollToBottom}
+              style={{
+                position: 'absolute',
+                top: -48,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 36,
+                height: 36,
+                background: colors.surface,
+                borderColor: colors.border,
+                color: colors.textSecondary,
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.12)',
+                zIndex: 5,
+              }}
+            />
+          </Tooltip>
+        )}
         <div
           style={{
             maxWidth: READING_WIDTH,

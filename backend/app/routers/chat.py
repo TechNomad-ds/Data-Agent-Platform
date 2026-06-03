@@ -246,6 +246,11 @@ async def send_message(
                             segments[-1]["content"] += event["delta"]
                         else:
                             segments.append({"type": "text", "content": event["delta"]})
+                    elif event["type"] == "thinking":
+                        if segments and segments[-1]["type"] == "thinking":
+                            segments[-1]["content"] += event.get("content", "")
+                        else:
+                            segments.append({"type": "thinking", "content": event.get("content", "")})
                     elif event["type"] in ("tool_use", "tool_result"):
                         if segments and segments[-1]["type"] == "tools":
                             segments[-1]["events"].append(event)

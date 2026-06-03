@@ -15,8 +15,15 @@ export default function ExportButton({ conversationId }: Props) {
     try {
       const res = await reportsApi.generate(conversationId, format)
       const disposition = res.headers['content-disposition'] || ''
-      const filenameMatch = disposition.match(/filename="(.+)"/)
-      const filename = filenameMatch ? filenameMatch[1] : `report.${format === 'markdown' ? 'md' : 'pdf'}`
+      // 优先读 RFC 5987 的 filename*（含中文，UTF-8 百分号编码），回退到普通 filename
+      let filename = `report.${format === 'markdown' ? 'md' : 'pdf'}`
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const asciiMatch = disposition.match(/filename="([^"]+)"/i)
+      if (utf8Match) {
+        try { filename = decodeURIComponent(utf8Match[1]) } catch { /* 保持默认 */ }
+      } else if (asciiMatch) {
+        filename = asciiMatch[1]
+      }
       saveAs(res.data, filename)
       message.success('报告已导出')
     } catch {

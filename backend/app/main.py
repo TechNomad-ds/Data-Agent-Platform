@@ -33,6 +33,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"恢复运行时配置失败: {e}")
 
+    # 预热 embedding 模型（在线程池中加载，不阻塞启动），消除首次上传的加载延迟
+    try:
+        import asyncio
+        from app.services.embedding import warmup
+        asyncio.get_running_loop().run_in_executor(None, warmup)
+        logger.info("embedding 模型预热已在后台启动")
+    except Exception as e:
+        logger.warning(f"启动 embedding 预热失败: {e}")
+
     yield
 
     # 关闭 Redis 连接

@@ -38,6 +38,14 @@ export default function ChartMessage({ chartJson }: Props) {
   try {
     const spec = JSON.parse(chartJson)
     if (!spec || !spec.chart_type) throw new Error('缺少 chart_type')
+    // data 可能被模型当作 JSON 字符串传入，这里再解析一层
+    if (typeof spec.data === 'string') {
+      try {
+        spec.data = JSON.parse(spec.data)
+      } catch {
+        // 解析失败则保持原值，交给 ChartRenderer 的容错
+      }
+    }
     return <ChartRenderer spec={spec} />
   } catch (e: any) {
     return <ChartErrorFallback chartJson={chartJson} error={e?.message || '解析失败'} />

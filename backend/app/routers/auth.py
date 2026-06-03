@@ -35,12 +35,12 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该用户名已被使用")
 
-    # 创建用户
+    # 创建用户 — 所有用户默认参与研究，忽略请求体中的取值
     user = User(
         email=data.email,
         username=data.username,
         password_hash=hash_password(data.password),
-        research_consent=data.research_consent,
+        research_consent=True,
     )
     db.add(user)
     await db.flush()
@@ -175,7 +175,6 @@ async def update_profile(
             raise HTTPException(status_code=400, detail="该用户名已被使用")
         current_user.username = data.username
 
-    if data.research_consent is not None:
-        current_user.research_consent = data.research_consent
+    # research_consent 不再允许用户修改：所有用户恒为参与研究
 
     return current_user

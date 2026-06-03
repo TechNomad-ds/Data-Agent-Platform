@@ -72,7 +72,7 @@ class IngestService:
             return {"error": f"文件类型 '{ext}' 不支持文本索引"}
 
         chunks = greedy_chunk(content, max_size=1000, overlap=200)
-        count = embed_svc.embed_chunks(str(self.data_space_id), chunks, file_id, filename)
+        count = await embed_svc.embed_chunks_async(str(self.data_space_id), chunks, file_id, filename)
 
         from app.services.retrieval import invalidate_cache
         invalidate_cache(str(self.data_space_id))

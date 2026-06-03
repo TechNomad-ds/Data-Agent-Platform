@@ -299,7 +299,11 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
 
     from app.services.retrieval import get_retrieval_service
     svc = get_retrieval_service(str(data_space_id))
-    results = svc.search(query, top_k=top_k)
+    # 向量检索含 ONNX 推理（同步阻塞），丢到线程池避免冻结事件循环
+    import asyncio
+    results = await asyncio.get_running_loop().run_in_executor(
+        None, lambda: svc.search(query, top_k=top_k)
+    )
 
     if results:
         output = []
@@ -547,7 +551,9 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
             if isinstance(node, ast.Attribute) and isinstance(node.attr, str) and node.attr.startswith("__"):
                 return "安全限制：不允许访问 dunder 属性"
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id in ("exec", "eval", "compile", "open", "input", "breakpoint", "getattr", "setattr", "delattr"):
+                if node.func.id == "open":
+                    return "安全限制：pandas_query 沙箱禁止 open()。文件已自动加载为 df 变量，直接对 df 操作即可；需要其它文件请用 read_file 工具。"
+                if node.func.id in ("exec", "eval", "compile", "input", "breakpoint", "getattr", "setattr", "delattr"):
                     return f"安全限制：不允许调用 '{node.func.id}'"
     except SyntaxError as e:
         return f"表达式语法错误: {e}"
@@ -654,7 +660,9 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
                 if node.attr.startswith("__") and node.attr.endswith("__"):
                     return f"安全限制：不允许访问 dunder 属性 '{node.attr}'"
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id in ("exec", "eval", "compile", "open", "input", "breakpoint", "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr"):
+                if node.func.id == "open":
+                    return "安全限制：execute_python 沙箱禁止 open()。读取文件内容请改用 read_file 工具（支持各种格式），它会安全地返回文件内容。"
+                if node.func.id in ("exec", "eval", "compile", "input", "breakpoint", "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr"):
                     return f"安全限制：不允许调用 '{node.func.id}'"
     except SyntaxError as e:
         return f"代码语法错误: {e}"
@@ -751,10 +759,17 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
 
 
 def _tool_generate_chart(args: dict) -> str:
+    # 模型有时把 data 当 JSON 字符串传（尤其是 OpenAI 兼容模型），统一解析成对象
+    data = args.get("data", {})
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except (json.JSONDecodeError, TypeError):
+            pass
     chart_spec = {
         "chart_type": args.get("chart_type", "bar"),
         "title": args.get("title", ""),
-        "data": args.get("data", {}),
+        "data": data,
         "x_label": args.get("x_label", ""),
         "y_label": args.get("y_label", ""),
     }

@@ -113,6 +113,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [processing, setProcessing] = useState<{ ready: number; total: number } | null>(null)
   const [searchText, setSearchText] = useState('')
   const [spacesLoading, setSpacesLoading] = useState(true)
 
@@ -188,15 +189,46 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       await dataSpacesApi.uploadFiles(selectedSpaceId, formData)
       clearInterval(progressInterval)
       setUploadProgress(100)
-      message.success(`${file.name} 上传成功`)
+      message.success(`${file.name} 上传成功，正在后台解析...`)
       loadFiles()
       loadSpaces()
+      // 上传只是入库，真正的解析+向量索引在后台进行，轮询真实进度
+      pollProcessing(selectedSpaceId)
     } catch (err: any) {
       message.error(err?.response?.data?.detail || '上传失败')
     } finally {
       setTimeout(() => { setUploading(false); setUploadProgress(0) }, 800)
     }
     return false
+  }
+
+  // 轮询后台处理进度，直到所有文件就绪（或失败）
+  const pollProcessing = (spaceId: string) => {
+    let tries = 0
+    const tick = async () => {
+      tries += 1
+      try {
+        const { data } = await dataSpacesApi.processingStatus(spaceId)
+        if (spaceId !== selectedSpaceId) { setProcessing(null); return }
+        setProcessing({ ready: data.ready, total: data.total_files })
+        // 结束条件：全部就绪，或已无处理中文件（ready + error 覆盖全部）
+        const settled = data.ready + data.error >= data.total_files
+        if (data.all_ready || data.total_files === 0 || settled) {
+          setProcessing(null)
+          loadFiles()
+          if (data.error > 0) {
+            message.warning(`数据已就绪，但有 ${data.error} 个文件解析失败`)
+          } else {
+            message.success('数据已就绪，可以开始分析')
+          }
+          return
+        }
+      } catch { /* 忽略单次失败，继续轮询 */ }
+      // 最多轮询 5 分钟（150 次 * 2s），避免无限轮询
+      if (tries < 150) setTimeout(tick, 2000)
+      else setProcessing(null)
+    }
+    setTimeout(tick, 1500)
   }
 
   const handleDeleteFile = async (fileId: string) => {
@@ -483,6 +515,26 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           <LoadingOutlined style={{ color: colors.primary }} />
           <Text style={{ fontSize: 13, color: colors.primary, fontWeight: 500 }}>上传中...</Text>
           <Progress percent={uploadProgress} size="small" strokeColor={colors.primary} showInfo={false} style={{ flex: 1, maxWidth: 200 }} />
+        </div>
+      )}
+
+      {/* 后台解析进度：上传完成后文件仍在做画像 + 向量索引 */}
+      {processing && (
+        <div style={{
+          padding: '10px 24px',
+          background: '#fffbe6',
+          borderBottom: `1px solid ${colors.border}`,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <LoadingOutlined style={{ color: '#d48806' }} />
+          <Text style={{ fontSize: 13, color: '#d48806', fontWeight: 500 }}>
+            正在后台解析数据 {processing.ready}/{processing.total}，可继续操作
+          </Text>
+          <Progress
+            percent={processing.total ? Math.round((processing.ready / processing.total) * 100) : 0}
+            size="small" strokeColor="#d48806" showInfo={false}
+            style={{ flex: 1, maxWidth: 200 }}
+          />
         </div>
       )}
 
