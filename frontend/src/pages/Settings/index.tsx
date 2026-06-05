@@ -3,6 +3,7 @@ import { Typography, Card, Button, Form, Input, Modal, message } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/authStore'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const { Title, Text } = Typography
 
@@ -11,6 +12,7 @@ export default function SettingsPage() {
   const [passwordForm] = Form.useForm()
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const { user, fetchUser } = useAuthStore()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (user) {
@@ -49,7 +51,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ height: '100vh', overflow: 'auto', background: '#f8fafc', padding: 32 }}>
+    <div style={{ height: '100%', overflow: 'auto', background: '#f8fafc', padding: isMobile ? 16 : 32 }}>
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         <Title level={3} style={{ marginBottom: 8 }}>设置</Title>
         <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>

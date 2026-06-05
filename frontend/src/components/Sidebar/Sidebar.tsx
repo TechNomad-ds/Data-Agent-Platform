@@ -32,6 +32,8 @@ interface Props {
   onOpenCredits: () => void
   onOpenAdmin: () => void
   currentView: MainView
+  /** 在移动端抽屉内渲染：填满容器宽高，操作按钮常显（适配触屏） */
+  inDrawer?: boolean
 }
 
 interface GroupedConversations {
@@ -50,6 +52,7 @@ export default function Sidebar({
   onOpenCredits,
   onOpenAdmin,
   currentView,
+  inDrawer = false,
 }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [spaces, setSpaces] = useState<DataSpace[]>([])
@@ -167,12 +170,12 @@ export default function Sidebar({
   return (
     <div
       style={{
-        width: 272,
-        height: '100vh',
+        width: inDrawer ? '100%' : 272,
+        height: inDrawer ? '100%' : '100vh',
         display: 'flex',
         flexDirection: 'column',
         background: colors.bgSubtle,
-        borderRight: `1px solid ${colors.border}`,
+        borderRight: inDrawer ? 'none' : `1px solid ${colors.border}`,
         flexShrink: 0,
       }}
     >
@@ -395,7 +398,7 @@ export default function Sidebar({
                             flexShrink: 0,
                             padding: '2px 4px',
                             borderRadius: 4,
-                            opacity: 0,
+                            opacity: inDrawer ? 1 : 0,
                             transition: 'opacity 0.15s',
                           }}
                         />

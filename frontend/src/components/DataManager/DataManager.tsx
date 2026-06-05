@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
 import { uploadErrorMessage } from '@/utils/uploadError'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import api from '@/api/client'
 import { colors, shadow } from '@/styles/tokens'
 
@@ -117,6 +118,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   const [processing, setProcessing] = useState<{ ready: number; total: number } | null>(null)
   const [searchText, setSearchText] = useState('')
   const [spacesLoading, setSpacesLoading] = useState(true)
+  const isMobile = useIsMobile()
 
   useEffect(() => { loadSpaces() }, [])
   useEffect(() => {
@@ -252,7 +254,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   // 状态 1：加载中
   if (spacesLoading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.bg }}>
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: colors.bg }}>
         <Spin size="large" />
       </div>
     )
@@ -262,10 +264,11 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   if (spaces.length === 0 && !selectedSpaceId) {
     return (
       <div style={{
-        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'auto',
         background: `radial-gradient(circle at 50% 30%, rgba(79,70,229,0.04), transparent 60%), ${colors.bg}`,
       }}>
-        <div style={{ maxWidth: 560, textAlign: 'center', padding: 40 }}>
+        <div style={{ maxWidth: 560, textAlign: 'center', padding: isMobile ? 24 : 40 }}>
           <div style={{
             width: 72, height: 72, borderRadius: 20,
             background: `linear-gradient(135deg, ${colors.primary}, #7c3aed)`,
@@ -285,13 +288,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           </Text>
 
           {/* 三步流程 */}
-          <div style={{ display: 'flex', gap: 20, marginBottom: 40, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, marginBottom: 40, justifyContent: 'center' }}>
             {[
               { icon: <FolderOutlined />, label: '创建空间', desc: '给分析起个名字' },
               { icon: <CloudUploadOutlined />, label: '上传数据', desc: '拖拽文件上传' },
               { icon: <MessageOutlined />, label: '对话分析', desc: '用自然语言提问' },
             ].map((step, i) => (
-              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+              <div key={i} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 14,
                   background: colors.primaryLight, color: colors.primary,
@@ -302,7 +305,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>{step.label}</div>
                 <div style={{ fontSize: 12, color: colors.textMuted }}>{step.desc}</div>
-                {i < 2 && (
+                {i < 2 && !isMobile && (
                   <div style={{ position: 'absolute', right: -14, top: '50%', color: colors.border, fontSize: 16 }}>→</div>
                 )}
               </div>
@@ -327,10 +330,10 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   // 状态 3：有空间但未选中 — 空间卡片列表
   if (!selectedSpaceId) {
     return (
-      <div style={{ height: '100vh', overflow: 'auto', background: colors.bg }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 32px 64px' }}>
+      <div style={{ height: '100%', overflow: 'auto', background: colors.bg }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '20px 16px 48px' : '32px 32px 64px' }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: isMobile ? 24 : 36 }}>
             <div>
               <Title level={3} style={{ marginBottom: 4, letterSpacing: -0.3 }}>数据管理</Title>
               <Text style={{ color: colors.textMuted, fontSize: 14 }}>
@@ -445,13 +448,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   const currentSpace = spaces.find(s => s.id === selectedSpaceId)
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: colors.bg }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: colors.bg }}>
       {/* Header with breadcrumb */}
       <div style={{
-        padding: '14px 24px',
+        padding: isMobile ? '10px 12px' : '14px 24px',
         borderBottom: `1px solid ${colors.border}`,
         background: colors.surface,
-        display: 'flex', alignItems: 'center', gap: 12,
+        display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexWrap: 'wrap',
       }}>
         <Button
           type="text" icon={<ArrowLeftOutlined />}
@@ -508,7 +511,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       {/* Upload progress overlay */}
       {uploading && (
         <div style={{
-          padding: '10px 24px',
+          padding: isMobile ? '10px 12px' : '10px 24px',
           background: '#f0f7ff',
           borderBottom: `1px solid ${colors.border}`,
           display: 'flex', alignItems: 'center', gap: 12,
@@ -522,7 +525,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       {/* 后台解析进度：上传完成后文件仍在做画像 + 向量索引 */}
       {processing && (
         <div style={{
-          padding: '10px 24px',
+          padding: isMobile ? '10px 12px' : '10px 24px',
           background: '#fffbe6',
           borderBottom: `1px solid ${colors.border}`,
           display: 'flex', alignItems: 'center', gap: 12,
@@ -540,12 +543,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       )}
 
       {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left: file list */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden' }}>
+        {/* Left: file list — 移动端选中文件后隐藏，让预览占满 */}
         <div style={{
-          width: files.length === 0 ? '100%' : 380,
-          borderRight: files.length > 0 ? `1px solid ${colors.border}` : 'none',
-          display: 'flex', flexDirection: 'column',
+          width: isMobile ? '100%' : (files.length === 0 ? '100%' : 380),
+          display: isMobile && files.length > 0 && selectedFileId ? 'none' : 'flex',
+          borderRight: !isMobile && files.length > 0 ? `1px solid ${colors.border}` : 'none',
+          flexDirection: 'column',
           overflow: 'hidden', flexShrink: 0,
         }}>
           {/* Upload area */}
@@ -668,9 +672,20 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           ) : null}
         </div>
 
-        {/* Right: preview */}
-        {files.length > 0 && (
-          <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+        {/* Right: preview — 移动端仅在选中文件时显示 */}
+        {files.length > 0 && (!isMobile || selectedFileId) && (
+          <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? 12 : 24 }}>
+            {isMobile && selectedFileId && (
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowLeftOutlined />}
+                onClick={() => { setSelectedFileId(undefined); setPreview(null) }}
+                style={{ color: colors.textSecondary, marginBottom: 8, paddingLeft: 0 }}
+              >
+                返回文件列表
+              </Button>
+            )}
             {!selectedFileId ? (
               <div style={{ textAlign: 'center', paddingTop: 80 }}>
                 <FileTextOutlined style={{ fontSize: 48, color: colors.border, marginBottom: 16 }} />
@@ -789,7 +804,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
         onCancel={() => { setCreateModalOpen(false); setNewSpaceName(''); setNewSpaceDesc('') }}
         footer={null}
         centered
-        width={440}
+        width={isMobile ? '92%' : 440}
       >
         <div style={{ padding: '8px 0' }}>
           <div style={{

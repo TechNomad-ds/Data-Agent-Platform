@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons'
 import api from '@/api/client'
 import { UserInfo } from '@/api/auth'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { colors } from '@/styles/tokens'
 
 const { Title, Text } = Typography
@@ -39,6 +40,7 @@ interface AdminConversation {
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('stats')
   const [users, setUsers] = useState<UserInfo[]>([])
+  const isMobile = useIsMobile()
   const [models, setModels] = useState<any[]>([])
   const [conversations, setConversations] = useState<AdminConversation[]>([])
   const [convTotal, setConvTotal] = useState(0)
@@ -447,7 +449,7 @@ export default function Admin() {
                   <Text type="secondary">共 {users.length} 个用户</Text>
                   <Button onClick={() => setCreditModalOpen(true)} icon={<WalletOutlined />}>手动调整额度</Button>
                 </div>
-                <Table columns={userColumns} dataSource={users} rowKey="id" size="small" />
+                <Table columns={userColumns} dataSource={users} rowKey="id" size="small" scroll={{ x: 'max-content' }} />
               </div>
             ),
           },
@@ -460,6 +462,7 @@ export default function Admin() {
                 dataSource={conversations}
                 rowKey="id"
                 size="small"
+                scroll={{ x: 'max-content' }}
                 pagination={{
                   current: convPage,
                   total: convTotal,
@@ -611,22 +614,22 @@ export default function Admin() {
 
                 {researchStats && (
                   <Row gutter={16} style={{ marginBottom: 24 }}>
-                    <Col span={6}>
+                    <Col xs={12} sm={6}>
                       <Card size="small" style={{ borderRadius: 12, border: `1px solid ${colors.border}` }}>
                         <Statistic title="已授权用户" value={researchStats.consented_users} suffix={`/ ${researchStats.total_users}`} valueStyle={{ fontSize: 20 }} />
                       </Card>
                     </Col>
-                    <Col span={6}>
+                    <Col xs={12} sm={6}>
                       <Card size="small" style={{ borderRadius: 12, border: `1px solid ${colors.border}` }}>
                         <Statistic title="授权率" value={researchStats.consent_rate} suffix="%" valueStyle={{ fontSize: 20 }} />
                       </Card>
                     </Col>
-                    <Col span={6}>
+                    <Col xs={12} sm={6}>
                       <Card size="small" style={{ borderRadius: 12, border: `1px solid ${colors.border}` }}>
                         <Statistic title="可导出对话" value={researchStats.consented_conversations} valueStyle={{ fontSize: 20 }} />
                       </Card>
                     </Col>
-                    <Col span={6}>
+                    <Col xs={12} sm={6}>
                       <Card size="small" style={{ borderRadius: 12, border: `1px solid ${colors.border}` }}>
                         <Statistic title="可导出消息" value={researchStats.consented_messages} valueStyle={{ fontSize: 20 }} />
                       </Card>
@@ -684,7 +687,7 @@ export default function Admin() {
             children: (
               <>
                 <Card size="small" style={{ marginBottom: 16, borderRadius: 10 }} title="全局 API 配置（所有模型共用）">
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, alignItems: isMobile ? 'stretch' : 'flex-end' }}>
                     <div style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>API 中转站地址</Text>
                       <Input
@@ -705,7 +708,7 @@ export default function Admin() {
                         size="small"
                       />
                     </div>
-                    <Button type="primary" size="small" onClick={handleSaveGlobalApi}>保存</Button>
+                    <Button type="primary" size="small" onClick={handleSaveGlobalApi} block={isMobile}>保存</Button>
                   </div>
                 </Card>
 
@@ -715,7 +718,7 @@ export default function Admin() {
                     添加模型
                   </Button>
                 </div>
-                <Table columns={modelColumns} dataSource={models} rowKey="id" size="small" />
+                <Table columns={modelColumns} dataSource={models} rowKey="id" size="small" scroll={{ x: 'max-content' }} />
               </>
             ),
           },
@@ -793,10 +796,10 @@ export default function Admin() {
             </Descriptions>
 
             <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col span={6}><Card size="small"><Statistic title="数据空间" value={userDetail.spaces?.length || 0} valueStyle={{ fontSize: 20 }} /></Card></Col>
-              <Col span={6}><Card size="small"><Statistic title="文件" value={userDetail.file_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
-              <Col span={6}><Card size="small"><Statistic title="对话" value={userDetail.conversation_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
-              <Col span={6}><Card size="small"><Statistic title="余额" value={userDetail.credit_balance} valueStyle={{ fontSize: 20 }} /></Card></Col>
+              <Col xs={12} sm={6}><Card size="small"><Statistic title="数据空间" value={userDetail.spaces?.length || 0} valueStyle={{ fontSize: 20 }} /></Card></Col>
+              <Col xs={12} sm={6}><Card size="small"><Statistic title="文件" value={userDetail.file_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
+              <Col xs={12} sm={6}><Card size="small"><Statistic title="对话" value={userDetail.conversation_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
+              <Col xs={12} sm={6}><Card size="small"><Statistic title="余额" value={userDetail.credit_balance} valueStyle={{ fontSize: 20 }} /></Card></Col>
             </Row>
 
             {userDetail.spaces?.length > 0 && (

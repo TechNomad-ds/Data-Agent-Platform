@@ -3,6 +3,7 @@ import { Card, Statistic, Table, Typography, Tag, Button, Input, Form, Modal, Se
 import { WalletOutlined, ThunderboltOutlined, ApiOutlined, DeleteOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import api from '@/api/client'
 import { settingsApi, ApiConfig, ModelOption } from '@/api/settings'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const { Title, Text } = Typography
 
@@ -28,6 +29,7 @@ export default function Credits() {
 
   const [configModalOpen, setConfigModalOpen] = useState(false)
   const [configForm] = Form.useForm()
+  const isMobile = useIsMobile()
   const [saving, setSaving] = useState(false)
 
   const [mappingModalOpen, setMappingModalOpen] = useState(false)
@@ -177,7 +179,7 @@ export default function Credits() {
       </div>
 
       {/* 两个模式卡片 */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, marginBottom: 24 }}>
         {/* 使用平台额度 */}
         <Card
           style={cardStyle(apiMode === 'credits')}
@@ -273,6 +275,7 @@ export default function Credits() {
           dataSource={transactions}
           rowKey="id"
           size="small"
+          scroll={{ x: 'max-content' }}
           pagination={{ current: page, total, pageSize: 20, onChange: setPage, showTotal: (t) => `共 ${t} 条记录` }}
         />
       </Card>

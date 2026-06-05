@@ -14,6 +14,7 @@ import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
 import { settingsApi, ModelOption } from '@/api/settings'
 import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import MessageContent from '@/components/Chat/MessageContent'
 import ThinkingBlock from '@/components/Chat/ThinkingBlock'
 import ExportButton from '@/components/Chat/ExportButton'
@@ -98,6 +99,7 @@ export default function ChatView({
   const [spaces, setSpaces] = useState<DataSpace[]>([])
   const [models, setModels] = useState<ModelOption[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
+  const isMobile = useIsMobile()
   const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [inputFocused, setInputFocused] = useState(false)
@@ -110,6 +112,9 @@ export default function ChatView({
   const sseBufferRef = useRef('')
   const savedMsgIdRef = useRef<string | null>(null)
   const creditsUsedRef = useRef<number | null>(null)
+  // 刚在本地创建的对话 id：conversationId 变化时不要再拉取服务端快照，
+  // 否则会与发送请求竞态、把本地乐观插入的用户消息覆盖掉
+  const justCreatedConvRef = useRef<string | null>(null)
 
   useEffect(() => {
     loadSpaces()
@@ -117,8 +122,14 @@ export default function ChatView({
   }, [])
 
   useEffect(() => {
-    if (conversationId) loadConversation(conversationId)
-    else {
+    if (conversationId) {
+      // 本地刚创建的对话：消息已在 state 中（含乐观插入的用户消息），跳过拉取
+      if (justCreatedConvRef.current === conversationId) {
+        justCreatedConvRef.current = null
+        return
+      }
+      loadConversation(conversationId)
+    } else {
       setCurrentConversation(null)
       setMessages([])
     }
@@ -254,6 +265,7 @@ export default function ChatView({
       try {
         const res = await chatApi.createConversation({ data_space_id: selectedSpaceId, model_id: selectedModel })
         setCurrentConversation(res.data)
+        justCreatedConvRef.current = res.data.id
         onConversationCreated(res.data.id)
         convId = res.data.id
       } catch { message.error('创建对话失败'); return }
@@ -276,6 +288,7 @@ export default function ChatView({
           model_id: selectedModel,
         })
         setCurrentConversation(res.data)
+        justCreatedConvRef.current = res.data.id
         onConversationCreated(res.data.id)
         convId = res.data.id
       } catch {
@@ -402,14 +415,14 @@ export default function ChatView({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100%',
         background: colors.bg,
       }}
     >
       {/* Top bar */}
       <div
         style={{
-          padding: '10px 24px',
+          padding: isMobile ? '8px 12px' : '10px 24px',
           borderBottom: `1px solid ${colors.border}`,
           background: colors.surface,
           display: 'flex',
@@ -455,7 +468,7 @@ export default function ChatView({
               value={spaces.some((s) => s.id === selectedSpaceId) ? selectedSpaceId : undefined}
               onChange={onSpaceChange}
               placeholder="数据空间"
-              style={{ minWidth: 140 }}
+              style={{ minWidth: isMobile ? 100 : 140 }}
               popupMatchSelectWidth={false}
               variant="borderless"
               options={spaces.map((s) => ({ label: s.name, value: s.id }))}
@@ -466,7 +479,7 @@ export default function ChatView({
             value={selectedModel || undefined}
             onChange={setSelectedModel}
             placeholder="模型"
-            style={{ minWidth: 160, maxWidth: 320 }}
+            style={{ minWidth: isMobile ? 110 : 160, maxWidth: isMobile ? 160 : 320 }}
             variant="borderless"
             popupMatchSelectWidth={false}
             optionLabelProp="label"
@@ -491,7 +504,7 @@ export default function ChatView({
           style={{
             maxWidth: READING_WIDTH,
             margin: '0 auto',
-            padding: showEmpty ? '0 24px' : '32px 24px 24px',
+            padding: showEmpty ? '0 24px' : isMobile ? '20px 14px 16px' : '32px 24px 24px',
           }}
         >
           {loadingConversation ? (
@@ -531,7 +544,7 @@ export default function ChatView({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
                     gap: 10,
                     maxWidth: 600,
                     margin: '0 auto',
@@ -688,7 +701,7 @@ export default function ChatView({
       </div>
 
       {/* Input */}
-      <div style={{ padding: '8px 24px 22px', background: colors.bg, position: 'relative' }}>
+      <div style={{ padding: isMobile ? '8px 12px 14px' : '8px 24px 22px', background: colors.bg, position: 'relative' }}>
         {/* 回到底部悬浮按钮 — 仅在未贴底时显示 */}
         {showScrollToBottom && !showEmpty && (
           <Tooltip title="回到底部">
@@ -738,8 +751,12 @@ export default function ChatView({
             onBlur={() => setInputFocused(false)}
             placeholder={
               selectedSpaceId
-                ? '向 DataMind 提问…  Enter 发送，Shift+Enter 换行'
-                : '选择数据空间后可分析数据，或直接提问…'
+                ? isMobile
+                  ? '向 DataMind 提问…'
+                  : '向 DataMind 提问…  Enter 发送，Shift+Enter 换行'
+                : isMobile
+                  ? '直接提问，或先选数据空间…'
+                  : '选择数据空间后可分析数据，或直接提问…'
             }
             autoSize={{ minRows: 1, maxRows: 6 }}
             onPressEnter={(e) => {
@@ -753,7 +770,8 @@ export default function ChatView({
             style={{
               flex: 1,
               resize: 'none',
-              fontSize: 14.5,
+              // 移动端用 16px 避免 iOS 聚焦时自动放大
+              fontSize: isMobile ? 16 : 14.5,
               padding: '8px 0',
               lineHeight: 1.55,
             }}

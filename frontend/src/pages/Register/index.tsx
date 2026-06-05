@@ -4,6 +4,7 @@ import { Form, Input, Button, Typography, Checkbox, Modal, message, ConfigProvid
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons'
 import { authApi } from '@/api/auth'
 import { lightThemeConfig } from '@/theme/themeConfig'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import AuthBrand from '@/components/Layout/AuthBrand'
 import { colors } from '@/styles/tokens'
 
@@ -13,6 +14,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [legalOpen, setLegalOpen] = useState(false)
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   const onFinish = async (values: any) => {
     setLoading(true)
@@ -35,7 +37,7 @@ export default function Register() {
   return (
     <ConfigProvider theme={lightThemeConfig}>
       <div style={{ display: 'flex', minHeight: '100vh' }}>
-        <AuthBrand />
+        {!isMobile && <AuthBrand />}
 
         <div
           style={{
@@ -43,12 +45,26 @@ export default function Register() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            padding: '36px 72px',
+            padding: isMobile ? '24px 20px' : '36px 72px',
             background: '#ffffff',
             overflowY: 'auto',
           }}
         >
           <div style={{ maxWidth: 380, width: '100%', margin: '0 auto' }}>
+            {isMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 11,
+                  background: `linear-gradient(135deg, ${colors.primary}, #7c3aed)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2.5L13.5 9L20 10.5L13.5 12L12 18.5L10.5 12L4 10.5L10.5 9L12 2.5Z" fill="#ffffff" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: 18, fontWeight: 600, color: colors.textPrimary, letterSpacing: -0.2 }}>DataMind</span>
+              </div>
+            )}
             <div style={{ marginBottom: 28 }}>
               <Title level={3} style={{ marginBottom: 6, color: colors.textPrimary, fontWeight: 600, letterSpacing: -0.3 }}>
                 创建 DataMind 账号

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Modal } from 'antd'
+import { Modal, Drawer, Button } from 'antd'
+import { MenuOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { dataSpacesApi } from '@/api/dataSpaces'
 import { chatApi } from '@/api/chat'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import Sidebar from '@/components/Sidebar/Sidebar'
 import ChatView from '@/components/Chat/ChatView'
 import DataManager from '@/components/DataManager/DataManager'
@@ -10,6 +12,8 @@ import SettingsPage from '@/pages/Settings'
 import CreditsPage from '@/pages/Credits'
 import AdminPage from '@/pages/Admin'
 import Onboarding from '@/components/Onboarding/Onboarding'
+import Logo from '@/components/Layout/Logo'
+import { colors } from '@/styles/tokens'
 
 export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin'
 
@@ -21,11 +25,18 @@ export default function MainLayout() {
   const [checkingSpaces, setCheckingSpaces] = useState(true)
   const [spaceLockedByConversation, setSpaceLockedByConversation] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const isMobile = useIsMobile()
   const { user, fetchUser } = useAuthStore()
 
   useEffect(() => {
     if (!user) fetchUser()
   }, [user, fetchUser])
+
+  // 切回桌面端时收起抽屉，避免再次回到移动端时残留打开态
+  useEffect(() => {
+    if (!isMobile) setMobileMenuOpen(false)
+  }, [isMobile])
 
   // 检查是否需要显示引导
   useEffect(() => {
@@ -111,6 +122,62 @@ export default function MainLayout() {
     setCurrentView('chat')
   }, [])
 
+  // 移动端：导航动作后自动收起抽屉（选对话 / 切视图 / 新对话等）
+  const withDrawerClose = useCallback(
+    <A extends any[]>(fn: (...a: A) => void) =>
+      (...a: A) => {
+        fn(...a)
+        setMobileMenuOpen(false)
+      },
+    []
+  )
+
+  const sidebar = (
+    <Sidebar
+      currentConvId={currentConvId}
+      onNewChat={withDrawerClose(handleNewChat)}
+      onSelectConversation={withDrawerClose(handleSelectConversation)}
+      onOpenDataManager={withDrawerClose(handleOpenDataManager)}
+      onOpenSettings={withDrawerClose(handleOpenSettings)}
+      onOpenCredits={withDrawerClose(handleOpenCredits)}
+      onOpenAdmin={withDrawerClose(handleOpenAdmin)}
+      currentView={currentView}
+      inDrawer={isMobile}
+    />
+  )
+
+  const mainContent =
+    currentView === 'chat' ? (
+      <ChatView
+        selectedSpaceId={selectedSpaceId}
+        conversationId={currentConvId}
+        onConversationCreated={handleConversationCreated}
+        onConversationDeleted={handleNewChat}
+        onSpaceChange={handleSpaceChange}
+        spaceLockedByConversation={spaceLockedByConversation}
+      />
+    ) : currentView === 'data' ? (
+      <DataManager
+        selectedSpaceId={selectedSpaceId}
+        onSpaceChange={setSelectedSpaceId}
+        onStartChat={handleStartChat}
+      />
+    ) : currentView === 'credits' ? (
+      <div style={{ height: '100%', overflow: 'auto', background: '#f8fafc', padding: isMobile ? 16 : 32 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <CreditsPage />
+        </div>
+      </div>
+    ) : currentView === 'admin' ? (
+      <div style={{ height: '100%', overflow: 'auto', background: '#f8fafc', padding: isMobile ? 16 : 32 }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <AdminPage />
+        </div>
+      </div>
+    ) : (
+      <SettingsPage />
+    )
+
   return (
     <>
       {checkingSpaces ? (
@@ -119,51 +186,46 @@ export default function MainLayout() {
         </div>
       ) : showOnboarding ? (
         <Onboarding onComplete={handleOnboardingComplete} />
+      ) : isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', overflow: 'hidden' }}>
+          {/* 移动端顶栏：汉堡按钮 + 品牌 */}
+          <div
+            style={{
+              flexShrink: 0,
+              height: 48,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0 8px',
+              borderBottom: `1px solid ${colors.border}`,
+              background: colors.surface,
+            }}
+          >
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={() => setMobileMenuOpen(true)}
+              style={{ color: colors.textSecondary }}
+              aria-label="打开菜单"
+            />
+            <Logo size={22} />
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{mainContent}</div>
+          <Drawer
+            placement="left"
+            open={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+            width={Math.min(300, typeof window !== 'undefined' ? window.innerWidth * 0.85 : 300)}
+            styles={{ body: { padding: 0 } }}
+            closable={false}
+          >
+            {sidebar}
+          </Drawer>
+        </div>
       ) : (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-          <Sidebar
-            currentConvId={currentConvId}
-            onNewChat={handleNewChat}
-            onSelectConversation={handleSelectConversation}
-            onOpenDataManager={handleOpenDataManager}
-            onOpenSettings={handleOpenSettings}
-            onOpenCredits={handleOpenCredits}
-            onOpenAdmin={handleOpenAdmin}
-            currentView={currentView}
-          />
-
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            {currentView === 'chat' ? (
-              <ChatView
-                selectedSpaceId={selectedSpaceId}
-                conversationId={currentConvId}
-                onConversationCreated={handleConversationCreated}
-                onConversationDeleted={handleNewChat}
-                onSpaceChange={handleSpaceChange}
-                spaceLockedByConversation={spaceLockedByConversation}
-              />
-            ) : currentView === 'data' ? (
-              <DataManager
-                selectedSpaceId={selectedSpaceId}
-                onSpaceChange={setSelectedSpaceId}
-                onStartChat={handleStartChat}
-              />
-            ) : currentView === 'credits' ? (
-              <div style={{ height: '100vh', overflow: 'auto', background: '#f8fafc', padding: 32 }}>
-                <div style={{ maxWidth: 900, margin: '0 auto' }}>
-                  <CreditsPage />
-                </div>
-              </div>
-            ) : currentView === 'admin' ? (
-              <div style={{ height: '100vh', overflow: 'auto', background: '#f8fafc', padding: 32 }}>
-                <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-                  <AdminPage />
-                </div>
-              </div>
-            ) : (
-              <SettingsPage />
-            )}
-          </div>
+          {sidebar}
+          <div style={{ flex: 1, overflow: 'hidden' }}>{mainContent}</div>
         </div>
       )}
 
