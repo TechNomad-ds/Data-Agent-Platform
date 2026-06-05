@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Typography, Button, Upload, Input, message } from 'antd'
 import { CloudUploadOutlined, FileTextOutlined, CheckCircleOutlined, BarChartOutlined, TeamOutlined, WalletOutlined, LineChartOutlined } from '@ant-design/icons'
 import { dataSpacesApi } from '@/api/dataSpaces'
+import { uploadErrorMessage } from '@/utils/uploadError'
 import { colors, radius, shadow } from '@/styles/tokens'
 import Logo from '@/components/Layout/Logo'
 
@@ -41,13 +42,17 @@ export default function Onboarding({ onComplete }: Props) {
 
   const handleUpload = async (file: File) => {
     if (!spaceId) return false
+    if (file.size > 200 * 1024 * 1024) {
+      message.error(`${file.name} 超过 200MB 限制`)
+      return false
+    }
     const formData = new FormData()
     formData.append('files', file)
     try {
       await dataSpacesApi.uploadFiles(spaceId, formData)
       setUploadedFiles(prev => [...prev, file.name])
-    } catch {
-      message.error(`${file.name} 上传失败`)
+    } catch (err: any) {
+      message.error(uploadErrorMessage(err, file.name))
     }
     return false
   }

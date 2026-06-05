@@ -23,6 +23,8 @@ export const filesApi = {
     files.forEach((f) => formData.append('files', f))
     return api.post<FileInfo[]>('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // 大文件上传可能超过全局 30s 超时，取消限制
+      timeout: 0,
     })
   },
   list: (page = 1, pageSize = 20, fileType?: string) =>

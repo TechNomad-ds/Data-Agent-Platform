@@ -13,6 +13,7 @@ import {
   ClockCircleOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
+import { uploadErrorMessage } from '@/utils/uploadError'
 import api from '@/api/client'
 import { colors, shadow } from '@/styles/tokens'
 
@@ -195,7 +196,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       // 上传只是入库，真正的解析+向量索引在后台进行，轮询真实进度
       pollProcessing(selectedSpaceId)
     } catch (err: any) {
-      message.error(err?.response?.data?.detail || '上传失败')
+      message.error(uploadErrorMessage(err, file.name))
     } finally {
       setTimeout(() => { setUploading(false); setUploadProgress(0) }, 800)
     }

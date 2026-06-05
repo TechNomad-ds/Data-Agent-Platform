@@ -46,5 +46,8 @@ export const dataSpacesApi = {
   uploadFiles: (spaceId: string, formData: FormData) =>
     api.post(`/data-spaces/${spaceId}/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      // 上传大文件/ZIP 可能远超全局 30s 超时，这里取消超时限制，
+      // 交由 nginx(client_body_timeout) 与后端兜底
+      timeout: 0,
     }),
 }
