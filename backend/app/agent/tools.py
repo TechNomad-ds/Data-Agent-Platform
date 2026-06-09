@@ -538,75 +538,39 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     filename = args.get("filename", "")
     expression = args.get("expression", "")
 
-    # 安全检查：AST 级别
-    try:
-        # 先尝试 eval 模式（单表达式），再尝试 exec 模式（多行）
-        try:
-            tree = ast.parse(expression, mode="eval")
-        except SyntaxError:
-            tree = ast.parse(expression, mode="exec")
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                return "安全限制：不允许 import"
-            if isinstance(node, ast.Attribute) and isinstance(node.attr, str) and node.attr.startswith("__"):
-                return "安全限制：不允许访问 dunder 属性"
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id == "open":
-                    return "安全限制：pandas_query 沙箱禁止 open()。文件已自动加载为 df 变量，直接对 df 操作即可；需要其它文件请用 read_file 工具。"
-                if node.func.id in ("exec", "eval", "compile", "input", "breakpoint", "getattr", "setattr", "delattr"):
-                    return f"安全限制：不允许调用 '{node.func.id}'"
-    except SyntaxError as e:
-        return f"表达式语法错误: {e}"
-
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():
         return f"文件 '{filename}' 不存在或无权访问"
 
     ext = filename.rsplit(".", 1)[-1].lower()
+    kind = {"csv": "csv", "xlsx": "excel", "xls": "excel", "json": "json"}.get(ext)
+    if not kind:
+        return f"pandas_query 暂不支持 .{ext} 文件，请用 read_file 或 execute_python 工具"
+
+    # 把表达式包装成给 result 赋值，交给隔离沙箱执行（df 已在子进程内预加载）
+    from app.agent.sandbox import run_in_sandbox
+    # 单表达式优先；若本身是多行语句则原样执行（用户需自行赋值给 result）
+    code = expression
     try:
-        df = _load_df(file_path, ext)
-        local_vars = {"df": df, "pd": pd, "np": np, "len": len, "min": min, "max": max, "sum": sum, "abs": abs, "round": round, "sorted": sorted, "set": set, "list": list, "print": print}
+        ast.parse(expression, mode="eval")
+        code = f"result = ({expression})"
+    except SyntaxError:
+        pass
 
-        # 尝试单表达式 eval（大多数场景）
-        try:
-            tree = ast.parse(expression, mode="eval")
-            result = eval(expression, {"__builtins__": {}}, local_vars)
-        except SyntaxError:
-            # 多行语句：exec 执行，取最后赋值的变量或 result 变量
-            import io
-            from contextlib import redirect_stdout
-            stdout_buf = io.StringIO()
-            exec_globals = {"__builtins__": {"print": print, "len": len, "min": min, "max": max, "sum": sum, "abs": abs, "round": round, "range": range, "sorted": sorted, "set": set, "list": list, "dict": dict, "int": int, "float": float, "str": str, "bool": bool, "enumerate": enumerate, "zip": zip, "True": True, "False": False, "None": None}}
-            exec_globals.update(local_vars)
-            with redirect_stdout(stdout_buf):
-                exec(expression, exec_globals)
-            stdout_output = stdout_buf.getvalue()
-            # 优先返回 result 变量
-            if "result" in exec_globals and exec_globals["result"] is not df:
-                result = exec_globals["result"]
-            elif stdout_output:
-                return stdout_output[:5000]
-            else:
-                # 找最后赋值的 DataFrame 变量
-                for var_name in reversed(list(exec_globals.keys())):
-                    if var_name.startswith("_") or var_name in local_vars or var_name == "__builtins__":
-                        continue
-                    val = exec_globals[var_name]
-                    if isinstance(val, (pd.DataFrame, pd.Series)):
-                        result = val
-                        break
-                else:
-                    return stdout_output if stdout_output else "执行完成（无返回值，可将结果赋给 result 变量）"
-
-        if isinstance(result, pd.DataFrame):
-            if len(result) > 50:
-                return f"结果共 {len(result)} 行，显示前50行:\n{result.head(50).to_string()}"
-            return result.to_string()
-        elif isinstance(result, pd.Series):
-            return result.to_string()
-        return str(result)
-    except Exception as e:
-        return f"查询执行失败: {str(e)}"
+    preload = {"df": (kind, str(file_path))}
+    r = run_in_sandbox(code, preload=preload,
+                       cpu_seconds=10, wall_timeout=30)
+    if not r.get("ok"):
+        return r.get("error", "查询执行失败")
+    if r.get("result") is not None:
+        out = r["result"]
+        # DataFrame.to_string 可能很长，截断
+        if len(out) > 6000:
+            return out[:6000] + "\n...(结果已截断)"
+        return out
+    if r.get("stdout"):
+        return r["stdout"][:6000]
+    return "执行完成（无返回值，可将结果赋给 result 变量）"
 
 
 async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
@@ -643,119 +607,40 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
 async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     code = args.get("code", "")
 
-    # AST 级安全检查：比字符串匹配更可靠
-    try:
-        tree = ast.parse(code, mode="exec")
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                module_name = ""
-                if isinstance(node, ast.Import):
-                    module_name = node.names[0].name
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    module_name = node.module
-                ALLOWED_MODULES_CHECK = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime", "csv", "io", "struct", "decimal", "fractions", "operator", "string", "textwrap", "pathlib"}
-                if module_name.split(".")[0] not in ALLOWED_MODULES_CHECK:
-                    return f"安全限制：不允许导入 '{module_name}'"
-            if isinstance(node, ast.Attribute) and isinstance(node.attr, str):
-                if node.attr.startswith("__") and node.attr.endswith("__"):
-                    return f"安全限制：不允许访问 dunder 属性 '{node.attr}'"
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id == "open":
-                    return "安全限制：execute_python 沙箱禁止 open()。读取文件内容请改用 read_file 工具（支持各种格式），它会安全地返回文件内容。"
-                if node.func.id in ("exec", "eval", "compile", "input", "breakpoint", "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr"):
-                    return f"安全限制：不允许调用 '{node.func.id}'"
-    except SyntaxError as e:
-        return f"代码语法错误: {e}"
-
-    file_paths = {}
+    # 收集数据空间文件，按文件名生成 df_xxx 变量供子进程预加载
+    preload = {}
     if data_space_id:
         files = await _get_space_files(user_id, data_space_id)
         for f in files:
             full_path = Path(settings.storage_root) / f.storage_path
-            file_paths[f.filename] = str(full_path)
+            ext = f.filename.rsplit(".", 1)[-1].lower()
+            kind = {"csv": "csv", "xlsx": "excel", "xls": "excel", "json": "json"}.get(ext)
+            if not kind:
+                continue
+            var = f.filename.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
+            preload[f"df_{var}"] = (kind, str(full_path))
 
-    import io
-    import sys
-    from contextlib import redirect_stdout, redirect_stderr
+    # 交给加固沙箱：静态检查 + 隔离子进程 + 资源限额 + 文件路径守卫
+    from app.agent.sandbox import run_in_sandbox
+    r = run_in_sandbox(code, preload=preload, cpu_seconds=10, wall_timeout=30)
 
-    stdout_capture = io.StringIO()
-    stderr_capture = io.StringIO()
+    if not r.get("ok"):
+        return f"代码执行错误: {r.get('error', '未知错误')}"
 
-    ALLOWED_MODULES = {"pandas", "numpy", "json", "math", "statistics", "collections", "itertools", "functools", "re", "datetime", "csv", "io", "struct", "decimal", "fractions", "operator", "string", "textwrap", "pathlib"}
-
-    def _safe_import(name, *a, **kw):
-        if name not in ALLOWED_MODULES:
-            raise ImportError(f"不允许导入: {name}")
-        return __import__(name, *a, **kw)
-
-    safe_builtins = {
-        "__import__": _safe_import,
-        "abs": abs, "all": all, "any": any, "bool": bool, "dict": dict,
-        "enumerate": enumerate, "filter": filter, "float": float, "format": format,
-        "int": int, "isinstance": isinstance, "iter": iter, "len": len, "list": list,
-        "map": map, "max": max, "min": min, "next": next, "print": print,
-        "range": range, "repr": repr, "reversed": reversed, "round": round,
-        "set": set, "slice": slice, "sorted": sorted, "str": str, "sum": sum,
-        "tuple": tuple, "type": type, "zip": zip,
-        "True": True, "False": False, "None": None,
-        "ValueError": ValueError, "TypeError": TypeError, "KeyError": KeyError,
-        "IndexError": IndexError, "Exception": Exception,
-    }
-
-    exec_globals = {"__builtins__": safe_builtins, "pd": pd, "np": np, "json": json, "FILES": file_paths}
-
-    for fname, fpath in file_paths.items():
-        var_name = fname.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
-        ext = fname.rsplit(".", 1)[-1].lower()
-        try:
-            if ext == "csv":
-                exec_globals[f"df_{var_name}"] = pd.read_csv(fpath)
-            elif ext in ("xlsx", "xls"):
-                exec_globals[f"df_{var_name}"] = pd.read_excel(fpath)
-            elif ext == "json":
-                exec_globals[f"df_{var_name}"] = _load_df(Path(fpath), "json")
-        except Exception:
-            pass
-
-    try:
-        import signal
-        import threading
-
-        result_container = {"stdout": "", "stderr": "", "error": None}
-
-        def _run():
-            try:
-                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                    exec(code, exec_globals)
-                result_container["stdout"] = stdout_capture.getvalue()
-                result_container["stderr"] = stderr_capture.getvalue()
-            except Exception as e:
-                result_container["error"] = f"{type(e).__name__}: {str(e)}"
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
-        thread.join(timeout=30)
-
-        if thread.is_alive():
-            return "代码执行超时（限制 30 秒）"
-
-        if result_container["error"]:
-            return f"代码执行错误: {result_container['error']}"
-
-        parts = []
-        stdout_text = result_container["stdout"]
-        stderr_text = result_container["stderr"]
-        if len(stdout_text) > 10000:
-            stdout_text = stdout_text[:10000] + "\n...(输出已截断)"
-        if stdout_text:
-            parts.append(f"输出:\n{stdout_text}")
-        if stderr_text:
-            parts.append(f"警告:\n{stderr_text[:2000]}")
-        if not parts:
-            parts.append("代码执行成功（无输出）")
-        return "\n".join(parts)[:12000]
-    except Exception as e:
-        return f"代码执行错误: {type(e).__name__}: {str(e)}"
+    parts = []
+    stdout_text = r.get("stdout") or ""
+    if len(stdout_text) > 10000:
+        stdout_text = stdout_text[:10000] + "\n...(输出已截断)"
+    if stdout_text:
+        parts.append(f"输出:\n{stdout_text}")
+    if r.get("result") is not None:
+        parts.append(f"result = {r['result'][:4000]}")
+    stderr_text = r.get("stderr") or ""
+    if stderr_text:
+        parts.append(f"警告:\n{stderr_text[:2000]}")
+    if not parts:
+        parts.append("代码执行成功（无输出，可将结果赋给 result 变量以便查看）")
+    return "\n".join(parts)[:12000]
 
 
 def _tool_generate_chart(args: dict) -> str:
