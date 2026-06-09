@@ -83,8 +83,6 @@ async def run_task(task_id: str, rebuild: bool = True) -> dict:
         await reset_space(user_id, task_id)
         print(f"  building space for {task_id} ...")
         space_id = await build_space(user_id, task_id, run_preprocess=True)
-        print("  draining background tasks ...")
-        await drain_background_tasks()
     else:
         space_id = await build_space(user_id, task_id, run_preprocess=False)
 

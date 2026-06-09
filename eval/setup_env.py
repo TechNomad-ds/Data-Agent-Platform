@@ -178,10 +178,17 @@ async def build_space(user_id: uuid.UUID, task_id: str, run_preprocess: bool = T
         await db.commit()
 
     if run_preprocess:
+        # 记录预处理前已存在的任务，事后只等"新增"的后台任务（embedding/视频OCR）。
+        # 不能用全局 all_tasks 等待，否则并行跑时会等到兄弟 task 的协程上，造成死锁。
+        before = set(asyncio.all_tasks())
         for fid, ext, fname in file_ids:
             try:
                 await preprocess_file(fid, space_id)
             except Exception as e:
                 print(f"  [preprocess 失败] {fname}: {e}")
+        # 等待本次预处理派生的后台任务
+        spawned = [t for t in asyncio.all_tasks() if t not in before and not t.done()]
+        if spawned:
+            await asyncio.wait(spawned, timeout=600)
 
     return space_id

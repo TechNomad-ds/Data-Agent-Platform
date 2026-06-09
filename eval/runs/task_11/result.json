@@ -1,0 +1,741 @@
+{
+  "task_id": "task_11",
+  "question": "According to the Large Subscription Fulfillment Standard configured in the video, which shareholder names meet both channel requirements?",
+  "answer": "\n\nLet me start by watching the briefing video and examining the relevant data files.\n\n\n\nThe video appears to be a binary file, so I couldn't get text from it directly. Let me look at the data more carefully and also search for any contextual information about the \"Large Subscription Fulfillment Standard\" and \"channel requirements\".\n\n\n\n\n\n\nLet me get more details from the video content and look at the data more closely.\n\n\n\nLet me read the full video content more carefully. The video seems to have structured text content embedded in it that might give clues about the \"two-channel fulfillment standard.\"\n\n\n\n\n\n\nThe video is a binary mp4 file that can't be easily read as text. Let me search more specifically for information about what the \"two-channel fulfillment standard\" means, and also look at the full data to understand the fields better.\n\n\n\n\n\n\n\n\n\nLet me look at the full data more carefully and analyze the \"two channels\" — based on the video description and the data structure, I need to understand what the two-channel fulfillment standard means.\n\nThe video mentions:\n1. **Large Subscription Fulfillment Standard** - \"Configure the two-channel fulfillment standard\"\n2. The two key fields in `lc_largeshsubscription` are **OughtShares** (应认购/entitled shares) and **ActualShares** (实际认购/actual shares)\n3. The video says the thresholds must both pass\n\nThe \"two channels\" likely refer to:\n- **Channel 1**: OughtShares (entitled/committed subscription shares) — a minimum threshold\n- **Channel 2**: ActualShares (actual subscribed shares) — a minimum threshold\n\nLet me look at the data to find what thresholds might apply.\n\n\n\n\n\nThe column names might be slightly different. Let me check.\n\n\n\n\n\nThe JSON has a nested structure. Let me read it differently.\n\n\n\n\n\n\n\n\n\nLet me use the data that was already loaded via inspect_data/pandas_query.\n\n\n\n\n\n\nThe JSON was imported as a SQLite table! Let me query it.\n\n\n\n\n\n\nNow, based on the video's description about \"Large Subscription Fulfillment Standard\" and \"Configure the two-channel fulfillment standard,\" let me think about what the two channels could be.\n\nThe video says:\n1. The \"Large Subscription Fulfillment Standard\" has a \"two-channel fulfillment standard\"\n2. The two field thresholds must both pass\n3. The video mentions \"IPO 配售参考规则 — 网下投资者单笔\" (IPO placement reference rules — offline investor single lot)\n\nThe two key fields in the data are:\n- **OughtShares** (应认购股份) — Shares the shareholder was entitled/committed to subscribe\n- **ActualShares** (实际认购股份) — Shares the shareholder actually subscribed\n\nFor \"fulfillment,\" a shareholder needs to:\n1. Have committed (ought) to subscribe shares above some threshold (Channel 1)\n2. Actually subscribed shares above some threshold (Channel 2)\n\nOr alternatively, the ratio of ActualShares to OughtShares needs to meet a threshold — i.e., they need to have actually fulfilled a certain percentage of their commitment.\n\nLet me look at the data distribution more carefully.\n\n\n\n\n\n\nNow let me understand the \"channel\" concept better. Let me see what patterns exist in the data. The video mentions \"the final shareholder list is not shown here\" and \"the video defines two field thresholds that must both pass.\" It also shows a table with \"holding value\" in CNY (not share count).\n\nLet me think about this more carefully. The video's description mentions \"IPO 配售参考规则 — 网下投资者单笔\" which is about IPO placement rules for offline investors. In Chinese IPO context, \"two channels\" (两个通道) could refer to:\n\n1. **网上申购** (Online subscription channel) \n2. **网下配售** (Offline placement channel)\n\nBut since we're looking at `lc_largeshsubscription` data, and the fields are **OughtShares** and **ActualShares**, the \"two-channel fulfillment standard\" more likely refers to:\n\n**Channel 1 (Entitlement Channel - OughtShares)**: The shareholder must be entitled to subscribe at least a minimum number of shares.\n**Channel 2 (Fulfillment Channel - ActualShares)**: The shareholder must have actually subscribed at least a minimum number of shares (actually fulfilled their subscription).\n\nLet me look at typical thresholds. Let me examine the data to find natural cutoff points.\n\n\n\n\n\n\nLet me search for more specific information from the video content about what the thresholds are.\n\n\n\n\n\n\n\nLet me look at the video content more carefully. It seems there's HTML table content in the video with \"华立集团 holding value, not subscription shares\" and \"320,000 CNY\". Let me search for more of this content.\n\n\n\n\n\n\n\n\n\n\n\n\n\nLet me try to get more details from the video content by searching for specific thresholds.\n\n\n\n\n\n\n\n\n\n\n\nLet me try to search for more content from the video, particularly about the specific threshold values.\n\n\n\n\n\n\n\n\n\n\n\nLet me look at the video content more carefully by examining the text content embedded in it.\n\n\n\n\n\n\n\n\n\nThe video is a binary H.264 encoded mp4 file, so its text content can't be read directly. However, the search results extracted some meaningful text from it. Let me look more carefully at what was extracted from the video.\n\nFrom the search results, I have the following key info about the video:\n\n**Page 1**: \"Large Subscription Fulfillment Standard\" - \"Configure the two-channel fulfillment standard\" - \"The final shareholder list is not shown here. The video defines two field thresholds that must both pass.\"\n\n**Page 2**: \"Holding value overview\" - Shows a table with \"华立集团\" having \"holding value, not subscription shares\" of \"320,000 CNY\" - Note it says \"These values use money units, not the two share-count channels.\"\n\n**Page 3**: \"IPO 配售参考规则 — 网下投资者单笔\" (IPO Placement Reference Rules - Offline Investor Single Lot)\n\nNow, the \"two channels\" are clearly about the two fields: **OughtShares** (should subscribe/entitled) and **ActualShares** (actual subscription). The question is what the thresholds are.\n\nThe video mentions \"IPO 配售参考规则 — 网下投资者单笔\" - In Chinese IPO offline placement, there are standard minimum bid amounts. Let me look into the data more deeply to understand the distribution of these two fields.\n\nLet me find what thresholds make sense based on the data patterns.\n\n\n\n\n\n\n\n\n\nLet me check if there's a specific pattern - like a threshold where both OughtShares and ActualShares must be above a certain value.\n\n\n\n\n\n\n\n\n\n\n\n\nInteresting. Let me look at this differently. Let me check the shareholders who have both OughtShares AND ActualShares > 0, and look at their names.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nNow I need to understand the \"two-channel\" standard better. Based on the video search results, the key message is:\n\n1. **Large Subscription Fulfillment Standard** - has \"two-channel fulfillment standard\"  \n2. \"The final shareholder list is not shown here. The video defines **two field thresholds that must both pass**.\"\n3. Page 3 mentions \"**IPO 配售参考规则 — 网下投资者单笔**\" (IPO Placement Reference Rules - Offline Investor Single Lot)\n\nIn Chinese IPO context, \"网下投资者单笔\" refers to offline (institutional) investors' single bid lot. The two key fields in the table are **OughtShares** (应认购/entitled) and **ActualShares** (实际认购/actual).\n\nThe \"two channels\" (two-channel fulfillment) likely means:\n- **Channel 1**: OughtShares ≥ minimum threshold (entitlement channel - the shareholder was entitled/committed to subscribe at least X shares)\n- **Channel 2**: ActualShares ≥ minimum threshold (fulfillment channel - the shareholder actually subscribed at least X shares)\n\nBased on the IPO placement rules, standard minimum subscription thresholds are typically **1,000 shares** (1手) for retail or specific amounts for offline. However, looking at the data, the most common threshold in Chinese securities context is **1,000 shares** (equivalent to 1手/lot).\n\nBut let me check the actual data pattern more carefully.\n\n\n\n\n\n\n\n\n\nLet me think about this more carefully. The video mentions \"IPO 配售参考规则 — 网下投资者单笔\" which refers to offline investor IPO placement rules. In China's market, specific rules for offline IPO placement typically require:\n\n- For **online** subscription: minimum 1,000 shares (1手, which is 1,000 shares in Shanghai or 500 shares in Shenzhen)\n- For **offline** (网下) placement: different thresholds apply\n\nBut let me re-read the search results more carefully. The text extracted says:\n\n\"Configure the two-channel fulfillment standard. The final shareholder list is not shown here. The video defines two field thresholds that must both pass.\"\n\nAnd the fields are **OughtShares** and **ActualShares** from `lc_largeshsubscription`.\n\nLooking at the knowledge.md definition:\n- `OughtShares`: \"The number of shares the shareholder was entitled or committed to subscribe\"\n- `ActualShares`: \"The number of shares actually subscribed/acquired by the shareholder\"\n\nSo the \"two-channel fulfillment standard\" means: a shareholder must have **both**:\n1. OughtShares (entitled/committed) ≥ some threshold\n2. ActualShares (actually subscribed) ≥ some threshold\n\nBut what are the specific thresholds? Let me check if there's a standard from the data.\n\nLooking at the data range:\n- OughtShares: min=273, max=659M\n- ActualShares: min=0, max=3B (3 billion!)\n\nLet me check the percentile distribution to identify natural threshold points.\n\n\n\n\n\n\n\n\n\n\n\nLet me re-examine the data and think about the \"two-channel\" concept from a different angle. \n\nThe video says \"Configure the two-channel fulfillment standard\" and \"two field thresholds that must both pass.\"\n\nPerhaps the two channels are:\n1. **Channel 1**: The shareholder must have **OughtShares** (committed shares) above a certain threshold  \n2. **Channel 2**: The shareholder must have **ActualShares** (actual subscription) that meets a certain proportion/fulfillment rate relative to OughtShares\n\nOr maybe the thresholds are directly about the values themselves. Let me check if there's a specific value that makes sense as a threshold.\n\nIn Chinese IPO context, \"网下投资者单笔\" often refers to standard minimum bid quantities. For offline institutional investors, the minimum subscription is commonly **1,000 shares (1000股)**. The standard \"一手\" (one board lot) is:\n- Shanghai: 1,000 shares\n- Shenzhen: 500 shares (but 100 shares for some)\n\nLet me check the threshold of 1000 shares.\n\nActually, let me re-examine more carefully. Let me check if there's more specific information I can find.\n\n\n\n\n\n\n\n\n\n\n\n\nLet me look at this from a business logic perspective. The video mentions:\n\n1. \"Large Subscription Fulfillment Standard\"\n2. \"Configure the two-channel fulfillment standard\"\n3. \"The video defines two field thresholds that must both pass\"\n4. Page 2: \"Holding value overview\" showing values in CNY (money), NOT shares — \"These values use money units, not the two share-count channels\"\n5. Page 3: \"IPO 配售参考规则 — 网下投资者单笔\"\n\nThe phrase \"not the two share-count channels\" confirms the two channels are about **share counts** — specifically **OughtShares** and **ActualShares**.\n\nFor the specific thresholds, in Chinese IPO offline placement context (网下投资者), the standard minimum is typically:\n- Minimum subscription: **1,000 shares (1000股)** for a single lot/bid\n\nBut another common threshold is **500 shares** for Shenzhen or **1,000 shares** for Shanghai.\n\nLet me also look at what \"网下投资者单笔\" means more specifically — it's about \"single lot\" for offline investors. \n\nLet me try a different approach and check shareholders that have both OughtShares AND ActualShares meeting certain threshold values.\n\n\n\n\n\n\n\n\n\nWait, I notice that there are only 105 shareholders with ActualShares > 0 out of 220 total. Let me look at this more carefully. The \"two-channel fulfillment standard\" likely means the shareholder needs to fulfill both requirements simultaneously.\n\nLet me look at this from a different perspective. What if the \"two channels\" refer to:\n1. Having a minimum **OughtShares** (entitlement) \n2. Having a certain **fulfillment ratio** (ActualShares / OughtShares) above a threshold\n\nOr maybe even simpler - let me check if the two channels are simply:\n1. OughtShares > 0 (the shareholder was entitled to subscribe)\n2. ActualShares > 0 (the shareholder actually subscribed something)\n\nBut that seems too simple. Let me look for more clues.\n\n\n\n\n\n\n\n\n\n\n\nLet me reconsider. The video's extracted text specifically mentions:\n\n**Page 1**: \"Large Subscription Fulfillment Standard\" - \"Configure the two-channel fulfillment standard\" - \"The video defines **two field thresholds** that must both pass.\"\n\n**Page 2**: \"Holding value overview\" with a table showing 华立集团 with \"320,000 CNY\" - \"These values use money units, **not the two share-count channels**.\"\n\n**Page 3**: \"**IPO 配售参考规则 — 网下投资者单笔**\"\n\nThe term \"网下投资者单笔\" (offline investor single lot) is key. In China's IPO allocation rules, \"网下\" (offline) investors have specific minimum subscription requirements.\n\nLet me look at the data for a more nuanced approach. The two channels likely relate to:\n1. **OughtShares must be ≥ a certain amount** (the shareholder committed to subscribe at least X shares)\n2. **ActualShares must be ≥ a certain amount** (the shareholder actually received at least X shares)\n\nSince the video mentions \"IPO 配售参考规则 — 网下投资者单笔\", let me think about what the standard IPO offline minimum bid is.\n\nIn Chinese IPO regulations, the minimum bid for offline (网下) investors is typically:\n- **1 million shares (100万股)** for some offerings\n- OR **10,000 shares** for standard bidding\n\nActually, let me approach this differently. Let me look more carefully at the actual data to see what pattern might emerge.\n\n\n\n\n\n\n\n\n\n\n\n\nLet me look at the actual numbers from the data more carefully. Let me check what kinds of thresholds make business sense.\n\nLooking at the data distribution and considering the IPO context:\n- The standard unit of trading in A-shares is **1手 = 100 shares** (for Shenzhen) or **1手 = 100 shares** (after 2015 reform, both markets use 100 shares)\n- For offline (网下) IPO bidding, the minimum subscription is typically **10,000 shares (1万股)** or higher\n\nLet me check the threshold of 10,000 shares (万股 level).\n\n\n\n\n\n\n\n\n\n\n\n\nHmm, interesting - the numbers barely change between 5,000 and 10,000 share thresholds. Let me focus on finding the specific threshold.\n\nLet me look at the unique actual shares values more carefully around the low end.\n\n\n\n\n\n\n\n\n\n\n\n\n\n[已达到最大执行步数，自动停止]",
+  "tool_log": [
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "briefing.mp4",
+        "max_lines": 10
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: briefing.mp4 (共 20795 行，显示第 1-10 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001€×moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001Wk\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000¨&trak\u0000\u0000\u0000\\tkhd\u0000\u0000\u0000\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0001W;\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0005\u0000\u0000\u0000\u0002Ğ\u0000\u0000\u0000\u0000\u0000$edts\u0000\u0000\u0000\u001celst\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0001W;\u0000\u0000\u0017p\u0000\u0001\u0000\u0000\u0000\u0000§mdia\u0000\u0000\u0000 mdhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001_\u0000xª UÄ\u0000\u0000\u0000\u0000\u0000-hdlr\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000vide\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000VideoHandler\u0000\u0000\u0000§Iminf\u0000\u0000\u0000\u0014vmhd\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000$dinf\u0000\u0000\u0000\u001cdref\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\furl \u0000\u0000\u0000\u0001\u0000\u0000§\tstbl\u0000\u0000\u0002™stsd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0002‰avc1\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0005\u0000\u0002Ğ\u0000H\u0000\u0000\u0000H\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0018ÿÿ\u0000\u0000\u0000;avcC\u0001d\u0000\u001fÿá\u0000\u001egd\u0000\u001f¬Ù@P\u0005»\u0001n\u0004\u0004\u000bJ\u0000\u0000\u0003\u0000\u0002\u0000\u0000\u0003\u0000x\u001e0c,\u0001\u0000\u0006hëàŒ²,ıøø\u0000\u0000\u0000\u0001Ôcolrprof\u0000\u0000\u0001È\u0000\u0000\u0000\u0000\u00040\u0000\u0000mntrRGB XYZ \u0007à\u0000\u0001\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000acsp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\tdesc\u0000\u0000\u0000ğ\u0000\u0000\u0000$rXYZ\u0000\u0000\u0001\u0014\u0000\u0000\u0000\u0014gXYZ\u0000\u0000\u0001(\u0000\u0000\u0000\u0014bXYZ\u0000\u0000\u0001<\u0000\u0000\u0000\u0014wtpt\u0000\u0000\u0001P\u0000\u0000\u0000\u0014rTRC\u0000\u0000\u0001d\u0000\u0000\u0000(gTRC\u0000\u0000\u0001d\u0000\u0000\u0000(bTRC\u0000\u0000\u0001d\u0000\u0000\u0000(cprt\u0000\u0000\u0001Œ\u0000\u0000\u0000<mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000\b\u0000\u0000\u0000\u001c\u0000s\u0000R\u0000G\u0000BXYZ \u0000\u0000\u0000\u0000\u0000\u0000o¢\u0000\u00008õ\u0000\u0000\u0003XYZ \u0000\u0000\u0000\u0000\u0000\u0000b™\u0000\u0000·…\u0000\u0000\u0018ÚXYZ \u0000\u0000\u0000\u0000\u0000\u0000$ \u0000\u0000\u000f„\u0000\u0000¶ÏXYZ \u0000\u0000\u0000\u0000\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-para\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002ff\u0000\u0000ò§\u0000\u0000\nY\u0000\u0000\u0013Ğ\u0000\u0000\n[\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000 \u0000\u0000\u0000\u001c\u0000G\u0000o\u0000o\u0000g\u0000l\u0000e\u0000 \u0000I\u0000n\u0000c\u0000.\u0000 \u00002\u00000\u00001\u00006\u0000\u0000\u0000\u0010pasp\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0014btrt\u0000\u0000\u0000\u0000\u0000\u0001¶Ñ\u0000\u0001¶Ñ\u0000\u0000\u0000\u0018stts\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\nL\u0000\u0000\u000b¸\u0000\u0000\u0000Lstss\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u000f\u0000\u0000\u0000\u0001\u0000\u0000\u0000û\u0000\u0000\u0001°\u0000\u0000\u0002ª\u0000\u0000\u0002Õ\u0000\u0000\u0003Ï\u0000\u0000\u0004\u0017\u0000\u0000\u0005\u0011\u0000\u0000\u0006\u000b\u0000\u0000\u0006S\u0000\u0000\u0007*\u0000\u0000\b$\u0000\u0000\t\u001e\u0000\u0000\tE\u0000\u0000\n?\u0000\u0000Q`ctts\u0000\u0000\u0000\u0000\u0000\u0000\n*\u0000\u0000\u0000\u0005\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000.à\u0000\u0000\u0000\u0002\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000.à\u0000\u0000\u0000\u0002\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "inspect_data",
+      "input": {
+        "filename": "lc_largeshsubscription.json"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "inspect_data",
+      "content": "文件: lc_largeshsubscription.json\n行数: 220\n列数: 9\n\n列信息:\n  - id: int64 (220/220 非空, 220 唯一值, 示例: 1)\n  - CompanyCode: int64 (220/220 非空, 72 唯一值, 示例: 44)\n  - ChiName: object (220/220 非空, 72 唯一值, 示例: 深圳长城开发科技股份有限公司)\n  - ChiNameAbbr: object (220/220 非空, 72 唯一值, 示例: 深科技)\n  - SecuCode: object (220/220 非空, 72 唯一值, 示例: 000021)\n  - InitialInfoPublDate: object (220/220 非空, 99 唯一值, 示例: 1995-04-04 00:00:00)\n  - SHName: object (220/220 非空, 193 唯一值, 示例: 中国电子信息产业集团公司)\n  - OughtShares: float64 (193/220 非空, 164 唯一值, 示例: 26460000.0)\n  - ActualShares: float64 (202/220 非空, 101 唯一值, 示例: 0.0)\n\n前5行:\n   id  CompanyCode         ChiName ChiNameAbbr SecuCode  InitialInfoPublDate        SHName  OughtShares  ActualShares\n0   1           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00  中国电子信息产业集团公司   26460000.0           0.0\n1   2           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00        博旭有限公司   20790000.0           0.0\n2   3           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00        秉宏有限公司   20790000.0           0.0\n3   4           44  深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00    长城科技股份有限公司   94653000.0           0.0\n4   5           44  深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00      香港博旭有限公司   15912000.0           0.0",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "Large Subscription Fulfillment Standard channel requirements"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\n standard 6-digit Chinese market convention (6xxxxx for Shanghai main board, 0xxxxx/3xxxxx for Shenzhen).\n\n---\n\n## 2. Core Entities & Field Definitions\n\n### 2.1 Corporate Archives — `lc_stockarchives`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `companycode` | Internal unique id",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "subscription standard channel large shareholder"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\n# Enterprise Knowledge Guide: en-origin-ccks_stock\n\n## China Capital Markets Stock Database — Semantic Layer & Governance Reference\n\n---\n\n## 1. Business Context & Scope\n\nThis database serves as a comprehensive repository for China's A-share listed companies, covering corporate archives, equity struc",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "lc_largeshsubscription.json",
+        "max_lines": 100
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: lc_largeshsubscription.json (220 行, 9 列，显示第 1-100 行)\n列: id(int64), CompanyCode(int64), ChiName(object), ChiNameAbbr(object), SecuCode(object), InitialInfoPublDate(object), SHName(object), OughtShares(float64), ActualShares(float64)\n---\n     id  CompanyCode          ChiName ChiNameAbbr SecuCode  InitialInfoPublDate                          SHName  OughtShares  ActualShares\n0     1           44   深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                    中国电子信息产业集团公司   26460000.0           0.0\n1     2           44   深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                          博旭有限公司   20790000.0           0.0\n2     3           44   深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                          秉宏有限公司   20790000.0           0.0\n3     4           44   深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                      长城科技股份有限公司   94653000.0           0.0\n4     5           44   深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                        香港博旭有限公司   15912000.0           0.0\n5     6           44   深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                          香港秉宏公司   12285000.0           0.0\n6     7           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1995-04-22 00:00:00               深圳市鸿基(集团)股份有限公司工会   14450000.0           0.0\n7     8           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00             深圳市鸿基(集团)股份有限公司工会基金   20683634.0           0.0\n8     9           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                      潮州意溪工艺实业公司    1501500.0           0.0\n9    10           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                     深圳中农信投资实业公司     815100.0           0.0\n10   11           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                       中国太平洋保险公司     536250.0           0.0\n11   12           63    东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00             ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "IPO 配售 网下投资者单笔 channel two-channel subscription standard"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[lc_business.pdf] (得分: 0.016, 来源: hybrid)\n司，其业务被归入计算机、通信和其他电子设备制造业这一宽泛的类别。公司的产品线非常多样，涵盖了从通信设备、计算机到专用输配电及控制设备等多个领域。这种多元化的制造能力是其长期发展的基石。\n\n关于档案 113，云南云维股份有限公司的行业分类为石油加工、炼焦和核燃料加工业。其主营业务集中于化工产品、焦炭、煤炭及相关矿产品的销售，并配套汽车货运等物流服务。公司的业绩表现与大宗商品市场的周期性波动紧密相关。\n\n档案 115 的鲁信创业投资集团股份有限公司，其行业归属为资本市场服务。其核心业务是创业投资及投资管理咨询，尽管其经营范围中仍保留了磨料磨具等传统制造业项目。公司最近发布了其投资组合的季度回顾。评",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "two-channel fulfillment standard oughtshares actualshares threshold"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[lc_largeshsubscription.json] (得分: 0.015, 来源: hybrid)\n表格文件 lc_largeshsubscription.json，共 220 行，9 列。列包括: id, CompanyCode, ChiName, ChiNameAbbr, SecuCode, InitialInfoPublDate, SHName, OughtShares, ActualShares。 列 id (类型: int64)，均值 110.5，范围 1.0 ~ 220.0，示例: 1, 2, 3。 列 CompanyCode (类型: int64)，均值 8832.9273，范围 44.0 ~ 172350.0，示例: 44, 44, 44。 列 ChiName (类型: ob",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "briefing.mp4",
+        "max_lines": 200
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: briefing.mp4 (共 20795 行，显示第 1-200 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001€×moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001Wk\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000¨&trak\u0000\u0000\u0000\\tkhd\u0000\u0000\u0000\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0001W;\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0005\u0000\u0000\u0000\u0002Ğ\u0000\u0000\u0000\u0000\u0000$edts\u0000\u0000\u0000\u001celst\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0001W;\u0000\u0000\u0017p\u0000\u0001\u0000\u0000\u0000\u0000§mdia\u0000\u0000\u0000 mdhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001_\u0000xª UÄ\u0000\u0000\u0000\u0000\u0000-hdlr\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000vide\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000VideoHandler\u0000\u0000\u0000§Iminf\u0000\u0000\u0000\u0014vmhd\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000$dinf\u0000\u0000\u0000\u001cdref\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\furl \u0000\u0000\u0000\u0001\u0000\u0000§\tstbl\u0000\u0000\u0002™stsd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0002‰avc1\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0005\u0000\u0002Ğ\u0000H\u0000\u0000\u0000H\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0018ÿÿ\u0000\u0000\u0000;avcC\u0001d\u0000\u001fÿá\u0000\u001egd\u0000\u001f¬Ù@P\u0005»\u0001n\u0004\u0004\u000bJ\u0000\u0000\u0003\u0000\u0002\u0000\u0000\u0003\u0000x\u001e0c,\u0001\u0000\u0006hëàŒ²,ıøø\u0000\u0000\u0000\u0001Ôcolrprof\u0000\u0000\u0001È\u0000\u0000\u0000\u0000\u00040\u0000\u0000mntrRGB XYZ \u0007à\u0000\u0001\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000acsp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\tdesc\u0000\u0000\u0000ğ\u0000\u0000\u0000$rXYZ\u0000\u0000\u0001\u0014\u0000\u0000\u0000\u0014gXYZ\u0000\u0000\u0001(\u0000\u0000\u0000\u0014bXYZ\u0000\u0000\u0001<\u0000\u0000\u0000\u0014wtpt\u0000\u0000\u0001P\u0000\u0000\u0000\u0014rTRC\u0000\u0000\u0001d\u0000\u0000\u0000(gTRC\u0000\u0000\u0001d\u0000\u0000\u0000(bTRC\u0000\u0000\u0001d\u0000\u0000\u0000(cprt\u0000\u0000\u0001Œ\u0000\u0000\u0000<mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000\b\u0000\u0000\u0000\u001c\u0000s\u0000R\u0000G\u0000BXYZ \u0000\u0000\u0000\u0000\u0000\u0000o¢\u0000\u00008õ\u0000\u0000\u0003XYZ \u0000\u0000\u0000\u0000\u0000\u0000b™\u0000\u0000·…\u0000\u0000\u0018ÚXYZ \u0000\u0000\u0000\u0000\u0000\u0000$ \u0000\u0000\u000f„\u0000\u0000¶ÏXYZ \u0000\u0000\u0000\u0000\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-para\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002ff\u0000\u0000ò§\u0000\u0000\nY\u0000\u0000\u0013Ğ\u0000\u0000\n[\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000 \u0000\u0000\u0000\u001c\u0000G\u0000o\u0000o\u0000g\u0000l\u0000e\u0000 \u0000I\u0000n\u0000c\u0000.\u0000 \u00002\u00000\u00001\u00006\u0000\u0000\u0000\u0010pasp\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0014btrt\u0000\u0000\u0000\u0000\u0000\u0001¶Ñ\u0000\u0001¶Ñ\u0000\u0000\u0000\u0018stts\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\nL\u0000\u0000\u000b¸\u0000\u0000\u0000Lstss\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u000f\u0000\u0000\u0000\u0001\u0000\u0000\u0000û\u0000\u0000\u0001°\u0000\u0000\u0002ª\u0000\u0000\u0002Õ\u0000\u0000\u0003Ï\u0000\u0000\u0004\u0017\u0000\u0000\u0005\u0011\u0000\u0000\u0006\u000b\u0000\u0000\u0006S\u0000\u0000\u0007*\u0000\u0000\b$\u0000\u0000\t\u001e\u0000\u0000\tE\u0000\u0000\n?\u0000\u0000Q`ctts\u0000\u0000\u0000\u0000\u0000\u0000\n*\u0000\u0000\u0000\u0005\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000.à\u0000\u0000\u0000\u0002\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000.à\u0000\u0000\u0000\u0002\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "lc_largeshsubscription.json",
+        "max_lines": 220
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: lc_largeshsubscription.json (220 行, 9 列，显示第 1-220 行)\n列: id(int64), CompanyCode(int64), ChiName(object), ChiNameAbbr(object), SecuCode(object), InitialInfoPublDate(object), SHName(object), OughtShares(float64), ActualShares(float64)\n---\n      id  CompanyCode             ChiName ChiNameAbbr SecuCode  InitialInfoPublDate                          SHName  OughtShares  ActualShares\n0      1           44      深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                    中国电子信息产业集团公司   26460000.0  0.000000e+00\n1      2           44      深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                          博旭有限公司   20790000.0  0.000000e+00\n2      3           44      深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00                          秉宏有限公司   20790000.0  0.000000e+00\n3      4           44      深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                      长城科技股份有限公司   94653000.0  0.000000e+00\n4      5           44      深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                        香港博旭有限公司   15912000.0  0.000000e+00\n5      6           44      深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00                          香港秉宏公司   12285000.0  0.000000e+00\n6      7           63       东旭蓝天新能源股份有限公司        东旭蓝天   000040  1995-04-22 00:00:00               深圳市鸿基(集团)股份有限公司工会   14450000.0  0.000000e+00\n7      8           63       东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00             深圳市鸿基(集团)股份有限公司工会基金   20683634.0  0.000000e+00\n8      9           63       东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                      潮州意溪工艺实业公司    1501500.0  0.000000e+00\n9     10           63       东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                     深圳中农信投资实业公司     815100.0  0.000000e+00\n10    11           63       东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00                       中国太平洋保险公司     536250.0  0.000000e+00\n11    12           63       东旭蓝天新能源股份有限公司   ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "pandas_query",
+      "input": {
+        "filename": "lc_largeshsubscription.json"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "pandas_query",
+      "content": "                         table                                                                                                                                                                                                                                    records\ncount                      220                                                                                                                                                                                                                                        220\nunique                       1                                                                                                                                                                                                                                        220\ntop     lc_largeshsubscription  {'id': 220, 'CompanyCode': 251, 'ChiName': '内蒙古天首科技发展股份有限公司', 'ChiNameAbbr': '天首发展', 'SecuCode': '000611', 'InitialInfoPublDate': '1998-03-16 00:00:00', 'SHName': '呼和浩特市国有资产经营中心', 'OughtShares': 19245379.0, 'ActualShares': 5773613.0}\nfreq                       220                                                                                                                                                                                                                                          1",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "pandas_query",
+      "input": {
+        "filename": "lc_largeshsubscription.json"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "pandas_query",
+      "content": "KeyError: \"None of [Index(['OughtShares', 'ActualShares'], dtype='object')] are in the [columns]\"",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "pandas_query",
+      "input": {
+        "filename": "lc_largeshsubscription.json"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "pandas_query",
+      "content": "['table', 'records']",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "execute_python",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "execute_python",
+      "content": "代码执行错误: 安全限制：沙箱禁止 open()。读取数据请用 read_file 工具或已加载的 df 变量。",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n                     name\n0  lc_largeshsubscription",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 10 行\n   id  CompanyCode         ChiName ChiNameAbbr SecuCode  InitialInfoPublDate               SHName  OughtShares  ActualShares\n0   1           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00         中国电子信息产业集团公司   26460000.0           0.0\n1   2           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00               博旭有限公司   20790000.0           0.0\n2   3           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04 00:00:00               秉宏有限公司   20790000.0           0.0\n3   4           44  深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00           长城科技股份有限公司   94653000.0           0.0\n4   5           44  深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00             香港博旭有限公司   15912000.0           0.0\n5   6           44  深圳长城开发科技股份有限公司         深科技   000021  1998-03-10 00:00:00               香港秉宏公司   12285000.0           0.0\n6   7           63   东旭蓝天新能源股份有限公司        东旭蓝天   000040  1995-04-22 00:00:00    深圳市鸿基(集团)股份有限公司工会   14450000.0           0.0\n7   8           63   东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00  深圳市鸿基(集团)股份有限公司工会基金   20683634.0           0.0\n8   9           63   东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00           潮州意溪工艺实业公司    1501500.0           0.0\n9  10           63   东旭蓝天新能源股份有限公司        东旭蓝天   000040  1997-04-08 00:00:00          深圳中农信投资实业公司     815100.0           0.0",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n   total_records  unique_shareholders  unique_companies  non_null_ought  non_null_actual  min_ought     avg_ought    max_ought  min_actual    avg_actual    max_actual\n0            220                  193                72             193              202      273.0  3.104103e+07  659826544.0         0.0  4.149151e+07  3.000000e+09",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 8 行\n  ought_range  cnt    avg_actual  fulfilled\n0       <100K    4  2.252500e+02          2\n1   100K-500K   33  5.855000e+04          7\n2     500K-1M   13  1.145303e+05          3\n3       1M-5M   23  1.171154e+06          9\n4      5M-10M   26  2.254171e+06         15\n5     10M-50M   63  1.042648e+07         42\n6    50M-100M   19  2.030159e+07         13\n7       100M+   12  1.901969e+08         11",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "threshold 5000 10000 50000 100000 subscription fulfillment standard"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\n# Enterprise Knowledge Guide: en-origin-ccks_stock\n\n## China Capital Markets Stock Database — Semantic Layer & Governance Reference\n\n---\n\n## 1. Business Context & Scope\n\nThis database serves as a comprehensive repository for China's A-share listed companies, covering corporate archives, equity struc",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "网下投资者 单笔 配售 标准 门槛 threshold"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[lc_sharefp.md] (得分: 0.016, 来源: hybrid)\n二零一八年一月二十四日，于二零一九年四月二十六日解除。档案 996 的质押期接近一年，始于二零一九年十月三十一日，于二零二零年九月一日结束。而档案 1009 则是一笔近期的短期融资，始于二零二一年九月三日，并于二零二二年一月十九日解除。\n\n法证审查结论\n\n本次针对目标公司历史资本结构、股东交易及融资活动的法证审查，揭示了多个需要进行最高级别关注的风险领域。综合上述所有档案条目的分析，关键结论如下：\n\n1.  极端股东杠杆：发现多起主要股东质押比例超过其自身持股 95% 的案例（如档案 349 和 383），使公司面临极高的股价波动风险和潜在的控制权不稳定性。\n2.  协同与一致行动嫌疑：多组证\n\n---\n\n[lc_business.pdf] (得分: 0.016, 来源: hybrid)\n司，其业务被归入计算机、通信和其他电子设备制造业这一宽泛的类别。公司的产品线非常多样，涵盖了从通信设备、计算机到专用输配电及控制设备等多个领域。这种多元化的制造能力是其长期发展的基石。\n\n关于档案 113，云南云维股份有限公司的行业分类为石油加工、炼焦和核燃料加工业。其主营业务集中于化工产品、焦炭、煤炭及相关矿产品的销售，并配套汽车货运等物流服务。公司的业绩表现与大宗商品市场的周期性波动紧密相关。\n\n档案 115 的鲁信创业投资集团股份有限公司，其行业归属为资本市场服务。其核心业务是创业投资及投资管理咨询，尽管其经营范围中仍保留了磨料磨具等传统制造业项目。公司最近发布了其投资组合的季度回顾。评\n\n---\n\n[lc_business.pdf] (得分: 0.016, 来源: hybrid)\n的合规培训材料。它在新能源汽车产业链中的战略卡位，使其成为直接受益于该行业高速增长的标的之一。\n\n在档案72的分析中，我们识别出广汇能源股份有限公司，它在能源价值链的上游运营，具体行业为石油和天然气开采业。其业务不仅限于开采，还包括煤炭、液化天\n\n然气和甲醇等能源产品的批发与零售，并对相关项目进行投资。公司的法律部门正在审阅一项新的合作协议。其一体化的能源产品组合有助于对冲单一商品价格波动的风险。\n\n记录80的浙江龙盛集团股份有限公司，其行业分类为化学原料及化学制品制造业。该公司的核心业务是染料、助剂及化工中间体的生产与销售，同时，它也积极从事外部的实业投资与资产管理活动。这种产业运营与资本运\n\n---\n\n[lc_intassetsdetail.md] (得分: 0.016, 来源: hybrid)\n擎。\n\n档案 3167 显示，金鸿顺在2019年拥有 119 名研发人员，占总员工数的 11.54%。\n\n关于记录 3306，中科海讯在2018年的研发人员数量为 120 人。该团队占公司总员工数的 56.34%，再次印证了其作为一家以高精尖技术为核心的企业的典型人力资源结构。\n\n对于档案 3398（通业科技），关于其在2016年的研发人员数量和占比的具体数据在当前数据集中未能获取，处于缺失状态。\n\n记录 3417 显示，米奥会展在2020年6月末的研发人员数量为 32 人。该团队占公司总员工数的 8.00%。在疫情冲击下，这支精干的团队是公司开发线上展览平台的关键力量。\n\n档案 3472 指",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "华立集团 320000 holding value table"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[lc_sharefp.md] (得分: 0.016, 来源: hybrid)\n笔不同交易，其涉及的股份数量均为 40,000,000 股。经核查，这两笔交易的初始质押股份数也分别是 50,000,000 股和 40,000,000 股。一份初步文件显示记录162的初始质押数为4千万股，但最终确认的数值为 50,000,000 股。这表明在记录162的交易中，可能发生了部分解押。\n\n档案 166 的审查确认，交易涉及股份数为 36,000,000 股，该数值与初始质押数相符。\n\n在档案 204 中，交易涉及股份数为 16,000,000 股，且初始质押数与此保持一致。\n\n亿利洁能相关记录的审查揭示了大规模的质押活动。档案 270 的交易涉及股份数高达 204,000,00\n\n---\n\n[lc_sharefp.md] (得分: 0.016, 来源: hybrid)\n了一个需要补充调查的数据断点。\n\n记录 699 的分析显示，本次交易涉及的股份数量为 6,765,000 股，经核对，该数值与初始设定的质押股份数额完全一致。这表明该笔质押自设立以来，其标的股份规模保持稳定。\n\n转向与迅游科技相关的系列记录，档案 737 和 740 显示，两笔交易涉及的股份数量均为 1,882,600 股。但这两笔记录均未能提供初始质押股份数，使得无法判断是否存在股份数量的变动。\n\n档案 769 的数据揭示了剧烈的变化。当前涉及的股份数量仅为 1 股，而初始质押股份数则为 2,790,000 股。该出质方近期参与了一次慈善晚宴的赞助活动。这种象征性的剩余股数通常意味着该笔质押\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "OughtShares ActualShares channel fulfillment both pass threshold"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[lc_largeshsubscription.json] (得分: 0.029, 来源: hybrid)\n表格文件 lc_largeshsubscription.json，共 220 行，9 列。列包括: id, CompanyCode, ChiName, ChiNameAbbr, SecuCode, InitialInfoPublDate, SHName, OughtShares, ActualShares。 列 id (类型: int64)，均值 110.5，范围 1.0 ~ 220.0，示例: 1, 2, 3。 列 CompanyCode (类型: int64)，均值 8832.9273，范围 44.0 ~ 172350.0，示例: 44, 44, 44。 列 ChiName (类型: ob",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "IPO 配售参考规则 网下投资者 单笔 最低 申购 threshold 500 1000"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[lc_sharefp.md] (得分: 0.016, 来源: hybrid)\n。与此同时，档案 900 显示，同一出质方的另一笔交易，当前涉及股份数为 14,900,000 股，而其初始质押规模与前一笔记录完全相同，均为 41,670,000 股。这两笔记录可能源于同一笔初始质押的分拆或重组，必须合并审查。\n\n档案 907 的记录则相对简单，其涉及的股份数和初始质押数均为 17,550,000 股。\n\n记录 935 的规模极小，涉及股份数和初始质押数均为 58,500 股。\n\n档案 941 和 945 的审查显示，两笔交易分别涉及 11,041,600 股和 1,890,000 股。这两笔记录的初始质押股份数均与当前涉及数完全相同。\n\n记录 952 的交易涉及 3,11\n\n---\n\n[lc_stockholdingst.pdf] (得分: 0.016, 来源: hybrid)\nvestor perusahaan ini sedang mempersiapkan rilis pers. Tanggal spesifik ini kemungkinan besar bertepatan dengan peristiwa perusahaan yang signifikan, seperti penawaran sekunder atau pengumuman merger.\n\nData untuk arsip 3305 berakhir pada 30 September 2020. Titik waktu ini sangat penting karena mengu\n\n---\n\n[lc_sharefp.md] (得分: 0.016, 来源: hybrid)\n了一个需要补充调查的数据断点。\n\n记录 699 的分析显示，本次交易涉及的股份数量为 6,765,000 股，经核对，该数值与初始设定的质押股份数额完全一致。这表明该笔质押自设立以来，其标的股份规模保持稳定。\n\n转向与迅游科技相关的系列记录，档案 737 和 740 显示，两笔交易涉及的股份数量均为 1,882,600 股。但这两笔记录均未能提供初始质押股份数，使得无法判断是否存在股份数量的变动。\n\n档案 769 的数据揭示了剧烈的变化。当前涉及的股份数量仅为 1 股，而初始质押股份数则为 2,790,000 股。该出质方近期参与了一次慈善晚宴的赞助活动。这种象征性的剩余股数通常意味着该笔质押\n\n---\n\n[lc_stockholdingst.pdf] (得分: 0.016, 来源: hybrid)\nwaktu ini menangkap kepemilikan institusional yang sangat tinggi sebesar 71% yang kami catat.\n\nData untuk arsip 2921 berakhir pada 31 Maret 2017.\n\nData untuk arsip 2990 berakhir pada 31 Desember 2019.\n\nSebagai kelanjutannya, data untuk arsip 2998 berakhir pada 31 Desember 2021. Jendela dua tahun ant",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "\"OughtShares\" \"ActualShares\" threshold minimum standard"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[lc_largeshsubscription.json] (得分: 0.030, 来源: hybrid)\n表格文件 lc_largeshsubscription.json，共 220 行，9 列。列包括: id, CompanyCode, ChiName, ChiNameAbbr, SecuCode, InitialInfoPublDate, SHName, OughtShares, ActualShares。 列 id (类型: int64)，均值 110.5，范围 1.0 ~ 220.0，示例: 1, 2, 3。 列 CompanyCode (类型: int64)，均值 8832.9273，范围 44.0 ~ 172350.0，示例: 44, 44, 44。 列 ChiName (类型: ob\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\ncompanycode` | Company identifier. |\n| `newmarketableashares` | Number of newly added tradable A-shares entering circulation. Unit: 10,000 shares (万股). |\n\n### 2.10 Share Freeze & Pledge — `lc_sharefp`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `secucode` | Stock ticker of the s",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "两通道 认购 标准 门槛  fulfilled subscription"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.030, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[lc_intassetsdetail.md] (得分: 0.016, 来源: hybrid)\n自动化控制系统领域的市场份额值得深入研究。公司的IT部门最近完成了对内部协作软件的全面升级。\n\n记录 2886 的数据显示，江苏苏盐井神股份有限公司的公司代码在一次数据库同步后，由初记的 175370 修正为 175371。这家简称为“苏盐井神”的公司，其交易代码为 603299。公司的仓储物流系统进行了智能化改造，以提升出入库效率。作为资源型企业，其产品定价受市场供需关系和宏观经济环境影响显著。\n\n关于档案 2989，我们分析了宁波太平鸟时尚服饰股份有限公司。这家以“太平鸟”闻名的时尚服饰公司，其内部管理代码为 193077，在上海证券交易所的交易代码是 603877。该公司对年轻消费群体的\n\n---\n\n[lc_legaldistribution.json] (得分: 0.016, 来源: hybrid)\n表格文件 lc_legaldistribution.json，共 21303 行，16 列。列包括: id, CompanyCode, ChiName, ChiNameAbbr, SecuCode, InfoPublDate, DistributionSum, IssuePrice, AquirerName, InvestorName, ValidApplyVol, AquiredSum, AquirerAmount, AquiredSecuCode, NonRestrictedSum, RestrictedSum。 列 id (类型: int64)，均值 10652.0，范围 1.0 ~ 2\n\n---\n\n[lc_intassetsdetail.md] (得分: 0.016, 来源: hybrid)\n62 详述了卫星化学股份有限公司（简称“卫星化学”）。该公司的公司代码为 164517，其股票以代码 002648 在市场进行交易。其一体化的产业链布局是其成本控制能力的关键。\n\n记录 2365 对应深圳兆日科技股份有限公司。这家以“兆日科技”闻名的公司，其内部识别码为 170645，股票代码为 300333。该公司在金融科技和安全领域的专业性值得关注。其行政部门确认，年度消防安全演习已顺利完成。\n\n最后，档案 2473 指向重庆博腾制药科技股份有限公司。一份内部草稿曾将其公司代码误记为 170641，但经过最终审计，确认为 170640。该公司以“博腾股份”作为其市场简称，交易代码为 300",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "briefing.mp4",
+        "max_lines": 500,
+        "start_line": 20500
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: briefing.mp4 (共 20795 行，显示第 20501-20795 行)\n---\nõ(Æ—\t0Ê@ÀßeÉ$\u000b\u0007Á£ü¯\u000eÅƒL×DÖa¹ğ\u0000œä\u001f¿èÔ”d¼\nº\u0007Rƒ«n\u0019HZ¹bµ\u0016…_'\u0007?8úFö<r£\u0017×^=Ò\u001cm\u001fÍ<S\u0006±„¬\u001d3ó;CÄ°\u0012¶dÔÌáæ®n—C¦\u0010÷Suj©\u0018°\u0003Rß¨Êg™»û\u000eõ\u001a~û£¦Pl\u001f‘×N¯’öŞŸÿ/»P„İw‡Ík—Ïdu\u0014}\u001f« vê\f‰›»wŞyÖ/dÜÇŒ(\u001b¼3ƒäŠóôs\u001eÊ?É£Qşßô\u001fUÖŸ]ü\u0017Ä×CÍûÛİşÙôÛHY¾L$i±ìÒµñŒ¨\u001aSšl…\u0017Ø\u001cv¿˜åÛ\u0015£\u001aÆZM5çĞÛë‰Ó5{i\u001b—ZÍÿë†çY\u001cM—­\\s\u0017é¿òù©\t\në\u000bÖ»Ê7¶]™‹óµ¦©›\u001d,æë\u0003gŞ¶Ë\u0013\u0006\">ÆTe¸ê3\u0012©\u0007Ÿ{Ù•åÑâ>#T¤\u0012r–7¯\b^¨\u0003a€‹‹mP^:\u000bPyRåq[å\u0011wş@v\u0012¸\u000f°oÿ\u0010¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥ß8!KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKÀ!\u001aÔuü$$Kbn5ô]:9öYCQ`\u0003äx==Ù·•GJ\u0012ŸSÑ#«JO+¾óì¸9¦å¨\u000eõ#V@—\u0004á´MX\u0017ı¸Ë…\tÄõ\u000b´.ÇÎ©ßl¬)l%Ä9ö\u000fNÔ#ªl\u000fœ•‡˜¥\"|ÃåŸ!¶ú÷~LÂÜ_~è~¾àµ\nÏñ¥\u0000q5,µí–hr\u0010efËç\"\u0000Ñ\u0006¾œÚŠX\fì9L–cèÃ†h:Z\u0000›„İ×\u0017\u0014I9$Ìsöm\u0015 æûæÄ\u0004¸M-S\u000e¢&Ÿ\u0011uOjic¬İÑÔz¶ã¯¬•\u0017”CµÁ\u0018.\u0014¡’!õJ”\u0011wdì]m\u000fÛy5wNv?Ö} åŸ‹ôù`\u001dH?Ó<F|\u0017OñnJñ\u0005ŸõògiåÚ(\u001au®\b.{Ö%{¾ëÒÖ[ÿ1 VÃ^¤7N¥ï9\u001böÎVk>‹:‡«Ô\u0016Pó²\u0005dÆ\n.Ä9J‘$'ç\b0ğ8ÒŠ±!mæ½q>›e!\u0006Îø'ö¹µÌcÓ|ƒ£„\u001bPÎ†›rÌqt¦?´få\u0013»\u0001Kká\u0001n\u000b;.gå>“°6™˜,=8.Ëá\\\u0007Ø7ÿˆRÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒï«\u0010¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥¥à\u0000\u0000\u0000:AŸME\u0015,+ÿ\u0000\u0000\u0015\u0005Ó›t6¼RU\u000fT)g<¸•^\u0000úmäÀ\u0001\u0003Œ\u0000\u0004½ö!b˜€\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u000e8!\u001aÔMü$°\u0003¿¿³Ğå~jüò\u0000\u0000}ƒå‰J×“ãs'É®LF7\u0001\"TNÁÁ°¤ã\u001foT\u0000“bCZª0T¦î>ûîX]\u001d“E«e\u0000è†\u001a³ó¿3]O)\u0000‹Df?\\èü|\u000fté,ş·B\u001a}=>€ãz€V0ná>yb­ûœ\u0003ìš»æ9Cğ_ûPt;­­\u0004úşnı_Åb»¢VNƒ_CH\u0010l_)v\u000bZS`ÉD®œ§œäYƒrªô¦á‚òÆû2çÅp…×\u0016k\u0011rµ•÷_1wk\u0016„œëË»\nÃ•Sö¼šZ‘³a\u0011ƒ[ï:(ë^Q)š.ôğó«9*mÃ®áto7îİsÅ˜å€¹†ËÛï­úû¹\u001f\t\u0014öÄ<",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n   total  fulfilled  zero_actual  null_actual  fully_fulfilled\n0    220        105           97           18               53",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 7 行\n   threshold  both_channels_pass  only_channel1  only_channel2  neither\n0       1000                 100             91              3       26\n1       5000                 100             91              3       26\n2      10000                 100             91              3       26\n3      50000                 100             90              3       27\n4     100000                  98             91              3       28\n5     500000                  89             67              3       61\n6    1000000                  82             61              3       74",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 102 行\n                           SHName  OughtShares  ActualShares  fulfillment_pct ChiNameAbbr SecuCode\n0                  山东省聊城地区国有资产管理局    5544000.0     5544000.0           100.00        东阿阿胶   000423\n1                         武汉石油化工厂   30850095.0    30850095.0           100.00        长航凤凰   000520\n2                      大连冰山集团有限公司   19278000.0    19278000.0           100.00        冰山冷热   000530\n3                      衡阳市国有资产管理局    7566000.0     7566000.0           100.00        启迪药业   000590\n4                烟台东方电子信息产业集团有限公司   30800000.0    30800000.0           100.00        东方电子   000682\n5                        锦州石油化工公司    9684000.0     9684000.0           100.00        东北证券   000686\n6                     吉林省信托有限责任公司   46012264.0    46012264.0           100.00        东北证券   000686\n7                  中色(宁夏)东方集团有限公司   40383360.0    40383360.0           100.00        东方钽业   000962\n8                 武汉华中科技大产业集团有限公司   34095860.0    34095860.0           100.00        华工科技   000988\n9                       中国国际电视总公司     300000.0      300000.0           100.00        中视传媒   600088\n10                       北京未来广告公司     300000.0      300000.0           100.00        中视传媒   600088\n11                  北京中电高科技电视发展公司     300000.0      300000.0           100.00        中视传媒   600088\n12                     北京荧屏出租汽车公司     100000.0      100000.0           100.00        中视传媒   600088\n13             新疆广汇实业投资(集团)有限责任公司  659826544.0   659826544.0           100.00        广汇能源   600256\n14   新疆广汇实业投资(集团)有限责任公司(宏广定向管理计划)   14610156.0    14610156.0           100.00        广汇能源   600256\n15   华龙证券-浦发银行-华龙证券金智汇31号集合资产管理计划   13603243.0    13603243.0           100.00        广汇能源   600256\n16                       东北大学软件中心    4560000.0     4560000.0           100.00        东软集团   600718\n17                  阿尔派电子(中国)有限公司    4440000.0     4440000.0           100.00        东软集团   600718\n18                     沈阳资产经营有限公司     840000.0      840000.0           100.00        东软集团   600718\n19         ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 115 行\n                             SHName  OughtShares  ActualShares ChiNameAbbr\n0                            辽源市国资局  236470000.0           0.0        亚泰集团\n1                        长城科技股份有限公司   94653000.0           0.0         深科技\n2                 中国北京同仁堂(集团)有限责任公司   69654997.0           0.0         同仁堂\n3                      超声电子(集团)有限公司   67200000.0           NaN        超声电子\n4                      东珠海市中富工业集团公司   59815500.0           0.0        珠海中富\n5                     中国标准缝纫机集团有限公司   58818810.0           0.0        标准股份\n6                           长春市市国资局   54189000.0           0.0        亚泰集团\n7                        济南市国有资产管理局   46883200.0           0.0        湖南天雁\n8                      宁夏恒力钢铁集团有限公司   39600000.0           0.0        新日恒力\n9                        山西焦化集团有限公司   34980000.0           0.0        山西焦化\n10   IJM OVERSEAS VENTURES SDN.BHD.   34923525.0           0.0         粤高速\n11                     中国电子信息产业集团公司   26460000.0           0.0         深科技\n12                 新疆天山建材(集团)有限责任公司   21456000.0           0.0        天山股份\n13                 兰州三毛纺织(集团)有限责任公司   21225600.0           0.0         甘咨询\n14                           博旭有限公司   20790000.0           0.0         深科技\n15                           秉宏有限公司   20790000.0           0.0         深科技\n16              深圳市鸿基(集团)股份有限公司工会基金   20683634.0           0.0        东旭蓝天\n17               深圳市鸿基(集团) 股份有限公司工会   20683634.0           0.0        东旭蓝天\n18                         金狮明钢有限公司   18900000.0           0.0        钱江摩托\n19                     湖北宜化集团有限责任公司   18862747.0           0.0        湖北宜化\n20                        福建省漳州建筑瓷厂   18616611.0           0.0        漳州发展\n21                       上海豫园旅游服务公司   18498480.0           0.0        豫园股份\n22                           幸福集团公司   16839900.0           NaN        华远地产\n23                         香港博旭有限公司   15912000.0           0.0         深科技\n24                     太原东山煤矿有限责任公司   14808000.0           0.0         英洛华\n25                深圳市鸿基(集团)股份有限公司工会   144",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 17 行\n    ActualShares\n0          273.0\n1          628.0\n2        50000.0\n3        60000.0\n4       100000.0\n5       300000.0\n6       319522.0\n7       360000.0\n8       369833.0\n9       453600.0\n10      500000.0\n11      502928.0\n12      510000.0\n13      710000.0\n14      840000.0\n15      900000.0\n16      993403.0",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 2 行\n          field  min_val       p25        p50        p75       max_val\n0   OughtShares    273.0  400742.0  2683951.0  7558283.0  6.598265e+08\n1  ActualShares      0.0       0.0     1098.0   821521.0  3.000000e+09",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "\"two-channel\" \"channel\" fulfilment fulfillment oughtshares actualshares threshold 1000 5000"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-wrap: break-word;'>CNY</td></tr></table>\n\nThese values use money units, not the two share-count channels.\n\n## 第 3 页\n\n## IPO 配售参考规则 — 网下投资者单笔\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\nndard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video defines two field thresholds that must both pass.\n\n## 第 2 页\n\n## Holding value overview\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nive region of the company's registered address. |\n| `city` | City-level administrative region of the company's registered address. |\n\n### 2.2 Large Shareholder Subscriptions — `lc_largeshsubscription`\n\n| Field | Semantic Definition |\n|-------|-------------------|\n| `shname` | Name of the subscribing\n\n---\n\n[lc_largeshsubscription.json] (得分: 0.016, 来源: hybrid)\n表格文件 lc_largeshsubscription.json，共 220 行，9 列。列包括: id, CompanyCode, ChiName, ChiNameAbbr, SecuCode, InitialInfoPublDate, SHName, OughtShares, ActualShares。 列 id (类型: int64)，均值 110.5，范围 1.0 ~ 220.0，示例: 1, 2, 3。 列 CompanyCode (类型: int64)，均值 8832.9273，范围 44.0 ~ 172350.0，示例: 44, 44, 44。 列 ChiName (类型: ob",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 3 行\n                criterion  total_records  pass_channel1_ought  pass_channel2_actual  both_pass\n0  Threshold: 1000 shares            220                  107                   103        100\n1   Threshold: 500 shares            220                  108                   104        101\n2   Threshold: 100 shares            220                  109                   105        102",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 5 行\n                         fulfillment_category  cnt\n0  Has entitlement but no actual subscription   91\n1                     Fully fulfilled (100%+)   53\n2                         Partially fulfilled   49\n3                           No data on either   24\n4        Has actual but no entitlement record    3",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 30 行\n                SHName  OughtShares  ActualShares ChiNameAbbr SecuCode\n0   新疆广汇实业投资(集团)有限责任公司  659826544.0   659826544.0        广汇能源   600256\n1       云南合和(集团)股份有限公司  328410013.0   328410013.0        红塔证券   601236\n2               福建省财政厅  313174554.0   313174554.0        兴业证券   601377\n3          北京市华远集团有限公司  251211879.0   251211879.0        华远地产   600743\n4     安徽国元金融控股集团有限责任公司  216338268.0   216338268.0        国元证券   000728\n5      河北省冀东水泥集团有限责任公司  180274950.0     5000000.0        冀东水泥   000401\n6          珠海市中富工业集团公司  165416998.0    14435000.0        珠海中富   000659\n7           中国双维投资有限公司  160000000.0   160000000.0        红塔证券   601236\n8         上海市国有资产管理办公室  146979030.0    90909090.0        城投控股   600649\n9       成都天齐实业(集团)有限公司  122862986.0   122862986.0        天齐锂业   002466\n10      吉林亚泰（集团）股份有限公司  120194790.0   120194790.0        东北证券   000686\n11     河北省冀东水泥集团有限责任公司   98652750.0     5000000.0        冀东水泥   000401\n12          山东海化集团有限公司   90000000.0     2700000.0        山东海化   000822\n13           广东省高速公路公司   89440300.0    31304100.0         粤高速   000429\n14        云南华叶投资有限责任公司   80000000.0    80000000.0        红塔证券   601236\n15      武汉三镇基建发展有限责任公司   76500000.0     7650000.0        武汉控股   600168\n16           东北京化工集团公司   72000000.0     1210000.0        国元证券   000728\n17        中国烟草总公司浙江省公司   72000000.0    72000000.0        红塔证券   601236\n18       新黄浦(集团)有限责任公司   58410335.0     2920518.0         新黄浦   600638\n19        上海纺织控股（集团）公司   55594426.0     5559443.0        龙头股份   600630\n20         中国北京同仁堂集团公司   54000000.0     1800000.0         同仁堂   600085\n21      成都天齐实业(集团)有限公司   53418690.0    53418690.0        天齐锂业   002466\n22      成都博瑞投资控股集团有限公司   51618518.0    51618518.0        博瑞传播   600880\n23               东海亮集团   50247342.0    50247342.0        海亮股份   002203\n24          长春市国有资产管理局   47160960.0    22911458.0        亚泰集团   600881\n25         吉林省信托有限责任公司   46012264.0    46012264.0        东北证券   000686\n26          四川沱牌集团有限公司   45105120.0     4731000.0        舍得酒业   600702\n27  ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 3 行\n          threshold_desc  total  ought_above_10k  actual_above_10k  both_pass\n0    10,000 shares (1万股)    220              191               103        100\n1           5,000 shares    220              191               103        100\n2  100,000 shares (10万股)    220              189               101         98",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 20 行\n                 SHName  OughtShares  ActualShares ChiNameAbbr\n0                   李斯龙        273.0         273.0        天齐锂业\n1                   李斯龙        628.0         628.0        天齐锂业\n2       中国工商银行衡阳市信托投资公司     600000.0       50000.0        启迪药业\n3               诸暨市黄金公司     360000.0       60000.0        浙江富润\n4            北京荧屏出租汽车公司     100000.0      100000.0        中视传媒\n5             中国国际电视总公司     300000.0      300000.0        中视传媒\n6              北京未来广告公司     300000.0      300000.0        中视传媒\n7         北京中电高科技电视发展公司     300000.0      300000.0        中视传媒\n8              同济大学法人持股    9653000.0      300000.0        同济科技\n9            中国第一汽车集团公司    6390437.0      319522.0        长春一东\n10  中国建设银行沈阳市信托投资股份有限公司     360000.0      360000.0        东软集团\n11               中国药材公司     900000.0      369833.0        启迪药业\n12             大连信托投资公司     453600.0      453600.0        冰山冷热\n13             富润集团有限公司    8868540.0      500000.0        浙江富润\n14           吉林东光集团有限公司   10058564.0      502928.0        长春一东\n15                  国家股   11310000.0      510000.0        亚泰集团\n16         上海市国有资产管理办公室    1443246.0      710000.0        同济科技\n17           沈阳资产经营有限公司     840000.0      840000.0        东软集团\n18           成都市国有资产管理局    6748770.0      900000.0        博瑞传播\n19             福建兴业证券公司    4232756.0      993403.0        航天发展",
+      "is_error": false
+    }
+  ],
+  "events": [
+    {
+      "type": "done",
+      "usage": {
+        "input_tokens": 1297185,
+        "output_tokens": 7743
+      },
+      "tool_calls_log": [
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "briefing.mp4",
+            "max_lines": 10
+          },
+          "output_preview": "文件: briefing.mp4 (共 20795 行，显示第 1-10 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001€×moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001Wk\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000¨&trak"
+        },
+        {
+          "name": "inspect_data",
+          "input": {
+            "filename": "lc_largeshsubscription.json"
+          },
+          "output_preview": "文件: lc_largeshsubscription.json\n行数: 220\n列数: 9\n\n列信息:\n  - id: int64 (220/220 非空, 220 唯一值, 示例: 1)\n  - CompanyCode: int64 (220/220 非空, 72 唯一值, 示例: 44)\n  - ChiName: object (220/220 非空, 72 唯一值, 示例: 深圳长城开发科技"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "Large Subscription Fulfillment Standard channel requirements"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "subscription standard channel large shareholder"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "lc_largeshsubscription.json",
+            "max_lines": 100
+          },
+          "output_preview": "文件: lc_largeshsubscription.json (220 行, 9 列，显示第 1-100 行)\n列: id(int64), CompanyCode(int64), ChiName(object), ChiNameAbbr(object), SecuCode(object), InitialInfoPublDate(object), SHName(object), OughtSha"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "IPO 配售 网下投资者单笔 channel two-channel subscription standard"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "two-channel fulfillment standard oughtshares actualshares threshold"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "briefing.mp4",
+            "max_lines": 200
+          },
+          "output_preview": "文件: briefing.mp4 (共 20795 行，显示第 1-200 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001€×moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001Wk\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000¨&tra"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "lc_largeshsubscription.json",
+            "max_lines": 220
+          },
+          "output_preview": "文件: lc_largeshsubscription.json (220 行, 9 列，显示第 1-220 行)\n列: id(int64), CompanyCode(int64), ChiName(object), ChiNameAbbr(object), SecuCode(object), InitialInfoPublDate(object), SHName(object), OughtSha"
+        },
+        {
+          "name": "pandas_query",
+          "input": {
+            "filename": "lc_largeshsubscription.json",
+            "expression": "df.describe()"
+          },
+          "output_preview": "                         table                                                                                                                                                                          "
+        },
+        {
+          "name": "pandas_query",
+          "input": {
+            "expression": "import pandas as pd\n# Get the statistics for OughtShares and ActualShares\nstats = df[['OughtShares', 'ActualShares']].describe()\nstats",
+            "filename": "lc_largeshsubscription.json"
+          },
+          "output_preview": "KeyError: \"None of [Index(['OughtShares', 'ActualShares'], dtype='object')] are in the [columns]\""
+        },
+        {
+          "name": "pandas_query",
+          "input": {
+            "expression": "df.columns.tolist()",
+            "filename": "lc_largeshsubscription.json"
+          },
+          "output_preview": "['table', 'records']"
+        },
+        {
+          "name": "execute_python",
+          "input": {
+            "code": "import json\nwith open('lc_largeshsubscription.json', 'r') as f:\n    data = json.load(f)\n\n# Check the structure\nprint(type(data))\nif isinstance(data, list):\n    print(f\"Length: {len(data)}\")\n    print(f\"First item keys: {data[0].keys()}\")\n    print(f\"First item: {data[0]}\")\nelif isinstance(data, dict):\n    print(f\"Keys: {data.keys()}\")\n    for k, v in data.items():\n        if isinstance(v, list):\n            print(f\"{k}: list of {len(v)} items\")\n            if v:\n                print(f\"  First item: {v[0]}\")\n        else:\n            print(f\"{k}: {v}\")"
+          },
+          "output_preview": "代码执行错误: 安全限制：沙箱禁止 open()。读取数据请用 read_file 工具或已加载的 df 变量。"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%largesh%'"
+          },
+          "output_preview": "返回 1 行\n                     name\n0  lc_largeshsubscription"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM lc_largeshsubscription LIMIT 10"
+          },
+          "output_preview": "返回 10 行\n   id  CompanyCode         ChiName ChiNameAbbr SecuCode  InitialInfoPublDate               SHName  OughtShares  ActualShares\n0   1           44  深圳长城开发科技股份有限公司         深科技   000021  1995-04-04"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT \n  COUNT(*) as total_records,\n  COUNT(DISTINCT SHName) as unique_shareholders,\n  COUNT(DISTINCT CompanyCode) as unique_companies,\n  SUM(CASE WHEN OughtShares IS NOT NULL THEN 1 ELSE 0 END) as non_null_ought,\n  SUM(CASE WHEN ActualShares IS NOT NULL THEN 1 ELSE 0 END) as non_null_actual,\n  MIN(OughtShares) as min_ought,\n  AVG(OughtShares) as avg_ought,\n  MAX(OughtShares) as max_ought,\n  MIN(ActualShares) as min_actual,\n  AVG(ActualShares) as avg_actual,\n  MAX(ActualShares) as max_actual\nFROM lc_largeshsubscription"
+          },
+          "output_preview": "返回 1 行\n   total_records  unique_shareholders  unique_companies  non_null_ought  non_null_actual  min_ought     avg_ought    max_ought  min_actual    avg_actual    max_actual\n0            220          "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Look at shareholders who have ActualShares > 0 (fulfilled some subscription)\n-- and see the distribution\nSELECT \n  CASE \n    WHEN OughtShares < 100000 THEN '<100K'\n    WHEN OughtShares < 500000 THEN '100K-500K'\n    WHEN OughtShares < 1000000 THEN '500K-1M'\n    WHEN OughtShares < 5000000 THEN '1M-5M'\n    WHEN OughtShares < 10000000 THEN '5M-10M'\n    WHEN OughtShares < 50000000 THEN '10M-50M'\n    WHEN OughtShares < 100000000 THEN '50M-100M'\n    ELSE '100M+'\n  END as ought_range,\n  COUNT(*) as cnt,\n  AVG(ActualShares) as avg_actual,\n  SUM(CASE WHEN ActualShares > 0 THEN 1 ELSE 0 END) as fulfilled\nFROM lc_largeshsubscription\nWHERE OughtShares IS NOT NULL\nGROUP BY ought_range\nORDER BY MIN(OughtShares)"
+          },
+          "output_preview": "返回 8 行\n  ought_range  cnt    avg_actual  fulfilled\n0       <100K    4  2.252500e+02          2\n1   100K-500K   33  5.855000e+04          7\n2     500K-1M   13  1.145303e+05          3\n3       1M-5M   2"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "threshold 5000 10000 50000 100000 subscription fulfillment standard"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "网下投资者 单笔 配售 标准 门槛 threshold"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "华立集团 320000 holding value table"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "OughtShares ActualShares channel fulfillment both pass threshold"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "IPO 配售参考规则 网下投资者 单笔 最低 申购 threshold 500 1000"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "\"OughtShares\" \"ActualShares\" threshold minimum standard"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "两通道 认购 标准 门槛  fulfilled subscription"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n-word;'>华立集团\\nholding value, not subscription shares</td><td style='text-align: center; word-wrap: break-word;'>320,000</td><td style='text-align: center; word-w"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "briefing.mp4",
+            "max_lines": 500,
+            "start_line": 20500
+          },
+          "output_preview": "文件: briefing.mp4 (共 20795 行，显示第 20501-20795 行)\n---\nõ(Æ—\t0Ê@ÀßeÉ$\u000b\u0007Á£ü¯\u000eÅƒL×DÖa¹ğ\u0000œä\u001f¿èÔ”d¼\nº\u0007Rƒ«n\u0019HZ¹bµ\u0016…_'\u0007?8úFö<r£\u0017×^=Ò\u001cm\u001fÍ<S\u0006±„¬\u001d3ó;CÄ°\u0012¶dÔÌáæ®n—C¦\u0010÷Suj©\u0018°\u0003Rß¨Êg™»û\u000eõ\u001a~û£¦Pl\u001f‘×N¯’öŞŸÿ/»P„İw‡Ík—Ïdu\u0014"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Check the distribution of ActualShares vs OughtShares\n-- and look for shareholders where ActualShares > 0 (meaning they fulfilled)\nSELECT COUNT(*) as total,\n       SUM(CASE WHEN ActualShares > 0 THEN 1 ELSE 0 END) as fulfilled,\n       SUM(CASE WHEN ActualShares = 0 THEN 1 ELSE 0 END) as zero_actual,\n       SUM(CASE WHEN ActualShares IS NULL THEN 1 ELSE 0 END) as null_actual,\n       SUM(CASE WHEN OughtShares IS NOT NULL AND ActualShares > 0 AND ActualShares >= OughtShares THEN 1 ELSE 0 END) as fully_fulfilled\nFROM lc_largeshsubscription"
+          },
+          "output_preview": "返回 1 行\n   total  fulfilled  zero_actual  null_actual  fully_fulfilled\n0    220        105           97           18               53"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Let's look at the shareholders who meet different threshold combinations\n-- Typical thresholds might be 5000, 10000, 50000, 100000 etc.\n\nSELECT \n  threshold,\n  SUM(CASE WHEN OughtShares >= threshold AND ActualShares >= threshold THEN 1 ELSE 0 END) as both_channels_pass,\n  SUM(CASE WHEN OughtShares >= threshold AND (ActualShares < threshold OR ActualShares IS NULL) THEN 1 ELSE 0 END) as only_channel1,\n  SUM(CASE WHEN (OughtShares < threshold OR OughtShares IS NULL) AND ActualShares >= threshold THEN 1 ELSE 0 END) as only_channel2,\n  SUM(CASE WHEN (OughtShares < threshold OR OughtShares IS NULL) AND (ActualShares < threshold OR ActualShares IS NULL OR ActualShares = 0) THEN 1 ELSE 0 END) as neither\nFROM (SELECT 1000 as threshold UNION ALL SELECT 5000 UNION ALL SELECT 10000 UNION ALL SELECT 50000 UNION ALL SELECT 100000 UNION ALL SELECT 500000 UNION ALL SELECT 1000000) as thresholds\nCROSS JOIN lc_largeshsubscription\nGROUP BY threshold\nORDER BY threshold"
+          },
+          "output_preview": "返回 7 行\n   threshold  both_channels_pass  only_channel1  only_channel2  neither\n0       1000                 100             91              3       26\n1       5000                 100             91  "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- List all shareholders where ActualShares > 0 (they fulfilled their subscription)\nSELECT SHName, OughtShares, ActualShares, \n       ROUND(CAST(ActualShares AS FLOAT) / NULLIF(OughtShares, 0) * 100, 2) as fulfillment_pct,\n       ChiNameAbbr, SecuCode\nFROM lc_largeshsubscription\nWHERE ActualShares > 0 AND OughtShares IS NOT NULL AND OughtShares > 0\nORDER BY fulfillment_pct DESC"
+          },
+          "output_preview": "返回 102 行\n                           SHName  OughtShares  ActualShares  fulfillment_pct ChiNameAbbr SecuCode\n0                  山东省聊城地区国有资产管理局    5544000.0     5544000.0           100.00        东阿阿胶   "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Let me look at the shareholders where ActualShares IS NULL (missing data)\n-- These might be the ones that don't meet the channel requirement\nSELECT SHName, OughtShares, ActualShares, ChiNameAbbr \nFROM lc_largeshsubscription \nWHERE ActualShares IS NULL OR ActualShares = 0\nORDER BY OughtShares DESC NULLS LAST"
+          },
+          "output_preview": "返回 115 行\n                             SHName  OughtShares  ActualShares ChiNameAbbr\n0                            辽源市国资局  236470000.0           0.0        亚泰集团\n1                        长城科技股份有限公司   946"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Check unique values of ActualShares and OughtShares for small values\nSELECT DISTINCT ActualShares \nFROM lc_largeshsubscription \nWHERE ActualShares > 0 AND ActualShares < 1000000\nORDER BY ActualShares"
+          },
+          "output_preview": "返回 17 行\n    ActualShares\n0          273.0\n1          628.0\n2        50000.0\n3        60000.0\n4       100000.0\n5       300000.0\n6       319522.0\n7       360000.0\n8       369833.0\n9       453600.0\n10   "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- What are the thresholds that make sense?\n-- Let's look at percentiles\nSELECT \n  'OughtShares' as field,\n  MIN(OughtShares) as min_val,\n  ROUND(AVG(CASE WHEN rn <= CAST(total*0.25 AS INT) THEN OughtShares END), 0) as p25,\n  ROUND(AVG(CASE WHEN rn <= CAST(total*0.50 AS INT) THEN OughtShares END), 0) as p50,\n  ROUND(AVG(CASE WHEN rn <= CAST(total*0.75 AS INT) THEN OughtShares END), 0) as p75,\n  MAX(OughtShares) as max_val\nFROM (\n  SELECT OughtShares, ROW_NUMBER() OVER (ORDER BY OughtShares) as rn, COUNT(*) OVER() as total\n  FROM lc_largeshsubscription WHERE OughtShares IS NOT NULL\n)\nUNION ALL\nSELECT \n  'ActualShares' as field,\n  MIN(ActualShares),\n  ROUND(AVG(CASE WHEN rn2 <= CAST(total2*0.25 AS INT) THEN ActualShares END), 0),\n  ROUND(AVG(CASE WHEN rn2 <= CAST(total2*0.50 AS INT) THEN ActualShares END), 0),\n  ROUND(AVG(CASE WHEN rn2 <= CAST(total2*0.75 AS INT) THEN ActualShares END), 0),\n  MAX(ActualShares)\nFROM (\n  SELECT ActualShares, ROW_NUMBER() OVER (ORDER BY ActualShares) as rn2, COUNT(*) OVER() as total2\n  FROM lc_largeshsubscription WHERE ActualShares IS NOT NULL\n)"
+          },
+          "output_preview": "返回 2 行\n          field  min_val       p25        p50        p75       max_val\n0   OughtShares    273.0  400742.0  2683951.0  7558283.0  6.598265e+08\n1  ActualShares      0.0       0.0     1098.0   821"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "\"two-channel\" \"channel\" fulfilment fulfillment oughtshares actualshares threshold 1000 5000"
+          },
+          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## Large Subscription Fulfillment Standard\n\n## Configure the two-channel fulfillment standard\n\nThe final shareholder list is not shown here. The video "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Let's check various threshold combinations to find what makes sense\n-- Look at the shareholders with OughtShares >= 1000 AND ActualShares >= 1000\n-- This is the standard \"1手\" threshold\n  \n-- First, let's see how many pass with 1000\nSELECT \n  'Threshold: 1000 shares' as criterion,\n  COUNT(*) as total_records,\n  SUM(CASE WHEN OughtShares >= 1000 AND (ActualShares >= 1000 OR ActualShares IS NULL) THEN 1 ELSE 0 END) as pass_channel1_ought,\n  SUM(CASE WHEN ActualShares >= 1000 THEN 1 ELSE 0 END) as pass_channel2_actual,\n  SUM(CASE WHEN OughtShares >= 1000 AND ActualShares >= 1000 THEN 1 ELSE 0 END) as both_pass\nFROM lc_largeshsubscription\nUNION ALL\nSELECT \n  'Threshold: 500 shares',\n  COUNT(*),\n  SUM(CASE WHEN OughtShares >= 500 AND (ActualShares >= 500 OR ActualShares IS NULL) THEN 1 ELSE 0 END),\n  SUM(CASE WHEN ActualShares >= 500 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN OughtShares >= 500 AND ActualShares >= 500 THEN 1 ELSE 0 END)\nFROM lc_largeshsubscription\nUNION ALL\nSELECT \n  'Threshold: 100 shares',\n  COUNT(*),\n  SUM(CASE WHEN OughtShares >= 100 AND (ActualShares >= 100 OR ActualShares IS NULL) THEN 1 ELSE 0 END),\n  SUM(CASE WHEN ActualShares >= 100 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN OughtShares >= 100 AND ActualShares >= 100 THEN 1 ELSE 0 END)\nFROM lc_largeshsubscription"
+          },
+          "output_preview": "返回 3 行\n                criterion  total_records  pass_channel1_ought  pass_channel2_actual  both_pass\n0  Threshold: 1000 shares            220                  107                   103        100\n1  "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Let me look at a breakdown of shareholders by their fulfillment status\nSELECT \n  CASE \n    WHEN OughtShares IS NULL AND (ActualShares IS NULL OR ActualShares = 0) THEN 'No data on either'\n    WHEN OughtShares IS NOT NULL AND (ActualShares IS NULL OR ActualShares = 0) THEN 'Has entitlement but no actual subscription'\n    WHEN OughtShares IS NULL AND ActualShares > 0 THEN 'Has actual but no entitlement record'\n    WHEN OughtShares > 0 AND ActualShares > 0 AND ActualShares >= OughtShares THEN 'Fully fulfilled (100%+)'\n    WHEN OughtShares > 0 AND ActualShares > 0 AND ActualShares < OughtShares THEN 'Partially fulfilled'\n  END as fulfillment_category,\n  COUNT(*) as cnt\nFROM lc_largeshsubscription\nGROUP BY fulfillment_category\nORDER BY cnt DESC"
+          },
+          "output_preview": "返回 5 行\n                         fulfillment_category  cnt\n0  Has entitlement but no actual subscription   91\n1                     Fully fulfilled (100%+)   53\n2                         Partially fulf"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- List the shareholders where BOTH channels pass (OughtShares>0 AND ActualShares>0)\n-- and where the shareholder name doesn't contain obvious institutional suffixes\nSELECT SHName, OughtShares, ActualShares, ChiNameAbbr, SecuCode\nFROM lc_largeshsubscription \nWHERE OughtShares > 0 AND ActualShares > 0\nORDER BY OughtShares DESC\nLIMIT 30"
+          },
+          "output_preview": "返回 30 行\n                SHName  OughtShares  ActualShares ChiNameAbbr SecuCode\n0   新疆广汇实业投资(集团)有限责任公司  659826544.0   659826544.0        广汇能源   600256\n1       云南合和(集团)股份有限公司  328410013.0   328410013.0 "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Check the 10,000 shares threshold as it's a common unit in Chinese markets\nSELECT \n  '10,000 shares (1万股)' as threshold_desc,\n  COUNT(*) as total,\n  SUM(CASE WHEN OughtShares >= 10000 THEN 1 ELSE 0 END) as ought_above_10k,\n  SUM(CASE WHEN ActualShares >= 10000 THEN 1 ELSE 0 END) as actual_above_10k,\n  SUM(CASE WHEN OughtShares >= 10000 AND ActualShares >= 10000 THEN 1 ELSE 0 END) as both_pass\nFROM lc_largeshsubscription\nUNION ALL\nSELECT \n  '5,000 shares',\n  COUNT(*),\n  SUM(CASE WHEN OughtShares >= 5000 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN ActualShares >= 5000 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN OughtShares >= 5000 AND ActualShares >= 5000 THEN 1 ELSE 0 END)\nFROM lc_largeshsubscription\nUNION ALL\nSELECT \n  '100,000 shares (10万股)',\n  COUNT(*),\n  SUM(CASE WHEN OughtShares >= 100000 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN ActualShares >= 100000 THEN 1 ELSE 0 END),\n  SUM(CASE WHEN OughtShares >= 100000 AND ActualShares >= 100000 THEN 1 ELSE 0 END)\nFROM lc_largeshsubscription"
+          },
+          "output_preview": "返回 3 行\n          threshold_desc  total  ought_above_10k  actual_above_10k  both_pass\n0    10,000 shares (1万股)    220              191               103        100\n1           5,000 shares    220      "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "-- Look at shareholders with small ActualShares values to understand the threshold\nSELECT SHName, OughtShares, ActualShares, ChiNameAbbr\nFROM lc_largeshsubscription \nWHERE ActualShares > 0 \nORDER BY ActualShares \nLIMIT 20"
+          },
+          "output_preview": "返回 20 行\n                 SHName  OughtShares  ActualShares ChiNameAbbr\n0                   李斯龙        273.0         273.0        天齐锂业\n1                   李斯龙        628.0         628.0        天齐锂业\n2  "
+        }
+      ]
+    }
+  ]
+}

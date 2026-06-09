@@ -1,0 +1,316 @@
+{
+  "task_id": "task_8",
+  "question": "Which fund company was established most recently?",
+  "answer": "\n\nLet me look at the investment advisor data to find the most recently established fund company.\n\n\n\nLet me check the relevant JSON file for establishment dates.\n\n\nThat's the trustee outline, not the investment advisor outline. Let me look at the investment advisor data more carefully.\n\n\nI can see the document has establishment dates for many fund companies. Let me read more to find the most recent ones.\n\n\nLet me continue reading to find all the establishment dates and see which is the most recent.\n\n\nLet me read the final sections to find the most recently established company.\n\n\n\n\n\nNow I have a comprehensive view. Let me extract the establishment dates systematically.\n\nLet me also check if there are any more recent companies after贝莱德基金 (2020年9月10日) by reading the end of the file.\n\n\n\n\n\nNow I have a comprehensive view. Let me compile the data on the most recently established fund companies from the document. Let me summarize the key establishment dates:\n\nFrom the document, I can extract these establishment dates for fund companies (investment advisors):\n\n- **国元证券**: 2001年10月15日\n- **中信证券**: 1995年10月25日\n- **国联安基金**: 2003年4月3日\n- **光大保德信基金**: 2004年4月22日\n- **汇添富基金**: 2005年2月3日\n- **汇丰晋信基金**: 2005年11月16日\n- **信达澳亚基金**: 2006年6月5日\n- **中邮创业基金**: 2006年5月8日\n- **天风证券**: 2000年3月29日\n- **中金公司**: 1995年7月31日\n- **山西证券**: 1988年7月28日\n- **东莞证券**: 1997年6月9日\n- **华安证券**: 2001年1月8日\n- **华夏基金**: 1998年4月9日\n- **嘉实基金**: 1999年3月25日\n- **融通基金**: 2001年5月22日\n- **财达证券**: 2002年4月25日\n- **诺德基金**: 2006年6月8日\n- **招商基金**: 2002年12月27日\n- **东方基金**: 2004年6月11日\n- **申万菱信基金**: 2004年1月15日\n- **太平洋证券**: 2004年1月6日\n- **西部利得基金**: 2010年7月20日\n- **华融证券**: 2007年9月7日\n- **浙商基金**: 2010年10月21日\n- **财通基金**: 2011年6月21日\n- **方正富邦基金**: 2011年7月8日\n- **国金基金**: 2011年11月2日\n- **太平基金**: 2013年1月23日\n- **鑫元基金**: 2013年8月29日\n- **国寿安保基金**: 2013年10月29日\n- **兴证资管**: 2014年6月9日\n- **北信瑞丰基金**: 2014年3月17日\n- **九泰基金**: 2014年7月3日\n- **中泰资管**: 2014年8月13日\n- **新沃基金**: 2015年8月19日\n- **东证融汇**: 2015年12月24日\n- **先锋基金**: 2016年5月16日\n- **格林基金**: 2016年11月1日\n- **博道基金**: 2017年6月12日\n- **合煦智远基金**: 2017年8月21日\n- **睿远基金**: 2018年10月29日\n- **同泰基金**: 2018年10月11日\n- **华融基金**: 2019年3月1日\n- **安信资管**: 2020年1月16日\n- **贝莱德基金**: 2020年9月10日\n\n**贝莱德基金（BlackRock）** 成立于 **2020年9月10日**，是其中最晚成立的。\n\nLet me also check the SQLite database for any additional investment advisor data.\n\n\n\n\n\n\n\n\n\n\n\n\nNow I have all the information needed. Let me compile the answer.\n\nFrom the `mf_investadvisoroutline.md` forensic audit report, I can extract the establishment dates of all investment advisor entities. Let me identify the most recently established ones:\n\nThe latest establishment dates found in the document are:\n\n1. **贝莱德基金 (BlackRock)** - 2020年9月10日\n2. **安信资管** - 2020年1月16日\n3. **华融基金** - 2019年3月1日\n4. **睿远基金** - 2018年10月29日\n5. **同泰基金** - 2018年10月11日\n\nLet me also check if there are any other fund companies in the JSON files.\n\n\n\n\n\n\nThat file contains fund-level establishment dates (for individual funds), not fund company establishment dates. The investment advisor outline document is the right source.\n\nBased on my thorough review of the `mf_investadvisoroutline.md` document, here's my finding:\n\n---\n\n## 🏆 最新成立的投资顾问公司：**贝莱德基金管理有限公司 (贝莱德基金 / BlackRock)**\n\n根据 `mf_investadvisoroutline.md` 法证审计报告的数据，**贝莱德基金管理有限公司**（InvestAdvisorCode: **72029943**）是成立时间最晚的基金公司，成立于 **2020年9月10日**。\n\n### 近年来成立的新基金公司排名\n\n| 排名 | 公司名称 | InvestAdvisorCode | 成立日期 | 组织形式 | 注册资本 |\n|:---:|:---|:---:|:---:|:---|:---:|\n| 🥇 | **贝莱德基金** | 72029943 | **2020年9月10日** | 外商独资企业(WFOE) | 3亿元 |\n| 🥈 | **安信资管** | 52953718 | 2020年1月16日 | 股份有限公司 | 10亿元 |\n| 🥉 | **华融基金** | 43662063 | 2019年3月1日 | 股份有限公司 | 2亿元 |\n| 4 | **睿远基金** | 10021432 | 2018年10月29日 | 内资企业 | 1亿元 |\n| 5 | **同泰基金** | 10026741 | 2018年10月11日 | 内资企业 | 1亿元 |\n| 6 | **合煦智远基金** | 290941 | 2017年8月21日 | 内资企业 | 1.05亿元 |\n| 7 | **博道基金** | 270964 | 2017年6月12日 | 股份有限公司 | 1亿元 |\n| 8 | **格林基金** | 255533 | 2016年11月1日 | 股份有限公司 | 1.5亿元 |\n| 9 | **先锋基金** | 238701 | 2016年5月16日 | 内资企业 | 1.5亿元 |\n| 10 | **东证融汇** | 229215 | 2015年12月24日 | 股份有限公司 | 7亿元 |\n\n> **关键发现：** 贝莱德基金是首家外商独资公募基金公司（WFOE），于2020年4月获批，2020年9月正式成立，标志着中国公募基金行业对外资全面开放进入新阶段。紧随其后的安信资管（2020年1月）则是券商资管子公司。",
+  "tool_log": [
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 50
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 1-50 行)\n---\n### 投资顾问实体身份认证与合规性审查法证审计报告\n\n文件编号: FA-REG-2023-77B\n审查日期: 2023年10月27日\n审查范围: 投资顾问实体识别码与注册名称一致性验证\n\n---\n\n1.0 实体审查发现\n\n本报告详细记录了对一系列投资顾问实体的识别信息进行的法证审查。审查旨在核实每个实体的注册全称、通用简称及其对应的监管机构分配代码 (`InvestAdvisorCode`) 的准确性与一致性。\n\n1.1 实体档案：348\n关于索引为 348 的实体，其监管档案代码确认为 348。该机构的注册法人名称为国元证券股份有限公司，在市场活动中通常使用简称国元证券。该公司的IT部门近期完成了一次针对其客户关系管理系统的安全补丁更新。此种名称与代码的直接对应关系简化了监管追踪流程。审查发现，其在所有公开披露文件中对全称与简称的使用均符合规范，未发现歧义。此外，该实体的访客登记系统于上季度进行了硬件升级。\n\n1.2 实体档案：1052\n经核查，与内部索引 3 关联的实体，其官方名称为中信证券股份有限公司。该实体被分配的 `InvestAdvisorCode` 是 1052，其市场通用简称为中信证券。此识别码在其所有历史报备材料中保持了一致性。该机构的品牌识别体系确保了其在各类媒体渠道中的形象统一。\n\n1.3 实体档案：2011\n索引条目 5 指向的实体是国联安基金管理有限公司。其对应的监管代码为 2011，并以国联安基金作为其官方简称。据后勤部门记录，该公司的办公区域照明系统正在进行节能改造评估。对该实体的审查确认，其名称与代码的匹配度无误，为后续的资产组合审计奠定了清晰的基础。该基金公司对其网站的用户隐私政策进行了年度例行更新。\n\n1.4 实体档案：2032\n对于索引为 13 的审查对象，其法律实体全称为光大保德信基金管理有限公司。该机构在监管体系内的识别代码为 2032，市场沟通中则使用光大保德信基金这一简称。此简称的使用频率在最近的季度报告中有所增加。该管理公司的档案完整性得到确认，其标识符在各数据库中均保持一致。\n\n1.5 实体档案：5131\n与索引 17 对应的实体，其 `InvestAdvisorCode` 被记录为 5131。该公司的注册全称为汇添富基金管理股份有限公司，并以汇添富基金作为其广为人知的简称。档案显示该公司最近参与了一项行业范围内的网络安全演习。这些核心身份信息的准确性对于评估其运营合规性至关重要。该公司的实体标识符在其整个运营历史中未发生过变更。\n\n1.6 实体档案：13469\n关于索引为 24 的实体，其档案显示其 `InvestAdvisorCode` 为 13469。该基金管理公司的正式名称为汇丰晋信基金管理有限公司，在业务中常被称为汇丰晋信基金。该机构的内部合规培训材料于近期进行了修订。审查确认，这家公司的名称和代码在其所有的监管申报文件中都得到了正确且一致的应用。这种一致性对于避免在跨市场交易中产生混淆至关重要。\n\n1.7 实体档案：19914\n索引 28 所对应的实体，其监管识别码初步报告为 19911，但经过与中央数据库的最终核对，已修正并确认为 19914。该机构的法定名称为信达澳亚基金管理有限公司，通常以信达澳亚基金的简称开展业务。对该实体的审查未发现其在名称使用上有任何违规行为。其企业社会责任报告中提及了对办公用品采购的环保政策调整。\n\n1.8 实体档案：20221\n与索引 29 相关的实体被识别为中邮创业基金管理股份有限公司。其 `InvestAdvisorCode` 为 20221，市场简称为中邮创业基金。该机构的灾备数据中心近期进行了一次成功的切换演练。这些身份信息的稳定性和准确性是其获得监管许可的先决条件。审查确认了这些标识符在所有相关合同与协议中的一致性。\n\n1.9 实体档案：22291\n索引条目 30 指向的实体是天风证券股份有限公司，其监管代码为 22291。该公司在公开文件中使用的简称为天风证券。该券商的客户服务热线系统在上个月进行了技术升级。此实体的识别信息清晰无误，为后续的财务报表分析提供了可靠的基础。\n\n1.10 实体档案：41076\n针对索引为 36 的实体，其监管代码 `InvestAdvisorCode` 确认为 41076。该实体以中国国际金融股份有限公司的法定名称进行注册，其广为人知的市场别名为中金公司。该公司的内部通讯平台最近增加了一个用于项目协作的新模块。该机构的名称与简称在行业内具有高度辨识度，其代码的准确性得到了验证。审查未发现任何使用非授权简称的情况。\n\n1.11 实体档案：41181\n经核查，与内部索引 40 关联的实",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "most recently established fund company establishment date",
+        "top_k": 5
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[knowledge.md] (得分: 0.033, 来源: hybrid)\ne fund manager. |\n| `performance` | Growth rate (return) achieved during the manager's tenure at a given fund. Expressed as a decimal or percentage. |\n\n### 2.6 Personal Information (`mf_personalinfo`)\n\nBiographical and demographic data for fund managers.\n\n| Column | Semantic Definition |\n|--------|-\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\n# Knowledge Guide: Enterprise Data Governance for `en-origin-ccks_fund`\n\n## 1. Business Context & Scope\n\nThis database supports a mutual fund analytics platform covering fund performance, portfolio holdings, fund manager profiles, benchmark comparisons, and fund company (investment advisor) metadata\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\nvestadvisorabbrname` | Abbreviated name of the fund management company. |\n| `establishmentdate` | Date the fund company was officially established. |\n\n---\n\n## 3. Metric Definitions & Calculation Logic\n\n| Metric | Source Table | Formula / Logic |\n|--------|-------------|-----------------|\n| Top N Fun\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\n-to-one per individual. |\n| Fund ↔ Manager | `mf_fundarchives.manager` (name-based) or via `mf_fundmanagernew` | Prefer `innercode`-based joins where available. |\n\n---\n\n## 5. Constraints & Conventions\n\n- Ranking Queries: Use `ORDER BY ... DESC LIMIT N` for \"top N\" questions. Default to descending un\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nalizedrrintwoyear` / `rrintenyear` / `rrsincethisyear` = fund returns. Column naming encodes the period; do not confuse 3-month benchmark with 3-month fund return unless schema confirms equivalence. |\n\n---\n\n## 8. Governance Notes\n\n- Primary Key Discipline: Always prefer `innercode` for fund-level jo",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_trusteeoutline.json",
+        "max_lines": 100
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_trusteeoutline.json (37 行, 18 列，显示第 1-37 行)\n列: id(int64), TrusteeCode(int64), TrusteeName(object), AbbrChiName(object), LegalRepr(object), TrusteeFunctionary(object), LinkMan(object), EstablishmentDate(object), OrganizationForm(object), RegCapital(float64), RegAddr(object), OfficeAddr(object), ZipCode(object), WebSite(object), Email(object), ContactAddr(object), Tel(object), Fax(object)\n---\n    id  TrusteeCode     TrusteeName AbbrChiName LegalRepr TrusteeFunctionary    LinkMan    EstablishmentDate OrganizationForm    RegCapital                      RegAddr                                              OfficeAddr ZipCode                           WebSite                        Email                                             ContactAddr                                                Tel                         Fax\n0    1            3      平安银行股份有限公司        平安银行       谢永林                陈正涛         潘琦  1987-12-22 00:00:00           股份有限公司  1.940592e+10              广东省深圳市深南东路5047号                                         广东省深圳市深南东路5047号    None                              None                         None                                         广东省深圳市深南东路5047号                    0755-82088761 22166596 22168257                        None\n1    2          378      广发证券股份有限公司        广发证券       孙树明                林治海        崔瑞娟  1994-01-21 00:00:00           股份有限公司  7.621088e+09   广东省广州市黄埔区中新广州知识城腾飞一街2号618室  广州市天河区天河北路183-187号大都会广场5、7、18、19、36、38、39、41、42、43和44楼  510075                     www.gf.com.cn                         None  广州市天河区天河北路183-187号大都会广场5、7、18、19、36、38、39、41、42、43和44楼                                       020-87555888                020-87553600\n2    3         1030  上海浦东发展银行股份有限公司        浦发银行       高国富               None         胡波  1992-10-19 00:00:00           股份有限公司  2.935200e+10                  上海市中山东一路12号                                             上海市中山东一路12号  200002                   www.spdb.com.cn              bdo@spdb.com.cn           ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 200,
+        "start_line": 100
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 101-300 行)\n---\n索引 112 对应的实体，其 `InvestAdvisorCode` 记录为 176635。该公司的注册全称为瑞银资产管理(香港)有限公司，并以瑞银资产管理(香港)作为其简称。此实体的跨境运营性质要求其身份标识符在不同司法管辖区内保持高度一致。审查确认，其在相关市场的披露文件中正确使用了这些标识信息。\n\n---\n报告结束\n\n好的，遵从指示。延续“Forensic Audit Report”文风，无缝衔接上一节内容，并对新增数据段应用指定的战略压力测试协议。\n\n*\n\n2.0 进一步的实体识别验证\n\n本节继续对补充的投资顾问实体名单进行法证审查，验证其注册信息与监管代码的匹配性，确保数据链的完整与准确。\n\n2.1 实体档案：183834\n关于内部索引为 117 的实体，其监管档案代码确认为 183834。该机构的注册法人名称为鑫元基金管理有限公司，在市场活动中通常使用简称鑫元基金。该公司的IT部门报告称，其电子邮件归档系统的存储容量已于上月扩容。此种名称与代码的直接对应关系，为后续审计其旗下产品提供了坚实基础。审查发现，其在所有公开披露文件中对全称与简称的使用均符合规范，未发现歧义。\n\n2.2 实体档案：184414\n经核查，与内部索引 120 关联的实体，其官方名称为国寿安保基金管理有限公司。该实体被分配的 `InvestAdvisorCode` 是 184414，其市场通用简称为国寿安保基金。该机构的品牌识别体系确保了其在各类媒体渠道中的形象统一。此识别码在其所有历史报备材料中保持了一致性，未发现任何偏差。此外，该实体的访客登记系统于上季度进行了软件升级。\n\n2.3 实体档案：185349\n索引条目 126 指向的资产管理机构，其监管代码在初步审查中被记录为 185340，但经过与中央注册数据库的交叉验证，最终确认为 185349。该实体的法定全称为广发证券资产管理(广东)有限公司，并以广发资管作为其业务简称。据后勤部门记录，该公司的办公区域正在进行新一轮的消防系统维护。对该实体的审查确认，其名称与代码的匹配度无误，为后续的合规性评估奠定了清晰的基础。\n\n2.4 实体档案：185416\n对于索引为 127 的审查对象，其法律实体全称为中金基金管理有限公司。该机构在监管体系内的识别代码为 185416，市场沟通中则使用中金基金这一简称。此简称的使用频率在最近的季度报告中保持稳定。该管理公司的档案完整性得到确认，其标识符在各数据库中均保持一致，未见异常。\n\n2.5 实体档案：187215\n与索引 129 对应的资产管理实体，其 `InvestAdvisorCode` 被记录为 187215。这家机构的注册全称为兴证证券资产管理有限公司，并以兴证资管作为其广为人知的简称。档案显示该公司最近参与了一项行业范围内的反洗钱培训。这些核心身份信息的准确性对于评估其运营风险至关重要。\n\n2.6 实体档案：187244\n关于索引为 130 的实体，其档案显示其 `InvestAdvisorCode` 为 187244。该基金管理公司的正式名称为北信瑞丰基金管理有限公司，在业务中常被称为北信瑞丰基金。该机构的内部合规手册于近期根据最新的监管要求进行了修订。审查确认，这家公司的名称和代码在其所有的监管申报文件中都得到了正确且一致的应用。\n\n2.7 实体档案：187360\n索引 131 所对应的实体，其监管识别码为 187360。该机构的法定名称为九泰基金管理有限公司，并使用由两个汉字组成的简称九泰基金开展业务。对该实体的审查未发现其在名称使用上有任何违规行为。其企业差旅报销系统最近增加了一个用于碳足迹追踪的附加模块。\n\n2.8 实体档案：201166\n与索引 136 相关的实体，其 `InvestAdvisorCode` 确认为 201166。该机构的法律全称，即长江证券(上海)资产管理有限公司，明确指出了其主要运营地点。该公司的市场简称为长江资管。这些身份信息的稳定性和准确性是其获得监管许可的先决条件。其人力资源部门正在试点一个新的员工在线学习平台。\n\n2.9 实体档案：202196\n索引条目 138 指向的实体是中泰证券(上海)资产管理有限公司，其监管代码为 202196。该公司在公开文件中使用的简称为中泰资管。此实体的识别信息清晰无误，为后续的财务报表分析提供了可靠的基础。\n\n2.10 实体档案：209234\n针对索引为 142 的实体，其监管代码 `InvestAdvisorCode` 确认为 209234。该实体以新沃基金管理有限公司的法定名称进行注册，其市场别名为新沃基金。该公司的内部通讯平台最近升级了其即时消息功能。该",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 200,
+        "start_line": 300
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 301-500 行)\n---\n4.6 实体档案：187215 (兴证资管)\n索引 129 对应的实体（兴证资管），其组织形式被明确记录为股份有限公司。其注册资本金为 800,000,000 元。该公司在2014年6月9日宣告成立，并被批准进行长期经营，无固定终止日期。\n\n4.7 实体档案：187244 (北信瑞丰基金)\n关于索引为 130 的实体（北信瑞丰基金），其组织形式为内资企业。一份过时的备案草稿将其注册资本误记为1.75亿元，但所有官方文件均正确显示其资本为 170,000,000 元。其成立日期为 2014年3月17日，公司章程中未设定经营期限。该实体的法律部门最近订阅了一项关于资产管理行业法规的更新服务。\n\n4.8 实体档案：187360 (九泰基金)\n与索引 131 相关的实体（九泰基金）是一家内资企业。其注册资本金为 300,000,000 元。该机构成立于二零一四年七月三日，其经营许可为长期有效。\n\n4.9 实体档案：202196 (中泰资管)\n索引 138 指向的实体（中泰资管）的组织形式为内资企业。该公司的注册资本金被核实为 166,660,000 元。其成立日期可追溯至2014年8月13日，其营业执照上未设定明确的到期日。\n\n4.10 实体档案：209234 (新沃基金)\n索引为 142 的实体（新沃基金）是一家内资企业。其注册资本金最初记录为1.3亿元，经精确核对后，确认为 135,000,000 元。该机构的成立时间为2015年8月19日，其经营期限为长期。其合规团队近期完成了一次对员工社交媒体使用政策的年度审查。\n\n4.11 实体档案：229215 (东证融汇)\n与索引 146 相关的实体（东证融汇）采用股份有限公司的组织形式。其注册资本为 700,000,000 元。该公司成立于二零一五年十二月二十四日，无固定经营期限。\n\n4.12 实体档案：238701 (先锋基金)\n索引 151 指向的实体（先锋基金），其法律结构为内资企业。其注册资本为 150,000,000 元。该公司的成立日期为 2016年5月16日，其经营活动无预设的终止日期。\n\n4.13 实体档案：255533 (格林基金)\n关于索引 153 的实体（格林基金），其组织形式为股份有限公司。其注册资本金规模为一点五亿元人民币。该公司于二零一六年十一月一日成立，并被授权进行长期经营。其设施管理团队正在计划对公司总部的安防系统进行升级。\n\n4.14 实体档案：270964 (博道基金)\n索引 157 对应的实体（博道基金）的组织形式被明确界定为股份有限公司。其注册资本为 100,000,000 元。该机构的成立日期为2017年6月12日，其公司章程中未设定具体的经营终止日期。\n\n4.15 实体档案：290941 (合煦智远基金)\n与索引 161 相关的实体（合煦智远基金），其法律结构为内资企业。一份内部审计文件曾提及资本金约为1.05亿元，经核实其精确注册资本为 105,152,471 元。该公司成立于2017年8月21日，无固定经营期限。\n\n4.16 实体档案：10021432 (睿远基金)\n索引 165 指向的实体（睿远基金）是一家内资企业。其注册资本为 100,000,000 元。其成立日期为二零一八年十月二十九日，其经营许可中未包含到期日条款。\n\n4.17 实体档案：10026741 (同泰基金)\n关于索引 167 的实体（同泰基金），其组织形式为内资企业。其注册资本金被记录为 100,000,000 元。该公司于2018年10月11日成立，其经营期限为长期。\n\n4.18 实体档案：43662063 (华融基金)\n索引 169 对应的实体（华融基金）是一家股份有限公司。其注册资本为两亿元人民币。该机构成立于二零一九年三月一日，其营业执照显示为无固定经营期限。该公司的档案中包含了一份关于其数据备份和恢复策略的年度审查报告。\n\n4.19 实体档案：52953718 (安信资管)\n索引 170 的实体（安信资管），其注册类型为股份有限公司。其注册资本金在增资前的记录为8亿元，增资后已核实为1,000,000,000 元。该机构的运营始于2020年1月16日，其经营许可未设定终止日期。\n\n4.20 实体档案：72029943 (贝莱德基金)\n与索引 177 相关的实体（贝莱德基金），其组织形式在注册文件中被描述为其他性质，这通常指代外商独资企业（WFOE）等特定结构。其注册资本为 300,000,000 元。该公司成立于2020年9月10日，经营期限为长期。\n\n---\n报告章节结束\n\n好的，遵从指示。延续“Forensic Audit Report”",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 200,
+        "start_line": 500
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 501-700 行)\n---\n对于索引 161 的实体（合煦智远基金），其法定代表人为郑旭。总经理职务由李骥担任。负责协调沟通的联络人是戚悦。该公司最近为其员工组织了一场关于职业健康的在线讲座。\n\n6.16 实体档案：10021432 (睿远基金)\n经查证，索引 165 的实体（睿远基金）的法定代表人与总经理职务均由陈光明担任。负责协调沟通的联络人是祝彬涵。该管理层结构在业内具有较高的知名度。\n\n6.17 实体档案：10026741 (同泰基金)\n索引 167 指向的实体（同泰基金），其法定代表人和总经理为马俊生。值得注意的是，该公司的对外联络人职责由多人共同承担，记录显示为赵晓勤和吴宇擎。这种共享联络人职责的安排需要确保信息传递的内部协调机制是有效的。\n\n6.18 实体档案：43662063 (华融基金)\n关于索引 169 的实体（华融基金），其法定代表人为杨铭海，总经理为丁卓。主要联络人是李美玉。该公司最近续签了其办公场地的租赁协议。\n\n6.19 实体档案：52953718 (安信资管)\n索引 170 的实体（安信资管），其法定代表人和总经理的职责由李力统一履行。公司的指定联络人是常伟。此种管理架构自该公司成立以来未发生变动。\n\n6.20 实体档案：72029943 (贝莱德基金)\n与索引 177 相关的实体（贝莱德基金），其法定代表人与总经理均为张弛。然而，在审查过程中，该实体未能提供指定的官方联络人信息。此信息缺口已被正式标记为待解决事项，并已向该机构发出补充信息请求。\n\n---\n报告章节结束\n\n好的，遵从指示。延续“Forensic Audit Report”文风，无缝衔接上一节内容，并对新增的地址与区域数据应用指定的战略压力测试协议。\n\n*\n\n7.0 实体物理地址与通讯地址验证\n\n本审计报告的此一章节旨在对各投资顾问实体的注册地址、实际办公地址及通讯地址进行法证核查。审查的目的是验证其物理存在的合法性，评估其运营地点的分离情况，并确保所有地址信息在监管档案中的准确性。\n\n7.1 实体档案：348 (国元证券)\n关于索引为 348 的实体（国元证券），其所有地址信息表现出高度一致性。该机构的法定注册地址、其实际办公场所及其指定的通讯地址均位于合肥市梅山路18号安徽国际金融中心A座。该办公楼近期升级了其访客管理系统。这种地址的统一性简化了监管送达和现场检查的流程。该区域的邮政编码被确认为 230001，其注册地在行政上隶属于合肥市。\n\n7.2 实体档案：1052 (中信证券)\n索引为 3 的实体（中信证券）的地址审查揭示了一个关键的地域分离现象。该公司的法定注册地位于广东省深圳市福田区中心三路8号卓越时代广场（二期）北座。然而，其核心运营中心及主要通讯地址则设在北京市朝阳区亮马桥路48号中信证券大厦。此种“注册地与经营地分离”的模式在大型金融机构中较为常见，但需要确保两地均符合相关法规。其北京办公地址的邮政编码为 100026，而其注册地则在深圳市管辖范围内。\n\n7.3 实体档案：2011 (国联安基金)\n经查证，索引为 5 的实体（国联安基金）的所有地址均位于中国（上海）自由贸易试验区陆家嘴环路1318号星展银行大厦9楼。该办公地址的邮政编码为 200121。该机构注册于上海，其物理位置和通讯地址的统一性确保了信息传递的效率。该大厦的物业管理公司最近组织了一次消防疏散演习。\n\n7.4 实体档案：2032 (光大保德信基金)\n对于索引为 13 的实体（光大保德信基金），其注册地址为上海市黄浦区中山东二路558号外滩金融中心1幢，6层。其办公与通讯地址则扩展至同一栋楼的6-7层及10层。这种在同一建筑物内的楼层扩展反映了公司业务的增长。该地点的邮政编码为 200010，位于上海市核心金融区。\n\n7.5 实体档案：5131 (汇添富基金)\n索引为 17 的实体（汇添富基金），其注册地址位于上海市黄浦区北京东路666号H区（东座）6楼H686室。然而，其主要办公和通讯地址则位于上海市黄浦区外马路728号。这种地址的分离需要确保所有法律文书均能有效送达至其注册地址。这两个地址均位于上海市黄浦区，邮政编码均为 200010。\n\n7.6 实体档案：13469 (汇丰晋信基金)\n索引 24 对应的实体（汇丰晋信基金），其注册、办公及通讯地址完全一致，均位于上海市浦东新区世纪大道8号上海国金中心汇丰银行大楼17楼。该地址的邮政编码为 200120，行政区域为上海。该办公楼的安保协议要求所有访客必须提前预约登记。\n\n7.7 实体档案：19914 (信达澳亚基金)\n关于索引 28 的实体（信达澳亚基金），其注册地址在广东省深圳市南山区科苑南路（深圳湾段",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 200,
+        "start_line": 700
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 701-889 行)\n---\n9.1 实体档案：348 (国元证券)\n对于索引为 348 的实体（国元证券），其提供了多层级的联系方式。电子问询可发送至两个邮箱地址：95578@gyzq.com.cn 和 dshbgs@gyzq.com.cn。其总机电话线路包括 0551-62201256、62207323 及 62207968。该公司的传真号码为 0551-62207322，其官方网站托管于域名 www.gyzq.com.cn。客户服务可通过两条热线接入，分别为 95578 和 4008888777。\n\n9.2 实体档案：1052 (中信证券)\n经查证，索引为 3 的实体（中信证券）的官方电子邮箱为 inquiry@citics.com。该公司设有多个地区的联系电话，包括北京总部的 010-60838888、010-60836029，以及青岛和杭州的分支机构号码。其官方网站为 www.citics.com。客户服务热线最初记录为95540，但经与官方公告核对后，确认为 95548。\n\n9.3 实体档案：2011 (国联安基金)\n索引为 5 的实体（国联安基金）的客户服务邮箱为 customer.service@cpicfunds.com。其总机电话是 021-38992888，传真号码为 021-50151880。该机构的官方网站是 www.cpicfunds.com。该公司的IT部门近期完成了一次针对其官方网站的DDOS攻击压力测试。其客户服务热线包括 021-38784766 和全国统一号码 4007000365。\n\n9.4 实体档案：2032 (光大保德信基金)\n对于索引为 13 的实体（光大保德信基金），其电子邮箱为 epfservice@epf.com.cn。该公司提供了多个电话号码，如 021-80262888 等。其传真线路同样有多个号码，包括 021-80262468 和 021-80262482。其官方网站为 www.epf.com.cn，客户服务热线是 4008202888。\n\n9.5 实体档案：5131 (汇添富基金)\n索引为 17 的实体（汇添富基金），其服务邮箱为 service@99fund.com。其联系电话为 021-28932888，传真号码是 021-28932998。该公司的官方网站域名为 www.99fund.com。客户服务热线是 4008889918。该公司的内部通讯系统最近增加了一个用于紧急通知的广播功能。\n\n9.6 实体档案：13469 (汇丰晋信基金)\n索引 24 对应的实体（汇丰晋信基金），其电子通讯地址为 `services` 邮箱，后缀为其官网域名 `hsbcjt.cn`。其总机电话为 021-20376868 和 20376789，传真号码为 021-20376999 和 20376998。其官方网站是 www.hsbcjt.cn，客户服务电话为 021-20376888。\n\n9.7 实体档案：19914 (信达澳亚基金)\n关于索引 28 的实体（信达澳亚基金），其服务邮箱为 service@fscinda.com。其联系电话为 0755-83172666，传真号码为 0755-83196151 和 83199091。其官方网站为 www.fscinda.com。客户服务热线包括 0755-83160160 和 4008888118。\n\n9.8 实体档案：20221 (中邮创业基金)\n与索引 29 相关的实体（中邮创业基金），其官方邮箱为 info@postfund.com.cn。其总机电话 010-82295160 与其传真分机号 010-82295160-121 共享同一主号。其官方网站为 www.postfund.com.cn，客户服务热线是 4008801618。\n\n9.9 实体档案：22291 (天风证券)\n索引 30 指向的实体（天风证券），其服务邮箱为 service@tfzq.com。其联系电话包括 021-68815327 和客服短号 95391。传真号码为 027-87618863。其官方网站为 www.tfzq.com，全国服务热线是 4008005000。该机构的客户关系管理系统（CRM）计划在下一财年进行一次重大升级。\n\n9.10 实体档案：41076 (中金公司)\n对于索引 36 的实体（中金公司），其信息邮箱为 info@cicc.com.cn。其总机电话为 010-65051166，传真号码是 010-65051156。其官方网站为 www.cicc.com。然而，在本次审查的档案中，该公司的指定客户服务热线信息未能提供。\n\n9.11 实体档案：41",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_investadvisoroutline.md",
+        "max_lines": 100,
+        "start_line": 820
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_investadvisoroutline.md (共 889 行，显示第 821-889 行)\n---\n关于索引 131 的实体（九泰基金），其服务邮箱为 service@jtamc.com。其联系电话为 010-57383999，传真号码为 010-57383867。其官方网站为 www.jtamc.com，客户服务热线是 4006280606。\n\n10.8 实体档案：201166 (长江资管)\n与索引 136 相关的实体（长江资管），其官方邮箱为 cjzg-service@cjsc.com。其联系电话为 021-80301221，传真号码是 021-80301399。其官方网站为 www.cjzcgl.com，客户服务热线是 4001166866。\n\n10.9 实体档案：202196 (中泰资管)\n索引 138 指向的实体（中泰资管），提供了两个指定联系邮箱：xuht@ztzqzg.com 和 cuisr@ztzqzg.com。其提供了多个电话号码，包括 021-20521111 和 021-68883772。其官方网站为 www.ztzqzg.com，并提供了多个服务电话，如 021-20521115。该机构的档案室正在进行数字化归档项目。\n\n10.10 实体档案：209234 (新沃基金)\n对于索引 142 的实体（新沃基金），其信息邮箱为 service@sinvofund.com。其总机电话为 010-58290600，传真号码是 010-58290555。其官方网站为 www.sinvofund.com，客户服务热线是 4006989988。\n\n10.11 实体档案：229215 (东证融汇)\n关于索引 146 的实体（东证融汇），其联系电话为 021-20361175 和 20361060。其官方网站为 www.nesc.cn，服务电话是 021-20361067。审计记录显示，该实体的官方电子邮箱和传真号码信息均缺失，此为一处显著的信息不完整。\n\n10.12 实体档案：238701 (先锋基金)\n索引 151 的实体（先锋基金）的官方邮箱为 service@xf-fund.com。其联系电话组包括 010-58239853、58239860 等号码。其传真号码是 010-58239896。该公司的官方网站为 www.xf-fund.com，并提供了 4008159998 和 010-58239829 两条服务热线。\n\n10.13 实体档案：255533 (格林基金)\n索引 153 指向的实体（格林基金），其邮箱为 services@china-greenfund.com。其电话线路包括 010-50890730 等多个号码。其传真号码为 010-50890775。其官方网站域名 www.china-greenfund.com 体现了其品牌特性，服务热线是 4001000501。\n\n10.14 实体档案：270964 (博道基金)\n索引 157 的实体（博道基金）的服务邮箱为 services@bdfund.cn。其联系电话为 021-80226288，传真号码是 021-80226289。其官方网站为 www.bdfund.com.cn，全国服务热线是 4000852888。该公司的社交媒体账号近期发布了一系列关于市场分析的帖子。\n\n10.15 实体档案：290941 (合煦智远基金)\n索引 161 的实体（合煦智远基金），其电子通讯地址为 service@uvasset.com。其联系电话为 0755-21835858，传真号码是 0755-21835850。其官方网站为 www.uvasset.com，服务热线是 4009835858。\n\n10.16 实体档案：10021432 (睿远基金)\n索引 165 指向的实体（睿远基金），其服务邮箱为 service@foresightfund.com。其联系电话为 021-38173000，传真号码是 021-38173001。其官方网站为 www.foresightfund.com，客户服务热线是 4009201000。\n\n10.17 实体档案：10026741 (同泰基金)\n关于索引 167 的实体（同泰基金），其官方邮箱为 services@tongtaiamc.com。其提供了包括 0755-23537899 在内的多个电话号码，以及 0755-23537801 等多个传真号码。其官方网站为 www.tongtaiamc.com，服务热线是 4008301666。\n\n10.18 实体档案：43662063 (华融基金)\n索引 169 的实体（华融基金）的服务邮箱为 service@hr-fund.com.cn。其主要联系电话为客服短号 95",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 25 行\n                         name\n0           mf_fmperfanalysis\n1                 mf_dividend\n2     mf_bondportifoliodetail\n3       mf_fcretscaleanalysis\n4        mf_keystockportfolio\n5            mf_chargeratenew\n6       mf_fmretscaleanalysis\n7             mf_personalinfo\n8   mf_netvalueperformancehis\n9         mf_advisorscalerank\n10         mf_assetallocation\n11                  mf_awards\n12          mf_fcretscalerank\n13        mf_fmscaleanalysisn\n14          mf_fmtermanalysis\n15          mf_fundreturnrank\n16           mf_fundrisklevel\n17          mf_investindustry\n18                mf_netvalue\n19     mf_mainfinancialindexq\n20            mf_fundarchives\n21          mf_fcnumofmanager\n22          mf_trusteeoutline\n23          mf_fundmanagernew\n24       mf_managerexperience",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 5 行\n   id  InnerCode                 ChiName     ChiNameAbbr SecuAbbr SecuCode SecuMarket SecuCategory ListedSector Type FundNature InvestmentType InvestStyle FundType              RegInst                                                                                                                                                               InvestOrientation                                                                              InvestTarget                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       InvestField                  PerformanceBenchMark                                                               RiskReturncharacter                                                                                              ProfitDistributionRule                                                                                                                                                                                                                                                           BriefIntro FloatType   FoundedSize    EstablishmentDate           ListedDate Duration            StartDate ExpireDate  Manager InvestAdvisorName     TrusteeName                                                                                                                                                                                                                                       LowestSumSubscribing  LowestSumSubLL  LowestSumPurLL  LowestSumRedemption                                                 LSFRDescription  LowestSumForHolding                         ",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 2 行\n                  name\n0  mf_advisorscalerank\n1    mf_investindustry",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 5 行\n   id  InnerCode               ChiName    ChiNameAbbr SecuCode SecuAbbr InvestType      IndustryName   MarketValue  RatioInNV\n0   1       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   160505       综合投资            行业投资合计  8.038062e+09   0.890800\n1   2       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   160505       综合投资               制造业  6.155553e+09   0.682100\n2   3       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   160505       综合投资  电力、热力、燃气及水生产和供应业  2.162828e+08   0.024000\n3   4       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   160505       综合投资               建筑业  4.713800e+03   0.000001\n4   5       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   160505       综合投资            批发和零售业  1.332115e+05   0.000015",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 5 行\n   id  InvestAdvisorCode  TotalFundN  EquityFundN  EquityNRank  AdvisorOfEquity  HybridFundN  HybridNRank  AdvisorOfHybrid  BondFundN  BondNRank  AdvisorOfBond  MonetaryFundN  MonetaryNRank  AdvisorOfMonetary  ShortBondFundN ShortBondNRank  AdvisorOfShortBond QDIINV QDIINVRank  QDIIN  QDIINRank  AdvisorOfQDII  FundNRank  TotalAdvisor UnMSBFNV UnMSBFNVRank  UnMSBFN  UnMSBFNRank  AdvisorOfUnMSBF ActiveEFNV ActiveEFNVRank  ActiveEFN  ActiveEFNRank  AdvisorOfActiveEF\n0   1                348           3            0          NaN              122            0          NaN              166          3      120.0            162              0            NaN                117               0           None                   0   None       None      0        NaN             37        153           181     None         None        3          152              181       None           None          0            NaN                100\n1   2                360           3            1        101.0              122            0          NaN              166          2      131.0            162              0            NaN                117               0           None                   0   None       None      0        NaN             37        153           181     None         None        3          152              181       None           None          1           72.0                100\n2   3               1052          16            1        101.0              122            9         99.0              166          6      102.0            162              0            NaN                117               0           None                   0   None       None      0        NaN             37        112           181     None         None       16          105              181       None           None          1           72.0                100\n3   4               2008         146           31         19.0              122           78         15.0              16",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "read_file",
+      "input": {
+        "filename": "mf_fundarchives.json",
+        "max_lines": 10
+      }
+    },
+    {
+      "phase": "result",
+      "name": "read_file",
+      "content": "文件: mf_fundarchives.json (1079 行, 44 列，显示第 1-10 行)\n列: id(int64), InnerCode(int64), ChiName(object), ChiNameAbbr(object), SecuAbbr(object), SecuCode(object), SecuMarket(object), SecuCategory(object), ListedSector(object), Type(object), FundNature(object), InvestmentType(object), InvestStyle(object), FundType(object), RegInst(object), InvestOrientation(object), InvestTarget(object), InvestField(object), PerformanceBenchMark(object), RiskReturncharacter(object), ProfitDistributionRule(object), BriefIntro(object), FloatType(object), FoundedSize(float64), EstablishmentDate(object), ListedDate(object), Duration(float64), StartDate(object), ExpireDate(object), Manager(object), InvestAdvisorName(object), TrusteeName(object), LowestSumSubscribing(object), LowestSumSubLL(float64), LowestSumPurLL(float64), LowestSumRedemption(float64), LSFRDescription(object), LowestSumForHolding(float64), LSFHDescription(object), PRconfirmationdate(object), DeliveryDays(float64), IfInitiatingFund(object), IfPensionTarget(object), IfFOF(object)\n---\n   id  InnerCode                    ChiName        ChiNameAbbr SecuAbbr SecuCode SecuMarket SecuCategory ListedSector Type FundNature InvestmentType InvestStyle FundType              RegInst                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             InvestOrientation                                                                                                                                           InvestTarget                                                                                                                                ",
+      "is_error": false
+    }
+  ],
+  "events": [
+    {
+      "type": "done",
+      "usage": {
+        "input_tokens": 377671,
+        "output_tokens": 2640
+      },
+      "tool_calls_log": [
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 50
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 1-50 行)\n---\n### 投资顾问实体身份认证与合规性审查法证审计报告\n\n文件编号: FA-REG-2023-77B\n审查日期: 2023年10月27日\n审查范围: 投资顾问实体识别码与注册名称一致性验证\n\n---\n\n1.0 实体审查发现\n\n本报告详细记录了对一系列投资顾问实体的识别信息进行的法证审查。审"
+        },
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "most recently established fund company establishment date",
+            "top_k": 5
+          },
+          "output_preview": "[knowledge.md] (得分: 0.033, 来源: hybrid)\ne fund manager. |\n| `performance` | Growth rate (return) achieved during the manager's tenure at a given fund. Expressed as a decimal or percentage. |\n\n### 2.6 P"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_trusteeoutline.json",
+            "max_lines": 100
+          },
+          "output_preview": "文件: mf_trusteeoutline.json (37 行, 18 列，显示第 1-37 行)\n列: id(int64), TrusteeCode(int64), TrusteeName(object), AbbrChiName(object), LegalRepr(object), TrusteeFunctionary(object), LinkMan(object), Establish"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 200,
+            "start_line": 100
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 101-300 行)\n---\n索引 112 对应的实体，其 `InvestAdvisorCode` 记录为 176635。该公司的注册全称为瑞银资产管理(香港)有限公司，并以瑞银资产管理(香港)作为其简称。此实体的跨境运营性质要求其身份标识符在不同司法管辖区内保持高度一致。审查确认，其在相关市场的披露文件中正确"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 200,
+            "start_line": 300
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 301-500 行)\n---\n4.6 实体档案：187215 (兴证资管)\n索引 129 对应的实体（兴证资管），其组织形式被明确记录为股份有限公司。其注册资本金为 800,000,000 元。该公司在2014年6月9日宣告成立，并被批准进行长期经营，无固定终止日期。\n\n4.7 实体档案：187244 (北信瑞"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 200,
+            "start_line": 500
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 501-700 行)\n---\n对于索引 161 的实体（合煦智远基金），其法定代表人为郑旭。总经理职务由李骥担任。负责协调沟通的联络人是戚悦。该公司最近为其员工组织了一场关于职业健康的在线讲座。\n\n6.16 实体档案：10021432 (睿远基金)\n经查证，索引 165 的实体（睿远基金）的法定代表人与总经理职"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 200,
+            "start_line": 700
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 701-889 行)\n---\n9.1 实体档案：348 (国元证券)\n对于索引为 348 的实体（国元证券），其提供了多层级的联系方式。电子问询可发送至两个邮箱地址：95578@gyzq.com.cn 和 dshbgs@gyzq.com.cn。其总机电话线路包括 0551-62201256、62207323 及"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_investadvisoroutline.md",
+            "max_lines": 100,
+            "start_line": 820
+          },
+          "output_preview": "文件: mf_investadvisoroutline.md (共 889 行，显示第 821-889 行)\n---\n关于索引 131 的实体（九泰基金），其服务邮箱为 service@jtamc.com。其联系电话为 010-57383999，传真号码为 010-57383867。其官方网站为 www.jtamc.com，客户服务热线是 4006280606。\n\n10.8 实体档案：201166"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT name FROM sqlite_master WHERE type='table'"
+          },
+          "output_preview": "返回 25 行\n                         name\n0           mf_fmperfanalysis\n1                 mf_dividend\n2     mf_bondportifoliodetail\n3       mf_fcretscaleanalysis\n4        mf_keystockportfolio\n5           "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM mf_fundarchives LIMIT 5"
+          },
+          "output_preview": "返回 5 行\n   id  InnerCode                 ChiName     ChiNameAbbr SecuAbbr SecuCode SecuMarket SecuCategory ListedSector Type FundNature InvestmentType InvestStyle FundType              RegInst         "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT name FROM sqlite_master WHERE name LIKE '%advisor%' OR name LIKE '%invest%'"
+          },
+          "output_preview": "返回 2 行\n                  name\n0  mf_advisorscalerank\n1    mf_investindustry"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM mf_investindustry LIMIT 5"
+          },
+          "output_preview": "返回 5 行\n   id  InnerCode               ChiName    ChiNameAbbr SecuCode SecuAbbr InvestType      IndustryName   MarketValue  RatioInNV\n0   1       2937  博时主题行业混合型证券投资基金(LOF)  博时主题行业混合(LOF)     博时主题   16"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM mf_advisorscalerank LIMIT 5"
+          },
+          "output_preview": "返回 5 行\n   id  InvestAdvisorCode  TotalFundN  EquityFundN  EquityNRank  AdvisorOfEquity  HybridFundN  HybridNRank  AdvisorOfHybrid  BondFundN  BondNRank  AdvisorOfBond  MonetaryFundN  MonetaryNRank  Ad"
+        },
+        {
+          "name": "read_file",
+          "input": {
+            "filename": "mf_fundarchives.json",
+            "max_lines": 10
+          },
+          "output_preview": "文件: mf_fundarchives.json (1079 行, 44 列，显示第 1-10 行)\n列: id(int64), InnerCode(int64), ChiName(object), ChiNameAbbr(object), SecuAbbr(object), SecuCode(object), SecuMarket(object), SecuCategory(object), L"
+        }
+      ]
+    }
+  ]
+}

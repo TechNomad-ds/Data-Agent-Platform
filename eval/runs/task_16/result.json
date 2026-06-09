@@ -1,0 +1,296 @@
+{
+  "task_id": "task_16",
+  "question": "When did patient 40059 first have the maximum number of anion gap during their current hospital encounter?",
+  "answer": "\n\nLet me start by exploring the data to understand what's available about patient 40059.\n\n\n\nI see CHARTEVENTS has many rows. Let me look up what ITEMIDs are available and find information about \"anion gap\". Let me also check the D_ITEMS table in the SQLite database.\n\n\nGreat! Let me check what ITEMID corresponds to \"anion gap\" in the D_ITEMS table, and also look at the CHARTEVENTS data.\n\n\n\nThe CHARTEVENTS table doesn't have anion gap data (ITEMIDs 51, 52, 211, 618, etc. are different). Let me check the LABEVENTS table which likely has lab values including anion gap.\n\n\n\n\n\n\n\nThe anion gap lab has ITEMID **50868** (from D_LABITEMS). Now let me find patient 40059's hospital encounters and their anion gap values.\n\n\n\n\n\n\nPatient 40059 has two hospital encounters (HADM_ID 110385 and 136343). The question mentions \"current hospital encounter\". Let me check the LABEVENTS table for anion gap (ITEMID 50868) for patient 40059.\n\n\n\n\n\n\nNow let me query the LABEVENTS for patient 40059's anion gap readings.\n\n\n\n\n\nNow I can see the data clearly. Let me analyze it.\n\nPatient 40059 has two hospital stays:\n1. **HADM_ID 110385** - admitted 2105-10-14 (emergency)\n2. **HADM_ID 136343** - admitted 2105-12-24 (emergency) - this one has no discharge time, so it's likely the **current** encounter.\n\nThe maximum anion gap in HADM_ID 110385 is **28.0 meq/l** at **2105-10-29 04:35:00**.\n\nFor HADM_ID 136343 (the more recent/current encounter), the maximum anion gap is **18.0 meq/l** at **2105-12-24 19:00:00**.\n\nLet me verify which is the \"current\" encounter more carefully.\n\n\n\n\n\n\n\n\n\nThe second admission (HADM_ID 136343) on **2105-12-24** has no discharge time — this is the **current hospital encounter**. Let me check the max anion gap during this current stay.\n\n\n\n\n\n\n\n\n\nNow let me also show a chart to visualize this nicely.\n\n\n\n\n\n\n\n\n## ✅ 结论\n\n**患者 40059 在当前住院期间（HADM 136343），阴离子间隙（Anion Gap）最高值出现在 2105-12-24 19:00:00，数值为 18.0 meq/l。**\n\n### 详细分析\n\n患者 40059 共有 **2 次住院记录**：\n\n| 住院记录 (HADM_ID) | 入院时间 | 出院时间 | 类型 |\n|---|---|---|---|\n| **110385** | 2105-10-14 20:08 | 2105-11-11 16:20 | 急诊 ✅ 已出院 |\n| **136343** | **2105-12-24 23:30** | **未出院（当前住院）** | 急诊 ✅ **当前住院** |\n\n在 **当前住院（HADM 136343）** 期间，共记录了 **5 次阴离子间隙** 检测结果：\n\n| 检测时间 | 阴离子间隙 (meq/l) |\n|---|---|\n| **2105-12-24 19:00** ⭐ | **18.0** ← **最大值** |\n| 2105-12-25 06:15 | 15.0 |\n| 2105-12-28 03:18 | 12.0 |\n| 2105-12-28 03:18 | 11.0 |\n| 2105-12-29 06:55 | 16.0 |\n\n**关键发现：**\n- 患者在入院前约 **4 小时**（入院时间 23:30，而检测时间 19:00）就已经检测出 **最高值 18.0 meq/l** 的阴离子间隙，这通常提示可能存在代谢性酸中毒，与急诊入院的情形相符。\n- 随后数值有所下降（15→12→11），但在 **12月29日又回升至 16.0 meq/l**，表明病情可能有反复，建议关注后续检测结果。",
+  "tool_log": [
+    {
+      "phase": "call",
+      "name": "search_data_space",
+      "input": {
+        "query": "patient 40059 hospital encounter",
+        "top_k": 5
+      }
+    },
+    {
+      "phase": "result",
+      "name": "search_data_space",
+      "content": "[PROCEDURES_ICD.pdf] (得分: 0.032, 来源: hybrid)\npatient 2536 during the hospital admission filed under 126498. The patient was known for their intricate knowledge of historical shipwrecks. All identifiers for this case were validated without issue.\n\nProcedural record 4428 pertains to a subject whose identity was first captured as 63360. Following\n\n---\n\n[PROCEDURES_ICD.pdf] (得分: 0.031, 来源: hybrid)\nadmission 102135. This particular patient had a career as a professional chef, which led to several interesting conversations with the dietary staff. The case was otherwise clinically straightforward.\n\nThe encounter logged as 2902 corresponds to patient 88409 during their stay under admission 172502\n\n---\n\n[PROCEDURES_ICD.pdf] (得分: 0.030, 来源: hybrid)\nn for patient 73652. While a peripheral scheduling system had proposed an admission code of 129930, the centrally ratified and authoritative hospital admission ID for this stay is confirmed as 129935.\n\nThe encounter documented as 1148 is for patient 21279, admitted under hospital identifier 128589. \n\n---\n\n[PROCEDURES_ICD.pdf] (得分: 0.030, 来源: hybrid)\n same hospital admission, 199093, indicating a complex or staged treatment plan. The cafeteria menu for that day featured a special theme, which was a topic of lighthearted discussion among the staff.\n\nThe case identified by 806 documents a procedure for patient 24029 during their stay under admissi\n\n---\n\n[PROCEDURES_ICD.pdf] (得分: 0.030, 来源: hybrid)\n central admissions system, the definitive hospital admission ID was corrected to 155535. The patient's file noted a preference for window-side beds, a request which was accommodated during this stay.\n\nAnalysis of case entry 581 confirms a procedure was performed for patient 728 in the context of ad",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "inspect_data",
+      "input": {
+        "filename": "CHARTEVENTS.csv"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "inspect_data",
+      "content": "文件: CHARTEVENTS.csv\n行数: 228587\n列数: 8\n\n列信息:\n  - ROW_ID: int64 (228587/228587 非空, 228587 唯一值, 示例: 0)\n  - SUBJECT_ID: int64 (228587/228587 非空, 540 唯一值, 示例: 138)\n  - HADM_ID: int64 (228587/228587 非空, 647 唯一值, 示例: 108120)\n  - ICUSTAY_ID: int64 (228587/228587 非空, 676 唯一值, 示例: 275067)\n  - ITEMID: int64 (228587/228587 非空, 9 唯一值, 示例: 51)\n  - CHARTTIME: object (228587/228587 非空, 40499 唯一值, 示例: 2104-11-06 17:30:00)\n  - VALUENUM: float64 (228587/228587 非空, 561 唯一值, 示例: 103.0)\n  - VALUEUOM: object (228587/228587 非空, 6 唯一值, 示例: mmhg)\n\n前5行:\n   ROW_ID  SUBJECT_ID  HADM_ID  ICUSTAY_ID  ITEMID            CHARTTIME  VALUENUM VALUEUOM\n0       0         138   108120      275067      51  2104-11-06 17:30:00     103.0     mmhg\n1       1         138   108120      275067    8368  2104-11-06 17:45:00      64.0     mmhg\n2       2         138   108120      275067     618  2104-11-06 17:45:00      14.0      bpm\n3       3         138   108120      275067     618  2104-11-06 17:45:00      26.0      bpm\n4       4         138   108120      275067      52  2104-11-06 18:00:00      95.0     mmhg",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 15 行\n                  name\n0          chartevents\n1       inputevents_cv\n2             patients\n3     d_icd_procedures\n4   microbiologyevents\n5      d_icd_diagnoses\n6            transfers\n7           d_labitems\n8           ADMISSIONS\n9              D_ITEMS\n10       DIAGNOSES_ICD\n11           LABEVENTS\n12       PRESCRIPTIONS\n13                COST\n14        OUTPUTEVENTS",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 2 行\n   ITEMID               LABEL\n0    3732  anion gap   (8-20)\n1  227073           anion gap",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 9 行\n   ITEMID\n0      51\n1      52\n2     211\n3     618\n4     677\n5     762\n6     834\n7     920\n8    8368",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 200 行（已截断至200行）\n     ITEMID\n0     50801\n1     50802\n2     50803\n3     50804\n4     50805\n5     50806\n6     50808\n7     50809\n8     50810\n9     50811\n10    50813\n11    50814\n12    50815\n13    50816\n14    50817\n15    50818\n16    50820\n17    50821\n18    50822\n19    50824\n20    50830\n21    50831\n22    50835\n23    50836\n24    50838\n25    50839\n26    50841\n27    50842\n28    50843\n29    50844\n30    50848\n31    50849\n32    50851\n33    50852\n34    50856\n35    50861\n36    50862\n37    50863\n38    50864\n39    50865\n40    50866\n41    50867\n42    50868\n43    50878\n44    50881\n45    50882\n46    50883\n47    50884\n48    50885\n49    50889\n50    50890\n51    50891\n52    50892\n53    50893\n54    50895\n55    50896\n56    50898\n57    50899\n58    50900\n59    50902\n60    50903\n61    50904\n62    50905\n63    50906\n64    50907\n65    50908\n66    50909\n67    50910\n68    50911\n69    50912\n70    50914\n71    50915\n72    50917\n73    50922\n74    50924\n75    50925\n76    50926\n77    50927\n78    50929\n79    50930\n80    50931\n81    50935\n82    50945\n83    50946\n84    50949\n85    50950\n86    50951\n87    50952\n88    50953\n89    50954\n90    50956\n91    50957\n92    50960\n93    50961\n94    50962\n95    50963\n96    50964\n97    50965\n98    50966\n99    50967\n100   50968\n101   50969\n102   50970\n103   50971\n104   50972\n105   50973\n106   50974\n107   50976\n108   50978\n109   50980\n110   50981\n111   50983\n112   50986\n113   50988\n114   50990\n115   50993\n116   50994\n117   50995\n118   50996\n119   50997\n120   50998\n121   51000\n122   51001\n123   51002\n124   51003\n125   51005\n126   51006\n127   51007\n128   51008\n129   51009\n130   51010\n131   51014\n132   51015\n133   51018\n134   51022\n135   51025\n136   51026\n137   51028\n138   51030\n139   51032\n140   51034\n141   51035\n142   51042\n143   51043\n144   51044\n145   51045\n146   51046\n147   51047\n148   51049\n149   51051\n150   51052\n151   51053\n152   51054\n153   51058\n154   51059\n155   51060\n156   51061\n157   51062\n158   51063\n159   51065\n160   51067\n161   51068\n162   51069\n163   51070\n1",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n   ROW_ID  ITEMID      LABEL\n0     195   50868  anion gap",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 2 行\n   SUBJECT_ID  HADM_ID            ADMITTIME            DISCHTIME ADMISSION_TYPE\n0       40059   110385  2105-10-14 20:08:00  2105-11-11 16:20:00      emergency\n1       40059   136343  2105-12-24 23:30:00                 None      emergency",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "数据库中的表:\n  - chartevents (228587 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ICUSTAY_ID(INTEGER), ITEMID(INTEGER), CHARTTIME(TEXT), VALUENUM(REAL), VALUEUOM(TEXT)\n  - inputevents_cv (101059 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ICUSTAY_ID(INTEGER), CHARTTIME(TEXT), ITEMID(INTEGER), AMOUNT(REAL)\n  - patients (1000 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), GENDER(TEXT), DOB(TEXT), DOD(TEXT)\n  - d_icd_procedures (3809 行): ROW_ID(INTEGER), ICD9_CODE(INTEGER), SHORT_TITLE(TEXT), LONG_TITLE(TEXT)\n  - microbiologyevents (11237 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), CHARTTIME(TEXT), SPEC_TYPE_DESC(TEXT), ORG_NAME(TEXT)\n  - d_icd_diagnoses (14567 行): ROW_ID(INTEGER), ICD9_CODE(TEXT), SHORT_TITLE(TEXT), LONG_TITLE(TEXT)\n  - transfers (5226 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ICUSTAY_ID(REAL), EVENTTYPE(TEXT), CAREUNIT(TEXT), WARDID(REAL), INTIME(TEXT), OUTTIME(TEXT)\n  - d_labitems (753 行): ROW_ID(INTEGER), ITEMID(INTEGER), LABEL(TEXT)\n  - ADMISSIONS (1234 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ADMITTIME(TEXT), DISCHTIME(TEXT), ADMISSION_TYPE(TEXT), ADMISSION_LOCATION(TEXT), DISCHARGE_LOCATION(TEXT), INSURANCE(TEXT), LANGUAGE(TEXT), MARITAL_STATUS(TEXT), ETHNICITY(TEXT), AGE(INTEGER)\n  - D_ITEMS (11310 行): ROW_ID(INTEGER), ITEMID(INTEGER), LABEL(TEXT), LINKSTO(TEXT)\n  - DIAGNOSES_ICD (13843 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ICD9_CODE(TEXT), CHARTTIME(TEXT)\n  - LABEVENTS (368008 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ITEMID(INTEGER), CHARTTIME(TEXT), VALUENUM(REAL), VALUEUOM(TEXT)\n  - PRESCRIPTIONS (74780 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), STARTDATE(TEXT), ENDDATE(TEXT), DRUG(TEXT), DOSE_VAL_RX(TEXT), DOSE_UNIT_RX(TEXT), ROUTE(TEXT)\n  - COST (461138 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), EVENT_TYPE(TEXT), EVENT_ID(INTEGER), CHARGETIME(TEXT), COST(REAL)\n  - OUTPUTEVENTS (78596 行): ROW_I",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 20 行\n    SUBJECT_ID  HADM_ID  ITEMID            CHARTTIME  VALUENUM VALUEUOM\n0        40059   110385   50868  2105-10-14 17:35:00      19.0    meq/l\n1        40059   110385   50868  2105-10-18 09:10:00       9.0    meq/l\n2        40059   110385   50868  2105-10-19 01:36:00      11.0    meq/l\n3        40059   110385   50868  2105-10-21 04:40:00      15.0    meq/l\n4        40059   110385   50868  2105-10-21 04:40:00      12.0    meq/l\n5        40059   110385   50868  2105-10-21 04:40:00       9.0    meq/l\n6        40059   110385   50868  2105-10-21 04:40:00      11.0    meq/l\n7        40059   110385   50868  2105-10-29 04:35:00      28.0    meq/l\n8        40059   110385   50868  2105-10-29 04:35:00       8.0    meq/l\n9        40059   110385   50868  2105-11-02 04:40:00      10.0    meq/l\n10       40059   110385   50868  2105-11-03 16:50:00      10.0    meq/l\n11       40059   110385   50868  2105-11-04 08:15:00      13.0    meq/l\n12       40059   110385   50868  2105-11-05 04:10:00      15.0    meq/l\n13       40059   110385   50868  2105-11-08 07:45:00      18.0    meq/l\n14       40059   110385   50868  2105-11-08 07:45:00      11.0    meq/l\n15       40059   136343   50868  2105-12-24 19:00:00      18.0    meq/l\n16       40059   136343   50868  2105-12-25 06:15:00      15.0    meq/l\n17       40059   136343   50868  2105-12-28 03:18:00      11.0    meq/l\n18       40059   136343   50868  2105-12-28 03:18:00      12.0    meq/l\n19       40059   136343   50868  2105-12-29 06:55:00      16.0    meq/l",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 2 行\n             ADMITTIME            DISCHTIME  HADM_ID ADMISSION_TYPE\n0  2105-10-14 20:08:00  2105-11-11 16:20:00   110385      emergency\n1  2105-12-24 23:30:00                 None   136343      emergency",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 5 行\n   SUBJECT_ID  HADM_ID            CHARTTIME  VALUENUM VALUEUOM\n0       40059   136343  2105-12-24 19:00:00      18.0    meq/l\n1       40059   136343  2105-12-29 06:55:00      16.0    meq/l\n2       40059   136343  2105-12-25 06:15:00      15.0    meq/l\n3       40059   136343  2105-12-28 03:18:00      12.0    meq/l\n4       40059   136343  2105-12-28 03:18:00      11.0    meq/l",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "generate_chart",
+      "input": {
+        "chart_type": "line",
+        "data": {
+          "x": [
+            "2105-12-24 19:00",
+            "2105-12-25 06:15",
+            "2105-12-28 03:18",
+            "2105-12-28 03:18",
+            "2105-12-29 06:55"
+          ],
+          "y": [
+            18.0,
+            15.0,
+            12.0,
+            11.0,
+            16.0
+          ]
+        },
+        "title": "Patient 40059 - Anion Gap Trend During Current Hospital Encounter (HADM 136343)",
+        "x_label": "Chart Time",
+        "y_label": "Anion Gap (meq/l)"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "generate_chart",
+      "content": "```chart\n{\"chart_type\": \"line\", \"title\": \"Patient 40059 - Anion Gap Trend During Current Hospital Encounter (HADM 136343)\", \"data\": {\"x\": [\"2105-12-24 19:00\", \"2105-12-25 06:15\", \"2105-12-28 03:18\", \"2105-12-28 03:18\", \"2105-12-29 06:55\"], \"y\": [18.0, 15.0, 12.0, 11.0, 16.0]}, \"x_label\": \"Chart Time\", \"y_label\": \"Anion Gap (meq/l)\"}\n```",
+      "is_error": false
+    }
+  ],
+  "events": [
+    {
+      "type": "done",
+      "usage": {
+        "input_tokens": 103357,
+        "output_tokens": 1995
+      },
+      "tool_calls_log": [
+        {
+          "name": "search_data_space",
+          "input": {
+            "query": "patient 40059 hospital encounter",
+            "top_k": 5
+          },
+          "output_preview": "[PROCEDURES_ICD.pdf] (得分: 0.032, 来源: hybrid)\npatient 2536 during the hospital admission filed under 126498. The patient was known for their intricate knowledge of historical shipwrecks. All identifier"
+        },
+        {
+          "name": "inspect_data",
+          "input": {
+            "filename": "CHARTEVENTS.csv"
+          },
+          "output_preview": "文件: CHARTEVENTS.csv\n行数: 228587\n列数: 8\n\n列信息:\n  - ROW_ID: int64 (228587/228587 非空, 228587 唯一值, 示例: 0)\n  - SUBJECT_ID: int64 (228587/228587 非空, 540 唯一值, 示例: 138)\n  - HADM_ID: int64 (228587/228587 非空, 647 "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT name FROM sqlite_master WHERE type='table';"
+          },
+          "output_preview": "返回 15 行\n                  name\n0          chartevents\n1       inputevents_cv\n2             patients\n3     d_icd_procedures\n4   microbiologyevents\n5      d_icd_diagnoses\n6            transfers\n7       "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT ITEMID, LABEL FROM D_ITEMS WHERE LABEL LIKE '%anion%' OR LABEL LIKE '%Anion%';"
+          },
+          "output_preview": "返回 2 行\n   ITEMID               LABEL\n0    3732  anion gap   (8-20)\n1  227073           anion gap"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT DISTINCT ITEMID FROM CHARTEVENTS ORDER BY ITEMID;"
+          },
+          "output_preview": "返回 9 行\n   ITEMID\n0      51\n1      52\n2     211\n3     618\n4     677\n5     762\n6     834\n7     920\n8    8368"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT DISTINCT ITEMID FROM LABEVENTS ORDER BY ITEMID;"
+          },
+          "output_preview": "返回 200 行（已截断至200行）\n     ITEMID\n0     50801\n1     50802\n2     50803\n3     50804\n4     50805\n5     50806\n6     50808\n7     50809\n8     50810\n9     50811\n10    50813\n11    50814\n12    50815\n13    50816\n1"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM D_LABITEMS WHERE LABEL LIKE '%anion%' OR LABEL LIKE '%Anion%';"
+          },
+          "output_preview": "返回 1 行\n   ROW_ID  ITEMID      LABEL\n0     195   50868  anion gap"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT SUBJECT_ID, HADM_ID, ADMITTIME, DISCHTIME, ADMISSION_TYPE \nFROM ADMISSIONS \nWHERE SUBJECT_ID = 40059;"
+          },
+          "output_preview": "返回 2 行\n   SUBJECT_ID  HADM_ID            ADMITTIME            DISCHTIME ADMISSION_TYPE\n0       40059   110385  2105-10-14 20:08:00  2105-11-11 16:20:00      emergency\n1       40059   136343  2105-12-2"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {},
+          "output_preview": "数据库中的表:\n  - chartevents (228587 行): ROW_ID(INTEGER), SUBJECT_ID(INTEGER), HADM_ID(INTEGER), ICUSTAY_ID(INTEGER), ITEMID(INTEGER), CHARTTIME(TEXT), VALUENUM(REAL), VALUEUOM(TEXT)\n  - inputevents_cv (10"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT l.SUBJECT_ID, l.HADM_ID, l.ITEMID, l.CHARTTIME, l.VALUENUM, l.VALUEUOM\nFROM LABEVENTS l\nWHERE l.SUBJECT_ID = 40059 \n  AND l.ITEMID = 50868\nORDER BY l.CHARTTIME;"
+          },
+          "output_preview": "返回 20 行\n    SUBJECT_ID  HADM_ID  ITEMID            CHARTTIME  VALUENUM VALUEUOM\n0        40059   110385   50868  2105-10-14 17:35:00      19.0    meq/l\n1        40059   110385   50868  2105-10-18 09:1"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT ADMITTIME, DISCHTIME, HADM_ID, ADMISSION_TYPE\nFROM ADMISSIONS \nWHERE SUBJECT_ID = 40059\nORDER BY ADMITTIME;"
+          },
+          "output_preview": "返回 2 行\n             ADMITTIME            DISCHTIME  HADM_ID ADMISSION_TYPE\n0  2105-10-14 20:08:00  2105-11-11 16:20:00   110385      emergency\n1  2105-12-24 23:30:00                 None   136343     "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT SUBJECT_ID, HADM_ID, CHARTTIME, VALUENUM, VALUEUOM\nFROM LABEVENTS \nWHERE SUBJECT_ID = 40059 \n  AND HADM_ID = 136343\n  AND ITEMID = 50868\nORDER BY VALUENUM DESC;"
+          },
+          "output_preview": "返回 5 行\n   SUBJECT_ID  HADM_ID            CHARTTIME  VALUENUM VALUEUOM\n0       40059   136343  2105-12-24 19:00:00      18.0    meq/l\n1       40059   136343  2105-12-29 06:55:00      16.0    meq/l\n2   "
+        },
+        {
+          "name": "generate_chart",
+          "input": {
+            "chart_type": "line",
+            "data": {
+              "x": [
+                "2105-12-24 19:00",
+                "2105-12-25 06:15",
+                "2105-12-28 03:18",
+                "2105-12-28 03:18",
+                "2105-12-29 06:55"
+              ],
+              "y": [
+                18.0,
+                15.0,
+                12.0,
+                11.0,
+                16.0
+              ]
+            },
+            "title": "Patient 40059 - Anion Gap Trend During Current Hospital Encounter (HADM 136343)",
+            "x_label": "Chart Time",
+            "y_label": "Anion Gap (meq/l)"
+          },
+          "output_preview": "```chart\n{\"chart_type\": \"line\", \"title\": \"Patient 40059 - Anion Gap Trend During Current Hospital Encounter (HADM 136343)\", \"data\": {\"x\": [\"2105-12-24 19:00\", \"2105-12-25 06:15\", \"2105-12-28 03:18\", \""
+        }
+      ]
+    }
+  ]
+}

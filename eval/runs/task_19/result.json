@@ -1,0 +1,39 @@
+{
+  "task_id": "task_19",
+  "question": "哪些学历水平对应基金经理从业年限平均值大于10",
+  "answer": "根据 `mf_personalinfo.csv` 的数据，按学历水平分组计算基金经理从业年限平均值，结果如下：\n\n## 结论\n\n**硕士及以上学历的基金经理，从业年限平均值均大于10年。**\n\n| 学历水平 | 平均从业年限 | 人数 |\n|---------|:----------:|:---:|\n| 🥇 **博士后 (Postdoctoral researcher)** | **13.95 年** | 2人 |\n| 🥈 **博士 (Doctoral degree)** | **12.58 年** | 66人 |\n| 🥉 **硕士 (Master's degree)** | **12.00 年** | 499人 |\n| ❌ 本科 (Bachelor's degree) | 9.83 年 | 26人 |\n\n可以看到：\n- **博士后**的平均从业年限最高，达到 **13.95 年**\n- **博士**次之，平均 **12.58 年**\n- **硕士**平均刚好 **12.00 年**\n- 而**本科**学历的平均从业年限仅为 **9.83 年**，未超过10年\n\n总体来看，随着学历提升，基金经理的平均从业经验年限也呈上升趋势，说明高学历基金经理不仅专业能力更强，行业积累也更深厚。",
+  "tool_log": [
+    {
+      "phase": "call",
+      "name": "pandas_query",
+      "input": {
+        "filename": "mf_personalinfo.csv"
+      }
+    },
+    {
+      "phase": "result",
+      "name": "pandas_query",
+      "content": "                 Education       mean  count\n3  Postdoctoral researcher  13.950000      2\n1          Doctoral degree  12.578788     66\n2          Master's degree  11.995391    499\n0        Bachelor's degree   9.830769     26",
+      "is_error": false
+    }
+  ],
+  "events": [
+    {
+      "type": "done",
+      "usage": {
+        "input_tokens": 32776,
+        "output_tokens": 471
+      },
+      "tool_calls_log": [
+        {
+          "name": "pandas_query",
+          "input": {
+            "filename": "mf_personalinfo.csv",
+            "expression": "df.groupby('Education')['ExperienceTime'].agg(['mean', 'count']).reset_index().sort_values('mean', ascending=False)"
+          },
+          "output_preview": "                 Education       mean  count\n3  Postdoctoral researcher  13.950000      2\n1          Doctoral degree  12.578788     66\n2          Master's degree  11.995391    499\n0        Bachelor's "
+        }
+      ]
+    }
+  ]
+}
