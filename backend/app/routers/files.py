@@ -24,6 +24,7 @@ ALLOWED_EXTENSIONS = {
     "html", "xml", "sql", "py", "ipynb", "zip", "yaml", "yml",
     "log", "tsv", "parquet", "feather", "sqlite", "db", "sqlite3",
     "png", "jpg", "jpeg", "gif", "bmp", "webp",
+    "mp4", "mov", "avi", "mkv", "webm",
     "r", "sas7bdat", "dta", "sav",
 }
 

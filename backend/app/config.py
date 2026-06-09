@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = ""  # 如 deepseek-chat
 
+    # OCR（PaddleOCR-VL 远程接口，用于 PDF/图片解析）
+    # 运行时优先读 Redis（管理后台可改），这里是回退默认值
+    ocr_api_base: str = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+    ocr_api_key: str = ""
+    ocr_model: str = "PaddleOCR-VL-1.6"
+
     # 检索配置
     retrieval_mode: str = "hybrid"  # vector | bm25 | hybrid | multi_query
     rrf_k: int = 60

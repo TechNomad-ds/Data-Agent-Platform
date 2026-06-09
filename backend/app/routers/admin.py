@@ -317,6 +317,48 @@ async def update_global_api(
     return {"message": "全局 API 配置已更新，所有模型已同步"}
 
 
+# ===== OCR 配置（PaddleOCR-VL，用于 PDF/图片解析） =====
+
+@router.get("/ocr-config")
+async def get_ocr_config(admin: User = Depends(get_admin_user)):
+    """获取 OCR 配置"""
+    from app.core.redis_client import get_redis
+    redis = await get_redis()
+    ocr_base = await redis.get("global:ocr_base") or settings.ocr_api_base or ""
+    ocr_model = await redis.get("global:ocr_model") or settings.ocr_model or ""
+    token_set = bool(await redis.get("global:ocr_token") or settings.ocr_api_key)
+    return {"ocr_base": ocr_base, "ocr_model": ocr_model, "ocr_token_set": token_set}
+
+
+class OcrConfigUpdate(BaseModel):
+    ocr_base: str = ""
+    ocr_token: str = ""
+    ocr_model: str = ""
+
+
+@router.put("/ocr-config")
+async def update_ocr_config(
+    data: OcrConfigUpdate,
+    admin: User = Depends(get_admin_user),
+):
+    """更新 OCR 配置（存入 Redis，即时生效）"""
+    from app.core.redis_client import get_redis
+    redis = await get_redis()
+
+    if data.ocr_base:
+        base = data.ocr_base.rstrip("/")
+        await redis.set("global:ocr_base", base)
+        settings.ocr_api_base = base
+    if data.ocr_token:
+        await redis.set("global:ocr_token", data.ocr_token)
+        settings.ocr_api_key = data.ocr_token
+    if data.ocr_model:
+        await redis.set("global:ocr_model", data.ocr_model)
+        settings.ocr_model = data.ocr_model
+
+    return {"message": "OCR 配置已更新"}
+
+
 @router.get("/config")
 async def get_runtime_config(
     admin: User = Depends(get_admin_user),

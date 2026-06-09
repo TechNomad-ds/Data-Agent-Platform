@@ -257,6 +257,27 @@ async def _get_space_files(user_id: uuid.UUID, data_space_id: uuid.UUID) -> list
         return result.scalars().all()
 
 
+async def _get_profile_ocr_text(filename: str, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str | None:
+    """从 DataProfile 取该文件的 OCR 全文（read_file 回退用）。"""
+    if not data_space_id:
+        return None
+    from app.models.data_profile import DataProfile
+    async with get_session_factory()() as db:
+        result = await db.execute(
+            select(DataProfile)
+            .join(File, File.id == DataProfile.file_id)
+            .where(
+                File.filename == filename,
+                File.user_id == user_id,
+                DataProfile.data_space_id == data_space_id,
+            )
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return None
+        return (profile.profile_data or {}).get("ocr_text")
+
+
 def _load_df(file_path: Path, ext: str) -> pd.DataFrame:
     from app.services.file_loader import load_dataframe
     return load_dataframe(file_path, ext)
@@ -367,11 +388,28 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
                     pages.append(f"--- 第 {i+1} 页 ---\n{page.get_text()}")
                 doc.close()
                 content = "\n".join(pages)
+                # fitz 抽到的文本极少（扫描件/图片型 PDF）→ 回退到 OCR 全文
+                if len(content.strip()) < 50:
+                    ocr_text = await _get_profile_ocr_text(filename, user_id, data_space_id)
+                    if ocr_text:
+                        lines = ocr_text.split("\n")
+                        selected = lines[start_line:start_line + max_lines]
+                        return f"文件: {filename} (PDF/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
                 lines = content.split("\n")
                 selected = lines[start_line:start_line + max_lines]
                 return f"文件: {filename} (PDF, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
             except ImportError:
                 pass
+
+        # 图片文件：返回 OCR 提取的文本（若有）
+        if ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
+            ocr_text = await _get_profile_ocr_text(filename, user_id, data_space_id)
+            if ocr_text:
+                lines = ocr_text.split("\n")
+                selected = lines[start_line:start_line + max_lines]
+                return f"文件: {filename} (图片/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+            return f"图片 '{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
+
 
         # Word 文件
         if ext == "docx":

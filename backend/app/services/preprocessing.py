@@ -51,10 +51,17 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
                 profile_data = _profile_document_fast(file_path, ext)
                 profile_type = "document"
                 import asyncio
-                asyncio.create_task(_embed_document_background(file_path, ext, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(_document_ocr_pipeline(file_path, ext, str(file_id), str(data_space_id), file.filename))
             elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
                 profile_data = _profile_image(file_path)
                 profile_type = "image"
+                import asyncio
+                asyncio.create_task(_image_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename))
+            elif ext in ("mp4", "mov", "avi", "mkv", "webm"):
+                profile_data = _profile_video(file_path)
+                profile_type = "video"
+                import asyncio
+                asyncio.create_task(_video_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename))
             else:
                 profile_data = {"info": f"文件类型: {ext}", "file_size": file.file_size}
                 profile_type = "other"
@@ -334,42 +341,197 @@ def _profile_document_fast(file_path: Path, ext: str) -> Dict[str, Any]:
     }
 
 
-async def _embed_document_background(
+async def _document_ocr_pipeline(
     file_path: Path, ext: str, file_id: str, data_space_id: str, filename: str
 ) -> None:
-    """后台异步执行文档 embedding"""
+    """文档处理流水线（单文件内顺序执行，避免嵌入竞态）：
+    1. 本地 fitz/docx 抽文本并嵌入（立即可搜，保证基础可用）
+    2. 若配置了 OCR，调用远程 API；成功则用 OCR Markdown 覆盖嵌入与画像
+    OCR 不可用 / 失败 / 超时 → 保留本地抽取结果。
+    """
     import logging
     logger = logging.getLogger("preprocessing")
+
+    # ---- 1. 本地抽取 + 嵌入 ----
+    local_text = ""
     try:
-        text = ""
         if ext == "pdf":
             try:
                 import fitz
                 doc = fitz.open(str(file_path))
                 for page in doc:
-                    text += page.get_text() + "\n"
+                    local_text += page.get_text() + "\n"
                 doc.close()
             except ImportError:
-                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                local_text = file_path.read_text(encoding="utf-8", errors="ignore")
         elif ext == "docx":
             try:
                 from docx import Document
                 doc = Document(str(file_path))
                 for para in doc.paragraphs:
-                    text += para.text + "\n"
+                    local_text += para.text + "\n"
             except ImportError:
-                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                local_text = file_path.read_text(encoding="utf-8", errors="ignore")
 
-        chunks = greedy_chunk(text, max_size=1000, overlap=200)
+        chunks = greedy_chunk(local_text, max_size=1000, overlap=200)
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
-        try:
-            from app.services.retrieval import invalidate_cache
-            invalidate_cache(data_space_id)
-        except Exception:
-            pass
-        logger.info(f"文档嵌入完成: {filename}, {len(chunks)} 个块")
+        _invalidate_retrieval(data_space_id)
+        logger.info(f"文档本地嵌入完成: {filename}, {len(chunks)} 个块")
     except Exception as e:
-        logger.error(f"文档嵌入失败 ({filename}): {e}", exc_info=True)
+        logger.error(f"文档本地嵌入失败 ({filename}): {e}", exc_info=True)
+
+    # ---- 2. OCR 覆盖（仅 PDF；docx 已是结构化文本，无需 OCR）----
+    if ext != "pdf":
+        return
+    try:
+        from app.services.ocr import is_ocr_configured, ocr_extract_markdown
+        if not await is_ocr_configured():
+            return
+        md = await ocr_extract_markdown(file_path)
+        if not md:
+            return
+
+        # 用 OCR 结果覆盖嵌入
+        embed_svc.delete_file_embeddings(data_space_id, file_id)
+        ocr_chunks = greedy_chunk(md, max_size=1000, overlap=200)
+        await embed_svc.embed_chunks_async(data_space_id, ocr_chunks, file_id, filename)
+        _invalidate_retrieval(data_space_id)
+
+        # 更新画像：覆盖 preview / char_count，记录 OCR 全文供 read_file 使用
+        await _update_profile_ocr(file_id, data_space_id, md)
+        logger.info(f"文档 OCR 覆盖完成: {filename}, {len(ocr_chunks)} 个块")
+    except Exception as e:
+        logger.error(f"文档 OCR 处理失败 ({filename}): {e}", exc_info=True)
+
+
+async def _image_ocr_pipeline(
+    file_path: Path, file_id: str, data_space_id: str, filename: str
+) -> None:
+    """图片 OCR 流水线：本地无文本，直接尝试远程 OCR。
+    成功则嵌入 OCR 文本并写入画像；失败/未配置则什么都不做（保留尺寸画像）。
+    """
+    import logging
+    logger = logging.getLogger("preprocessing")
+    try:
+        from app.services.ocr import is_ocr_configured, ocr_extract_markdown
+        if not await is_ocr_configured():
+            return
+        md = await ocr_extract_markdown(file_path)
+        if not md:
+            return
+
+        chunks = greedy_chunk(md, max_size=1000, overlap=200)
+        await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
+        _invalidate_retrieval(data_space_id)
+        await _update_profile_ocr(file_id, data_space_id, md)
+        logger.info(f"图片 OCR 完成: {filename}, {len(chunks)} 个块")
+    except Exception as e:
+        logger.error(f"图片 OCR 处理失败 ({filename}): {e}", exc_info=True)
+
+
+def _profile_video(file_path: Path) -> Dict[str, Any]:
+    """快速生成视频画像（不解码全片）：基础元数据 + 大小。OCR 全文后台补充。"""
+    meta = {}
+    try:
+        from app.services.video import probe_metadata
+        meta = probe_metadata(file_path)
+    except Exception:
+        pass
+    return {
+        "file_size_mb": round(file_path.stat().st_size / 1024 / 1024, 2),
+        "duration_seconds": meta.get("duration_seconds"),
+        "width": meta.get("width"),
+        "height": meta.get("height"),
+        "note": "幻灯片型视频，关键帧 OCR 文本在后台异步生成",
+    }
+
+
+async def _video_ocr_pipeline(
+    file_path: Path, file_id: str, data_space_id: str, filename: str
+) -> None:
+    """视频处理流水线（幻灯片型）：
+    1. 抽取去重后的关键帧（每张幻灯片一帧）
+    2. 逐帧调用远程 OCR，拼成 "## 第 N 页" 的 Markdown
+    3. chunk + embed + 写回画像，复用与图片/PDF 完全相同的下游
+    依赖缺失 / 无帧 / OCR 未配置或全部失败 → 保留基础画像，不嵌入。
+    """
+    import logging
+    import shutil
+    logger = logging.getLogger("preprocessing")
+
+    frames = []
+    work_dir = None
+    try:
+        from app.services.video import extract_keyframes
+        frames = extract_keyframes(file_path)
+        if not frames:
+            logger.info(f"视频无可用关键帧，跳过 OCR: {filename}")
+            return
+        work_dir = frames[0].parent
+
+        from app.services.ocr import is_ocr_configured, ocr_extract_markdown
+        if not await is_ocr_configured():
+            logger.info(f"OCR 未配置，跳过视频 OCR: {filename}")
+            return
+
+        parts = []
+        for i, frame in enumerate(frames, start=1):
+            md = await ocr_extract_markdown(frame)
+            if md and md.strip():
+                parts.append(f"## 第 {i} 页\n\n{md.strip()}")
+
+        full_md = "\n\n".join(parts).strip()
+        if not full_md:
+            logger.info(f"视频关键帧 OCR 结果为空: {filename}")
+            return
+
+        chunks = greedy_chunk(full_md, max_size=1000, overlap=200)
+        await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
+        _invalidate_retrieval(data_space_id)
+        await _update_profile_ocr(file_id, data_space_id, full_md)
+        logger.info(f"视频 OCR 完成: {filename}, {len(frames)} 帧, {len(chunks)} 个块")
+    except Exception as e:
+        logger.error(f"视频 OCR 处理失败 ({filename}): {e}", exc_info=True)
+    finally:
+        if work_dir is not None:
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+
+def _invalidate_retrieval(data_space_id: str) -> None:
+    try:
+        from app.services.retrieval import invalidate_cache
+        invalidate_cache(data_space_id)
+    except Exception:
+        pass
+
+
+async def _update_profile_ocr(file_id: str, data_space_id: str, md: str) -> None:
+    """把 OCR Markdown 写回 DataProfile：更新 preview/char_count，存全文供 read_file。"""
+    import uuid as _uuid
+    try:
+        async with get_session_factory()() as db:
+            result = await db.execute(
+                select(DataProfile).where(
+                    DataProfile.file_id == _uuid.UUID(file_id),
+                    DataProfile.data_space_id == _uuid.UUID(data_space_id),
+                )
+            )
+            profile = result.scalar_one_or_none()
+            if not profile:
+                return
+            data = dict(profile.profile_data or {})
+            data["preview"] = md[:500]
+            data["char_count"] = len(md)
+            data["ocr_applied"] = True
+            data["ocr_text"] = md[:20000]  # 截断存储，供 read_file 回退
+            profile.profile_data = data
+            profile.status = "ready"
+            await db.commit()
+    except Exception:
+        import logging
+        logging.getLogger("preprocessing").warning("写回 OCR 画像失败", exc_info=True)
+
+
 
 
 def _load_json_df(file_path: Path) -> pd.DataFrame:
@@ -528,7 +690,7 @@ async def get_space_profile(data_space_id: uuid.UUID) -> Dict[str, Any]:
             summary["columns"] = [c["name"] for c in p.profile_data.get("columns", [])]
             total_rows += summary["row_count"]
             total_columns += summary["column_count"]
-        elif p.profile_type in ("text", "document"):
+        elif p.profile_type in ("text", "document", "video"):
             summary["char_count"] = p.profile_data.get("char_count", 0)
             summary["chunk_count"] = p.profile_data.get("chunk_count", 0)
 

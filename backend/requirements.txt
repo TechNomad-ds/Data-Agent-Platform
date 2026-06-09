@@ -30,6 +30,7 @@ pyarrow>=14.0
 pyreadstat>=1.2.0
 aiomysql>=0.2.0
 Pillow>=10.0
+imageio-ffmpeg>=0.4.9
 jieba>=0.42
 aiofiles>=23.0
 bcrypt>=4.0

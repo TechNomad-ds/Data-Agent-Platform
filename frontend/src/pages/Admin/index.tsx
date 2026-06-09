@@ -69,6 +69,10 @@ export default function Admin() {
   const [globalApiBase, setGlobalApiBase] = useState('')
   const [globalApiKey, setGlobalApiKey] = useState('')
   const [globalApiKeySet, setGlobalApiKeySet] = useState(false)
+  const [ocrBase, setOcrBase] = useState('')
+  const [ocrToken, setOcrToken] = useState('')
+  const [ocrModel, setOcrModel] = useState('')
+  const [ocrTokenSet, setOcrTokenSet] = useState(false)
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
   const [exportConsentOnly, setExportConsentOnly] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -79,7 +83,7 @@ export default function Admin() {
     if (activeTab === 'models') loadModels()
     if (activeTab === 'conversations') loadConversations()
     if (activeTab === 'config') loadConfig()
-    if (activeTab === 'models') { loadModels(); loadGlobalApi() }
+    if (activeTab === 'models') { loadModels(); loadGlobalApi(); loadOcrConfig() }
     if (activeTab === 'research') loadResearchStats()
   }, [activeTab, convPage])
 
@@ -126,6 +130,26 @@ export default function Admin() {
       message.success('全局 API 配置已更新，所有模型已同步')
       setGlobalApiKey('')
       loadGlobalApi()
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '保存失败')
+    }
+  }
+
+  const loadOcrConfig = async () => {
+    try {
+      const res = await api.get('/admin/ocr-config')
+      setOcrBase(res.data.ocr_base || '')
+      setOcrModel(res.data.ocr_model || '')
+      setOcrTokenSet(res.data.ocr_token_set)
+    } catch {}
+  }
+
+  const handleSaveOcrConfig = async () => {
+    try {
+      await api.put('/admin/ocr-config', { ocr_base: ocrBase, ocr_token: ocrToken, ocr_model: ocrModel })
+      message.success('OCR 配置已更新')
+      setOcrToken('')
+      loadOcrConfig()
     } catch (err: any) {
       message.error(err.response?.data?.detail || '保存失败')
     }
@@ -710,6 +734,44 @@ export default function Admin() {
                     </div>
                     <Button type="primary" size="small" onClick={handleSaveGlobalApi} block={isMobile}>保存</Button>
                   </div>
+                </Card>
+
+                <Card size="small" style={{ marginBottom: 16, borderRadius: 10 }} title="OCR 解析配置（PaddleOCR-VL，用于 PDF/图片）">
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, alignItems: isMobile ? 'stretch' : 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>OCR 接口地址</Text>
+                      <Input
+                        value={ocrBase}
+                        onChange={(e) => setOcrBase(e.target.value)}
+                        placeholder="https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+                        size="small"
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+                        Access Token {ocrTokenSet && <Tag color="success" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', marginLeft: 4 }}>已配置</Tag>}
+                      </Text>
+                      <Input.Password
+                        value={ocrToken}
+                        onChange={(e) => setOcrToken(e.target.value)}
+                        placeholder={ocrTokenSet ? '留空则不修改' : '粘贴 access token'}
+                        size="small"
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>模型</Text>
+                      <Input
+                        value={ocrModel}
+                        onChange={(e) => setOcrModel(e.target.value)}
+                        placeholder="PaddleOCR-VL-1.6"
+                        size="small"
+                      />
+                    </div>
+                    <Button type="primary" size="small" onClick={handleSaveOcrConfig} block={isMobile}>保存</Button>
+                  </div>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+                    配置后，用户上传的 PDF / 图片会在后台自动 OCR 解析，结果供分析使用。未配置时仅做本地文本抽取。
+                  </Text>
                 </Card>
 
                 <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

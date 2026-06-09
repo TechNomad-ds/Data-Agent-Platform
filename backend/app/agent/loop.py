@@ -288,6 +288,18 @@ class AgentLoop:
                         lines.append(f"    - {t['name']} ({t.get('row_count', '?')}行): {cols}")
                     lines.append("")
 
+                elif profile and profile.status == "ready" and profile.profile_type == "image":
+                    data = profile.profile_data or {}
+                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
+                    lines.append(f"### {f.filename} ({type_label})")
+                    if data.get("ocr_applied") and data.get("preview"):
+                        lines.append(f"    OCR 识别内容预览: {data['preview'][:200]}")
+                    else:
+                        dims = f"{data.get('width', '?')}x{data.get('height', '?')}"
+                        lines.append(f"    尺寸 {dims}，暂无可提取文本（OCR 未配置或处理中）")
+                    lines.append("")
+
+
                 elif f.file_type in TABULAR_EXTS:
                     # 没有 profile 或正在处理 → 实时加载基础 schema（线程池避免阻塞）
                     fp = Path(settings.storage_root) / f.storage_path
