@@ -1,0 +1,367 @@
+{
+  "total": 60,
+  "passed": 4,
+  "pass_rate": 0.067,
+  "results": [
+    {
+      "task_id": "task_1",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_2",
+      "status": "fail",
+      "ncol": 1,
+      "gold_rows": 354,
+      "f1": 0.0,
+      "recall": 0.0,
+      "precision": 0.0,
+      "matched": 0,
+      "gold_n": 354,
+      "cand_n": 0
+    },
+    {
+      "task_id": "task_3",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_4",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_5",
+      "status": "pass",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 1.0,
+      "recall": 1.0,
+      "precision": 1.0,
+      "matched": 1,
+      "gold_n": 1,
+      "cand_n": 1,
+      "via": "text_match"
+    },
+    {
+      "task_id": "task_6",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_7",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_8",
+      "status": "pass",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 1.0,
+      "recall": 1.0,
+      "precision": 1.0,
+      "matched": 1,
+      "gold_n": 1,
+      "cand_n": 1,
+      "via": "text_match"
+    },
+    {
+      "task_id": "task_9",
+      "status": "fail",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 0.0,
+      "recall": 0.0,
+      "precision": 0.0,
+      "matched": 0,
+      "gold_n": 1,
+      "cand_n": 0
+    },
+    {
+      "task_id": "task_10",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_11",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_12",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_13",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_14",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_15",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_16",
+      "status": "pass",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 1.0,
+      "recall": 1.0,
+      "precision": 1.0,
+      "matched": 1,
+      "gold_n": 1,
+      "cand_n": 1,
+      "via": "text_match"
+    },
+    {
+      "task_id": "task_17",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_18",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_19",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_20",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_21",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_22",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_23",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_24",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_25",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_26",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_27",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_28",
+      "status": "fail",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 0.0,
+      "recall": 0.0,
+      "precision": 0.0,
+      "matched": 0,
+      "gold_n": 1,
+      "cand_n": 0
+    },
+    {
+      "task_id": "task_29",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_30",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_31",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_32",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_33",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_34",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_35",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_36",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_37",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_38",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_39",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_40",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_41",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_42",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_43",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_44",
+      "status": "fail",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 0.0,
+      "recall": 0.0,
+      "precision": 0.0,
+      "matched": 0,
+      "gold_n": 1,
+      "cand_n": 0
+    },
+    {
+      "task_id": "task_45",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_46",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_47",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_48",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_49",
+      "status": "pass",
+      "ncol": 1,
+      "gold_rows": 1,
+      "f1": 1.0,
+      "recall": 1.0,
+      "precision": 1.0,
+      "matched": 1,
+      "gold_n": 1,
+      "cand_n": 1,
+      "via": "text_match"
+    },
+    {
+      "task_id": "task_50",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_51",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_52",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_53",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_54",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_55",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_56",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_57",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_58",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_59",
+      "status": "no_run",
+      "f1": 0.0
+    },
+    {
+      "task_id": "task_60",
+      "status": "no_run",
+      "f1": 0.0
+    }
+  ]
+}

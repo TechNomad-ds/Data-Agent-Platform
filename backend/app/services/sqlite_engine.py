@@ -52,23 +52,29 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
         if ext in ("sqlite", "db", "sqlite3"):
             try:
                 src_conn = sqlite3.connect(str(file_path))
-                src_cursor = src_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                for (tbl,) in src_cursor.fetchall():
-                    quoted_tbl = '"' + tbl.replace('"', '""') + '"'
-                    pragma = src_conn.execute(f"PRAGMA table_info({quoted_tbl})").fetchall()
-                    col_defs = ",".join(
-                        f'"{row[1]}" {row[2] if row[2] else "TEXT"}' for row in pragma
-                    )
-                    src_data = src_conn.execute(f"SELECT * FROM {quoted_tbl}")
-                    cols = [d[0] for d in src_data.description]
-                    rows = src_data.fetchall()
-                    if cols and rows:
-                        placeholders = ",".join(["?"] * len(cols))
-                        conn.execute(f'CREATE TABLE IF NOT EXISTS "{tbl}" ({col_defs})')
-                        conn.executemany(f'INSERT INTO "{tbl}" VALUES ({placeholders})', rows)
-                src_conn.close()
+                tbls = [r[0] for r in src_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()]
             except Exception:
                 continue
+            for tbl in tbls:
+                # 每张表独立复制：单表失败不影响其它表（之前用 bare except 整库跳过）
+                try:
+                    quoted = '"' + tbl.replace('"', '""') + '"'
+                    # 用 pandas 搬运，自动处理类型/空表，避免手写 DDL 出错
+                    df = pd.read_sql(f"SELECT * FROM {quoted}", src_conn)
+                    dest = tbl
+                    existing = [t[0] for t in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+                    if dest in existing:
+                        dest = f"{tbl}_db"
+                    df.to_sql(dest, conn, if_exists="replace", index=False)
+                except Exception:
+                    continue
+            try:
+                src_conn.close()
+            except Exception:
+                pass
             continue
 
         if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
