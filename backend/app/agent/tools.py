@@ -401,14 +401,15 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
             except ImportError:
                 pass
 
-        # 图片文件：返回 OCR 提取的文本（若有）
-        if ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
+        # 图片 / 视频文件：返回 OCR 提取的文本（若有）
+        if ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp", "mp4", "mov", "avi", "mkv", "webm"):
             ocr_text = await _get_profile_ocr_text(filename, user_id, data_space_id)
+            kind = "视频/逐帧OCR" if ext in ("mp4", "mov", "avi", "mkv", "webm") else "图片/OCR"
             if ocr_text:
                 lines = ocr_text.split("\n")
                 selected = lines[start_line:start_line + max_lines]
-                return f"文件: {filename} (图片/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
-            return f"图片 '{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
+                return f"文件: {filename} ({kind}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+            return f"'{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
 
 
         # Word 文件
@@ -637,8 +638,10 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     df = pd.DataFrame(result["rows"])
     output = f"返回 {result['row_count']} 行"
     if result.get("truncated"):
-        output += "（已截断至200行）"
-    output += f"\n{df.to_string()}"
+        output += "（已截断至2000行）"
+    # 强制输出全部行（默认 to_string 超过 display.max_rows 会省略中间行），
+    # 否则列表型答案会被显示截断，导致 recall 偏低。
+    output += f"\n{df.to_string(max_rows=None)}"
     return output
 
 

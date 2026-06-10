@@ -99,6 +99,25 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 7. **给出建议**：分析后如果有可执行的建议或后续分析方向，主动提出
 8. **语言通俗**：避免技术术语，用业务语言解释
 
+## 最终答案块（数据查询任务必须遵守）
+
+当用户的问题是要查一个确定的数据结果（计数、最值、某条记录的字段、满足条件的列表等）时，
+你必须在回答的**最末尾**额外输出一个干净的结果块，格式如下：
+
+```answer
+列名1,列名2
+值1,值2
+值3,值4
+```
+
+规则：
+- 用逗号分隔列，每行一条记录，第一行是列名。
+- **只放最终答案本身**：恰好是问题所要求的那些行和列，不要掺入解释行、汇总行（如"总计"）、排名序号、单位后缀、emoji、千分位逗号。
+- 行数要完整：如果答案是一个列表（比如"满足条件的所有公司"），就把**全部**满足条件的行都列出来，哪怕有几十上百行，不要只列前几行或省略。
+- 数值就写原始数值（如 22101086925，不要写"约221亿"）。
+- 如果问题要求分组计数，列名和聚合口径要和问题一致；除非明确要求去重，否则 COUNT 按行计数。
+- 这个 ```answer 块是给系统精确核对用的，务必与你正文结论一致。
+
 ## 注意事项
 
 - 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，列出所有文件，不要遗漏任何一个
@@ -297,6 +316,25 @@ class AgentLoop:
                     else:
                         dims = f"{data.get('width', '?')}x{data.get('height', '?')}"
                         lines.append(f"    尺寸 {dims}，暂无可提取文本（OCR 未配置或处理中）")
+                    lines.append("")
+
+
+                elif profile and profile.status == "ready" and profile.profile_type == "video":
+                    data = profile.profile_data or {}
+                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
+                    lines.append(f"### {f.filename} ({type_label})")
+                    if data.get("ocr_applied") and data.get("ocr_text"):
+                        # 视频是幻灯片型，OCR 文本往往定义了本题的筛选口径/准入线/分组维度。
+                        # 放入前 4000 字；若更长，提示 Agent 用 read_file 读取完整内容。
+                        ocr = data["ocr_text"]
+                        lines.append("    视频逐帧 OCR 文本（定义了本题的筛选条件/统计口径/分组维度，必须据此理解问题，不要说无法提取视频内容）：")
+                        lines.append("    " + ocr[:4000].replace("\n", "\n    "))
+                        if len(ocr) > 4000:
+                            lines.append(f"    （视频文本较长，共 {len(ocr)} 字，如需完整内容用 read_file 读取 {f.filename}）")
+                    elif data.get("preview"):
+                        lines.append(f"    OCR 识别内容预览: {data['preview'][:200]}")
+                    else:
+                        lines.append("    暂无可提取文本（OCR 未配置或处理中）")
                     lines.append("")
 
 
@@ -798,8 +836,8 @@ class AgentLoop:
                     else:
                         consecutive_errors = 0
 
-                    if len(result_str) > 8000:
-                        result_str = result_str[:8000] + "\n...(结果已截断)"
+                    if len(result_str) > 30000:
+                        result_str = result_str[:30000] + "\n...(结果已截断)"
 
                     tool_calls_log.append({
                         "name": tu["name"],

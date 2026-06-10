@@ -110,7 +110,7 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
     return db_path
 
 
-def execute_query(db_path: str, sql: str, max_rows: int = 200) -> Dict[str, Any]:
+def execute_query(db_path: str, sql: str, max_rows: int = 2000) -> Dict[str, Any]:
     """执行只读 SQL 查询"""
     sql_upper = sql.strip().upper()
     if any(kw in sql_upper for kw in ("INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE")):
