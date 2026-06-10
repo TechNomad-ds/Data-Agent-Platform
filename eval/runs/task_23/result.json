@@ -1,469 +1,90 @@
 {
   "task_id": "task_23",
   "question": "According to the rights issue review dashboard shown in the video, in which years did the featured retail company conduct share placements, and what was the raised amount for each year?",
-  "answer": "\n\nLet me first look at the briefing video and the relevant data files.\n\n\n\nLet me dig into the rights issue data and identify the featured retail company from the video briefingI can see from the PDF that **王府井集团股份有限公司 (Wangfujing Group)** is a featured retail company. Let me search for more information about the rights issues related to this retail company.\n\n\n\nNow I can see the briefing mentions the target stock code is **600859** (王府井/Wangfujing). Let me look for the rights issue data in the database - specifically there's a table `A股配股` in the SQLite database, and also let me search the briefing more carefully.\n\n\n\nLet me look at the sub_db.sqlite tables and search for the 王府井 rights issue data.\n\n\nI see there's no dedicated `A股配股` table in the database. Let me look more carefully at the briefing video content and the data we have. Let me extract more text from the briefing.\n\n\nLet me look more carefully at the briefing video content which seems to have HTML table content embedded.\n\n\n\n\n\n\nThe mp4 file is binary video data. The text extraction from the search results already gave me key clues. Let me check what the search found about the briefing content. Let me look at the HTML tables in the briefing that were discovered during search.\n\n\n\n\n\nNow I have very clear information. The briefing video tells us:\n\n**Page 6** - \"配股募资记录核对 两条记录待写入\" (Two records to be written)\n- 王府井/600859 | 1995-12-31 | 179,544,030.0\n\nLet me also find the second record.\n\n\nI can see the first record clearly. Let me look more at the briefing content to find both records. The text says \"两条记录待写入\" (two records to be written) and shows the first one. Let me search further.\n\n\n\n\n\nLet me also check the database for the 配股 data and look at what the company info shows for 王府井.\n\n\n\n\n\n\n\n\n\n\n\n\nNow I have the rights issue records. But the video asks about \"募集资金总额(元)\" (total funds raised) - this information isn't in the `配股大股东认配状况` table which only has shares data. Let me look for the fundraising amount data.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nOK, so there's no SEO data for 王府井. The video briefing specifically said \"从分散页面里合并同一股票的配股年度和募集资金总额(元)\" - meaning the data should be extracted from the pages of the briefing video itself. Let me look more carefully at what was found in the briefing.\n\nFrom the search results, I already have the key findings:\n\n**Page 6 of the briefing video shows:**\n- 王府井/600859 | **1995-12-31** | **179,544,030.0** 元\n- 王府井/6008... (truncated - the second record)\n\nLet me find the complete second record.\n\n\n\n\n\n\n\n\n\nLet me search specifically for the second record text after \"王府井/6008\" in the briefing since it was truncated.\n\n\n\n\n\n\n\n\n\nNow I have a clear picture. Let me look at the 1997配股看板 page that was mentioned as \"答案证据2/2\" to see if the second record with 1997 data for 王府井 is there.\n\n\n\n\n\n\nThe mp4 binary file is not readable as text. But the search results have already extracted the key information from it. Based on the search results summary I found:\n\nFrom the **briefing.mp4** (video presentation), the extracted text shows:\n\n**Page 6 - 配股募资记录核对 (Rights Issue Fundraising Record Check) - \"两条记录待写入\" (Two records pending):**\n\nThe first record is clearly visible:\n- 王府井/600859 | 1995-12-31 | **179,544,030.0** 元\n\nAnd the second record is truncated as \"王府井/6008...\" but the context says \"两条记录\" (two records). Let me check what the second one is by looking at the 1997 rights issue data.\n\nFrom the database, 王府井 has these rights issue records in `配股大股东认配状况`:\n1. 1995-08-23 - 20,250,000 shares\n2. 1997-03-24 - 27,300,000 shares\n\nAnd the video mentions \"1997 配股看板\" as \"答案证据2/2\" - meaning the 1997 rights issue record is the second piece of evidence. Let me search more specifically.\n\n\n\n\n\n\nI notice the text mentions in the search results for the 1997 page: there's a table like this:\n```\n<tr><td>长航凤凰 / 000520</td><td>1997-12-31</td><td>419524992.0</td></tr>\n```\n\nLet me look at the 1997 page more carefully to see if 王府井/600859 appears there too.\n\n\n\n\n\n\n\n\n\n\n\n\nFrom the search results, I can now piece together the full picture. Let me also check the page 5 content about the \"1997 配股看板\".\n\n\n\n\nLet me search more broadly for the briefing page 5 content which mentions \"1997 配股看板\" and see the full table.\n\n\n\n\n\n\n\n\n\nNow I have enough information. Let me also check the \"1997 配股看板\" table more carefully. From the search results, I found that the 1997 page contains a table row:\n\n\"长航凤凰 / 000520\" | \"1997-12-31\" | \"419524992.0\"\n\nAnd Page 6 says \"两条记录待写入\" (two records to write) and the first one is:\n- 王府井/600859 | 1995-12-31 | 179,544,030.0\n\nThe second one is truncated as \"王府井/6008...\" but based on the context of \"1997 配股看板\" being \"答案证据2/2\" and the rights issue records in the database showing the 1997 rights issue, let me verify what the 1997 amount was.\n\nLet me also look at the page 4 side panel data about the 王府井 major shareholder subscription.\n\n\n\n\n\n\nAlright. From the briefing data I've gathered, let me compile the findings. The page 6 shows two records for 王府井 (600859). Let me now compute the second record's fundraising amount based on the available data. \n\nLooking at the database record, 王府井 had:\n- 1995 rights issue: shareholder 北京市国有资产经营公司, entitled 20,250,000 shares\n- 1997 rights issue: shareholder 北京市京联发投资管理中心, entitled 27,300,000 shares\n\nFrom the video briefing Page 6: \"配股募资记录核对 两条记录待写入\" - the first record is clearly:\n- 王府井/600859 | 1995-12-31 | **179,544,030.0** 元\n\nAnd the second line is truncated at \"王府井/6008...\" The 1997 page (Page 5) is labeled \"答案证据2/2\" (Evidence 2/2). Let me check the page 4 \"大股东认配侧栏\" for the 王府井 data.\n\n\n\n\n\n\n\n\n\nLet me look for the 1997 rights issue record more directly. The video briefing page 5 mentions \"1997 配股看板\" as \"答案证据2/2\". Let me also look at the page 4 and page 5 data specifically for 王府井.\n\n\n\n\n\n\n\n\n\n\n\n[已达到最大执行步数，自动停止]",
+  "answer": "\n\nLet me first look at the briefing video to understand the rights issue review dashboard, and also examine the relevant data files for share placement information.\n\n\n\nThe video clearly shows that the target company is **王府井 (600859)**. Let me now verify this data from the database to see if there's additional context.\n\nFrom the video, I can see the dashboard clearly states:\n\n- **Target stock code**: 600859 (王府井, a retail company)\n- **1995**: 179,544,030.0 元 (approximately **1.8亿**)\n- **1997**: 430,020,325.8 元 (approximately **4.3亿**)\n\nLet me also check the database for the rights issue data to see if there's a \"配股\" table with more details.\n\n\n\nNow let me look at the database for the A股配股 table (rights issues data) to cross-reference:\n\n\nThe database table `配股大股东认配状况` contains shareholder subscription info but not the total raised amounts. Let me look at the company overview to confirm 王府井's stock code.\n\n\n\n\n\n\nLet me check what tables/documents contain 王府井 or 600859 info.\n\n\n\n\n\n\nThe video dashboard is the primary source for this question. Let me consolidate what I've found from the video.\n\nBased on the **briefing.mp4** video dashboard, I can clearly identify the featured company and its rights issue records.\n\n---\n\n## 结论\n\n根据视频中展示的**配股募资看板（Rights Issue Review Dashboard）**，目标公司是**王府井（600859）**——一家零售企业（北京王府井百货集团的前身）。该看板显示王府井共进行了 **2 次配股**，具体如下：\n\n### 配股年度与募集资金\n\n| 配股年度 | 募集资金总额（元） | 对应金额 |\n|:--------:|:-----------------:|:--------:|\n| **1995** | **179,544,030.0** | **约1.80亿元** |\n| **1997** | **430,020,325.8** | **约4.30亿元** |\n\n### 详细说明\n\n- **1995年配股**：募资 **1.795亿** 元，这是王府井上市后较早的再融资动作。\n- **1997年配股**：募资 **4.30亿** 元，金额显著高于1995年，反映了公司在该时期的扩张需求。\n\n两次配股合计募集资金约 **6.10亿元**。\n\n> 📌 视频看板中有两条关键证据页面（第6-7页）明确标出：\"答案证据分散在1995和1997两个页面\"，并汇总展示了上述两条记录。\n\n```answer\n配股年度,募集资金总额(元)\n1995,179544030.0\n1997,430020325.8\n```",
   "tool_log": [
     {
       "phase": "call",
       "name": "read_file",
       "input": {
-        "filename": "knowledge.md"
+        "filename": "briefing.mp4"
       }
     },
     {
       "phase": "result",
       "name": "read_file",
-      "content": "文件: knowledge.md (共 167 行，显示第 1-100 行)\n---\n# Knowledge Guide: Chinese Stock Market Corporate Database (`enq-cnds-cndv-ccks_stock`)\n\n## 1. Business Context & Scope\n\nThis database serves as a comprehensive repository of Chinese A-share listed company information, covering corporate fundamentals, equity transactions, shareholder activities, market trading data, and regulatory filings. It supports analytical use cases across corporate governance, capital market events, industry classification, and financial performance assessment.\n\nAll table and column names are in Simplified Chinese. Field values follow conventions of the Chinese securities regulatory ecosystem (CSRC standards, Shanghai/Shenzhen stock exchange codes).\n\n---\n\n## 2. Core Entities & Field Definitions\n\n### 2.1 Corporate Identity & Fundamentals\n\n| Table | Business Purpose |\n|-------|-----------------|\n| `公司概况` | Master company profile: stock codes, registered names, board secretary contacts, incorporation details |\n| `公司行业划分表` | Industry classification mapping (primary/secondary industry names per company) |\n| `公司主营业务构成` | Revenue and margin breakdown by business segment per reporting period |\n\nKey Fields:\n- `公司代码` — Internal company identifier; primary join key across most tables.\n- `中文名称缩写` — Short Chinese company name; used as display label in results.\n- `A股证券代码` — 6-digit A-share ticker (e.g., `'600234'`). Always stored and filtered as a string.\n- `一级行业名称` — Primary industry classification name.\n- `董事会秘书` / `董秘电话` — Board secretary name and phone; sourced from `公司概况`.\n\n### 2.2 Equity Issuance & Capital Events\n\n| Table | Business Purpose |\n|-------|-----------------|\n| `A股发行申报企业信息` | IPO application filings; includes industry/sector of applicant |\n| `A股增发` | Secondary/additional share issuances (SEOs) with purpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |",
+      "content": "文件: briefing.mp4 (视频/逐帧OCR, 72 行，显示第 1-72 行)\n---\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><td style='text-align: center; word-wrap: break-word;'>800000000.0</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>1996 年全市场</td><td style='text-align: center; word-wrap: break-word;'>18 家</td><td style='text-align: center; word-wrap: break-word;'>2100000000.0</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>1997 年全市场</td><td style='text-align: center; word-wrap: break-word;'>22 家</td><td style='text-align: center; word-wrap: break-word;'>6000000000.0</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>1998 年全市场</td><td style='text-align: center; word-wrap: break-word;'>19 家</td><td style='text-align: center; word-wrap: break-word;'>4500000000.0</td></tr></table>\n\n## 第 3 页\n\n## 1996 页面无目标记录\n\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>湖南天雁 / 600698</td><td style='text-align: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>304807776.0</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>冰山冷热 / 000530</td><td style='text-align: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>98000000.0</td></tr><tr><td colspan=\"3\">本页没有 600859。</td></tr></table>\n\n## 第 4 页\n\n## 大股东认配侧栏\n\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>北京市国有资产经营公司</td><td style='text-align: center; word-wrap: break-word;'>应配 20,250,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 10,125,000 股</td></tr><tr><td style='text-alig",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 25 行\n            name\n0        公司实际控制人\n1        公司行业划分表\n2      限售股票解禁时间表\n3       公司主营业务构成\n4     a股发行申报企业信息\n5     公司报告期管理层持股\n6         自由流通股本\n7       公司股本结构变动\n8         A股询价明细\n9           A股增发\n10          股份回购\n11       概念所属公司表\n12          公司分红\n13  利润分配表附注_财务费用\n14    法人配售与战略投资者\n15        股东股权托管\n16          股东户数\n17        股东持股统计\n18        股东股权变动\n19     配股大股东认配状况\n20      股票月度行情数据\n21   股东股权冻结和质押统计\n22      股票交易资金流向\n23          日行情表\n24     股东股权冻结和质押",
+      "is_error": false
+    },
+    {
+      "phase": "call",
+      "name": "sqlite_query",
+      "input": {}
+    },
+    {
+      "phase": "result",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n        name                                                                                                                                                                                                sql\n0  配股大股东认配状况  CREATE TABLE \"配股大股东认配状况\" (\\n\"序号\" INTEGER,\\n  \"公司代码\" INTEGER,\\n  \"公司中文名称\" TEXT,\\n  \"中文名称缩写\" TEXT,\\n  \"所属基金/股票代码\" TEXT,\\n  \"首次信息发布时间\" TEXT,\\n  \"股东名称\" TEXT,\\n  \"应配股数(股)\" REAL,\\n  \"实配股数(股)\" REAL\\n)",
       "is_error": false
     },
     {
       "phase": "call",
       "name": "search_data_space",
       "input": {
-        "query": "rights issue 配股 零售 company retail raised amount",
-        "top_k": 10
+        "query": "配股 募集资金 王府井 600859"
       }
     },
     {
       "phase": "result",
       "name": "search_data_space",
-      "content": "[knowledge.md] (得分: 0.033, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[knowledge.md] (得分: 0.032, 来源: hybrid)\n funds raised, denominated in RMB yuan.\n- `回购总金额(元)` — Total buyback amount in RMB yuan.\n- `所属行业/领域` — Industry/sector field in IPO filings (e.g., `'银行业'`).\n\n### 2.3 Shareholder & Equity Change Events\n\n| Table | Business Purpose |\n|-------|-----------------|\n| `配股大股东认配状况` | Major shareholder subscri\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\n stored and filtered as a string.\n- `一级行业名称` — Primary industry classification name.\n- `董事会秘书` / `董秘电话` — Board secretary name and phone; sourced from `公司概况`.\n\n### 2.2 Equity Issuance & Capital Events\n\n| Table | Business Purpose |\n|-------|-----------------|\n| `A股发行申报企业信息` | IPO application filings;\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\ne Case 1: Major Shareholder Rights Entitlement\nQuestion: Which major shareholders are entitled to more than 2 million rights shares?\nLogic: Filter `配股大股东认配状况` where `应配股数(股) > 2000000`, return `股东名称`.\n\n### Use Case 2: Industry Distribution of High Free-Float Companies\nQuestion: How many companies ha\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\nuestion: How many companies had a single buyback transaction reaching ¥100 million last year?\nLogic: Filter `股份回购` where `回购总金额(元) >= 100000000` and announcement year equals last year (relative date).\n\n### Use Case 5: Top Shareholders by Pre-Transfer Holding with Executive Details\nQuestion: Show com\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.028, 来源: hybrid)\n的四川美丰化工股份有限公司，其主营业务为尿素、复合肥、车用尿素、三聚氰胺、硝酸、硝铵、包装塑料制品及LNG(液化天然气)等产品的制造与销售。该公司法定经营范围明确了其从事化学肥料、尿素、柴油机尾气处理液的研发、生产与销售。其产品线十分丰富，包括尿基复合肥、硝硫基复合肥、普通尿素以及车用尿素产品，同时还经营液化天然气等其他化工产品。公司的兼营业务包括石灰、金属门柜制造、销售，进一步拓宽了其业务边界。\n\n针对记录 39 的三湘印象股份有限公司，公司确立了“加",
+      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12,664,805.38元为资本化支出。\n\n档案编号 2336 的晶盛机电，其研发投入高达 182,907,000 元，占营收的 7.21%。在技术密集的光伏与半导体设备行业，如此高强度的投入是其维持技术代差和市场领导地位的基石。\n\n档案编号2346的冀凯股份，研发投入为17,182,040元，占营收的4.28%，专注于提升矿山支护装备的智能化与安全性。\n\n档案编号 2445 的福斯特，其研发投入经期末调整后确认为 202,8\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n数量、金额及比例等核心指标，深入理解中介机构在各发行项目中的角色与贡献。\n\n关于记录 6，针对海问律师事务所参与中国天楹股份有限公司项目的角色，档案中并未提供其承销数量(股)、承销金额(元)或承销比例的具体数据。作为法律顾问，其职责通常不涉及直接的承销承诺，这解释了相关数据的缺失。该机构的合伙人近期参加了一场关于跨境并购的行业研讨会。因此，对该机构的评估应侧重于其法律服务的质量而非量化的承销业绩。\n\n关于记录 134，对于中洲会计师事务所为粤高速提供的服务，其具体的承销数量(股)和承销金额(元)等量化指标并未被记录。作为审计机构，其核心任务是财务报表的审计，而非证券承销。该事务所的IT部门最近",
       "is_error": false
     },
     {
       "phase": "call",
-      "name": "read_file",
-      "input": {
-        "filename": "briefing.mp4",
-        "max_lines": 10
-      }
+      "name": "sqlite_query",
+      "input": {}
     },
     {
       "phase": "result",
-      "name": "read_file",
-      "content": "文件: briefing.mp4 (共 19650 行，显示第 1-10 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001†«moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001\\ë\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000ªtrak\u0000\u0000\u0000\\tkhd\u0000\u0000\u0000\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0001\\³\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0005\u0000\u0000\u0000\u0002Ğ\u0000\u0000\u0000\u0000\u0000$edts\u0000\u0000\u0000\u001celst\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0001\\³\u0000\u0000\u0017p\u0000\u0001\u0000\u0000\u0000\u0000ª\u0006mdia\u0000\u0000\u0000 mdhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001_\u0000z–ĞUÄ\u0000\u0000\u0000\u0000\u0000-hdlr\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000vide\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000VideoHandler\u0000\u0000\u0000©±minf\u0000\u0000\u0000\u0014vmhd\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000$dinf\u0000\u0000\u0000\u001cdref\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\furl \u0000\u0000\u0000\u0001\u0000\u0000©qstbl\u0000\u0000\u0002™stsd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0002‰avc1\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0005\u0000\u0002Ğ\u0000H\u0000\u0000\u0000H\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0018ÿÿ\u0000\u0000\u0000;avcC\u0001d\u0000\u001fÿá\u0000\u001egd\u0000\u001f¬Ù@P\u0005»\u0001n\u0004\u0004\u000bJ\u0000\u0000\u0003\u0000\u0002\u0000\u0000\u0003\u0000x\u001e0c,\u0001\u0000\u0006hëàŒ²,ıøø\u0000\u0000\u0000\u0001Ôcolrprof\u0000\u0000\u0001È\u0000\u0000\u0000\u0000\u00040\u0000\u0000mntrRGB XYZ \u0007à\u0000\u0001\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000acsp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\tdesc\u0000\u0000\u0000ğ\u0000\u0000\u0000$rXYZ\u0000\u0000\u0001\u0014\u0000\u0000\u0000\u0014gXYZ\u0000\u0000\u0001(\u0000\u0000\u0000\u0014bXYZ\u0000\u0000\u0001<\u0000\u0000\u0000\u0014wtpt\u0000\u0000\u0001P\u0000\u0000\u0000\u0014rTRC\u0000\u0000\u0001d\u0000\u0000\u0000(gTRC\u0000\u0000\u0001d\u0000\u0000\u0000(bTRC\u0000\u0000\u0001d\u0000\u0000\u0000(cprt\u0000\u0000\u0001Œ\u0000\u0000\u0000<mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000\b\u0000\u0000\u0000\u001c\u0000s\u0000R\u0000G\u0000BXYZ \u0000\u0000\u0000\u0000\u0000\u0000o¢\u0000\u00008õ\u0000\u0000\u0003XYZ \u0000\u0000\u0000\u0000\u0000\u0000b™\u0000\u0000·…\u0000\u0000\u0018ÚXYZ \u0000\u0000\u0000\u0000\u0000\u0000$ \u0000\u0000\u000f„\u0000\u0000¶ÏXYZ \u0000\u0000\u0000\u0000\u0000\u0000öÖ\u0000\u0001\u0000\u0000\u0000\u0000Ó-para\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002ff\u0000\u0000ò§\u0000\u0000\nY\u0000\u0000\u0013Ğ\u0000\u0000\n[\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000mluc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\fenUS\u0000\u0000\u0000 \u0000\u0000\u0000\u001c\u0000G\u0000o\u0000o\u0000g\u0000l\u0000e\u0000 \u0000I\u0000n\u0000c\u0000.\u0000 \u00002\u00000\u00001\u00006\u0000\u0000\u0000\u0010pasp\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0014btrt\u0000\u0000\u0000\u0000\u0000\u0001X*\u0000\u0001X*\u0000\u0000\u0000\u0018stts\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\nv\u0000\u0000\u000b¸\u0000\u0000\u0000Dstss\u0000\u0000\u0000\u0000\u0000\u0000\u0000\n\u0000\u0000\u0000\u0001\u0000\u0000\u0000û\u0000\u0000\u0001Ğ\u0000\u0000\u0002Ê\u0000\u0000\u0003x\u0000\u0000\u0004e\u0000\u0000\u0005_\u0000\u0000\u0006Y\u0000\u0000\u0007S\u0000\u0000\u0007’\u0000\u0000\bŒ\u0000\u0000\tB\u0000\u0000\n<\u0000\u0000R€ctts\u0000\u0000\u0000\u0000\u0000\u0000\nN\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000.à\u0000\u0000\u0000\u0002\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000#(\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000\u0000\u0000\u0001\u0000\u0000\u0017p\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u000b¸\u0000\u0000\u0000\u0001\u0000\u0000:˜\u0000",
+      "name": "sqlite_query",
+      "content": "返回 1 行\n    type       name   tbl_name  rootpage                                                                                                                                                                                                sql\n0  table  配股大股东认配状况  配股大股东认配状况      2796  CREATE TABLE \"配股大股东认配状况\" (\\n\"序号\" INTEGER,\\n  \"公司代码\" INTEGER,\\n  \"公司中文名称\" TEXT,\\n  \"中文名称缩写\" TEXT,\\n  \"所属基金/股票代码\" TEXT,\\n  \"首次信息发布时间\" TEXT,\\n  \"股东名称\" TEXT,\\n  \"应配股数(股)\" REAL,\\n  \"实配股数(股)\" REAL\\n)",
       "is_error": false
     },
     {
       "phase": "call",
-      "name": "read_file",
-      "input": {
-        "filename": "企业之间参股情况.pdf",
-        "max_lines": 200
-      }
+      "name": "sqlite_query",
+      "input": {}
     },
     {
       "phase": "result",
-      "name": "read_file",
-      "content": "文件: 企业之间参股情况.pdf (PDF, 728 行，显示第 1-200 行)\n---\n--- 第 1 页 ---\n尽职调查报告：目标公司股权结构与资本沿革的法证审查\n关于审查条目 10 的调查显示，一家位于江苏的材料科学公司，即 江苏百川高科新\n材料股份有限公司（简称：百川股份），其股东名单中包括一个重要的双边资本实\n体。该股东被确认为 中国-比利时直接股权投资基金。该基金的参与表明了国际资本\n对公司技术前景的认可。近期，该公司的生产基地完成了消防安全系统的年度升\n级，相关记录已归档。此项投资可能为公司引入了欧洲市场的渠道与管理经验。\n针对条目 32 的审查档案确认，武汉力源信息技术股份有限公司（简称：力源信息）\n的一位主要股东为 武汉听音投资有限公司。该投资公司的持股性质和背景需要进一\n步的穿透审查。公司最近的季度行政会议纪要显示，讨论了关于员工差旅报销标准\n调整的议题。此种本地投资实体的存在，通常意味着对区域市场的深度绑定和资源\n整合。\n审查条目 34 指向智能装备集团 华昌达智能装备集团股份有限公司（简称：华昌\n达）。记录显示，其股权结构中包含一家位于广州的创业投资合伙企业，即 广州基\n石创业投资合伙企业。该公司的IT部门近期提交了一份关于数据中心冷却系统效率\n的评估报告。创业投资基金的介入，通常预示着公司处于快速扩张或技术迭代的关\n键阶段。\n依据条目 55 的记录，一家大型国有商业银行，即 中国工商银行股份有限公司（简\n称：工商银行），其核心股东之一为 中央汇金投资有限责任公司。这种股权关系是\n国家层面金融稳定的典型架构，反映了其战略重要性。该银行的后勤部门最近启动\n了对部分老旧办公网点的内部装修招标流程。中央汇金的持股确保了该金融机构在\n宏观经济调控中的关键作用。\n条目 85 的记录显示，上海浦东发展银行股份有限公司（简称：浦发银行）的股东名\n单中出现了 上海国鑫投资发展有限公司。这家投资公司的背景及其与地方国资体系\n的关联，是本次审查的重点。该银行上月组织了一次全员信息安全意识培训。对该\n股东资金来源和投资意图的核查，对于理解浦发银行的治理结构至关重要。\n根据文件索引 140，广东地区的科技控股公司 广东东阳光科技控股股份有限公司\n（简称：东阳光）的股权结构中，包含了其关联实体 乳源阳之光铝业发展有限公\n司。这种内部持股安排在集团化公司中较为常见，旨在优化资源配置。该公司的行\n政部门正在协调更换会议室的多媒体设备。需要进一步分析此类关联交易的公允性\n及其对少数股东权益的影响。\n\n--- 第 2 页 ---\n档案 142 表明，上海润达医疗科技股份有限公司（简称：润达医疗）的股东中存在\n自然人股东 刘辉。对该自然人股东的背景调查是评估潜在关联方风险的必要步骤。\n公司内部备忘录提及，计划在下个财年增加研发部门的预算。必须核实刘辉先生是\n否在公司或其关键供应商中担任职务。\n关于审查条目 144，江苏苏盐井神股份有限公司（简称：苏盐井神）的股东之一是 \n江苏汇鸿国际集团股份有限公司。该股东具有显著的省级国资背景，其投资行为可\n能带有战略协同的考量。该公司的物流部门正在评估一个新的仓储管理系统。此股\n权链接可能为苏盐井神在供应链和国际贸易方面提供支持。\n条目 171 的调查指向 海思科医药集团股份有限公司（简称：海思科），其股东名单\n中包含自然人 申萍。对该自然人股东的资金实力和持股动机的审查正在进行中。公\n司的年度员工健康体检计划已于上季度顺利完成。需要确认该股东与公司创始人或\n核心技术团队之间是否存在未披露的一致行动关系。\n根据条目 172 的记录，香农芯创科技股份有限公司（简称：香农芯创）的投资方之\n一是一家有限合伙制的股权投资基金，其全称为 深圳市领驰基石股权投资基金合伙\n企业(有限合伙)。该公司最近更新了其官方网站的投资者关系页面。这类专业投资机\n构的入股，通常旨在获取财务回报并可能参与公司治理。\n紧随其后的条目 173 显示，香农芯创科技股份有限公司（简称：香农芯创）的股东\n名单中还包括 深圳市领汇基石股权投资基金合伙企业(有限合伙)。同一家公司引入\n两家名称相近的基金，可能表明这是同一基金管理人的不同投资主体进行的布局。\n该公司的法律部门正在审阅一份新的办公空间租赁合同。需要核实这两家“基石”基金\n的最终受益人是否存在重叠。\n条目 178 的审查档案确认，朗源股份有限公司（简称：朗源股份）的股东中包括 新\n疆尚龙股权投资管理有限公司。这家位于新疆的股权投资公司的投资逻辑及其与朗\n源股份主营业务的协同效应值得关注。公司的人力资源部发布了最新的内部招聘岗\n位列表。此项投资可能与区域性的产业扶持政策有关。\n关于审查条目 191，科技公司 立昂技术股份有限公司（简称：立昂技术）的股权结\n构中，包含了一家在宁波注册",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "王府井 配股 rights issue 募集资金",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[knowledge.md] (得分: 0.032, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.029, 来源: hybrid)\n金(有限合伙)。其旗舰店正在筹备一次外立面的翻新工程。此类基金的参与，通常意味着目标公司将在公司治理、激励机制和资产重组方面迎来深刻变革。\n\n紧随其后的条目 538 进一步披露，王府井集团股份有限公司的股东名单中还包括北京首都旅游集团有限责任公司。该公司市场部正在对上一个长假期间的客流量数据进行复盘分析。零售业巨头与大型旅游集团的资本联合，预示着双方在“商旅文”融合发展方面存在巨大的战略协同空间。\n\n条目 539 的档案确认，王府井集团股份有限公司 的另一位机构股东为 三胞集团南京投资管理有限公司。来自南京的大型民营投资集团的入股，使得该零售公司的股权\n\n结构更加多元化。公司的法务合规部门正在\n\n---\n\n[发行与上市中介机构.md] (得分: 0.026, 来源: hybrid)\n构的初步梳理，本报告将继续深入剖析在后续资本市场活动中扮演关键角色的其他专业服务机构，以构建完整的交易生态图谱。\n\n关于记录 2066，浙江网盛生意宝股份有限公司的资金监管服务由工行上海市淮海中路第二支行提供。关于该银行分支机构的简称、负责人以及具体业务经办人的信息，在当前数据集中均显示为缺失。该分支机构的地理位置便利，便于企业日常业务往来。对募集资金的有效监管是确保资金按预定用途使用的重要保障。\n\n关于记录 2214，光大证券股份有限公司的法律顾问为北京市天元律师事务所。这家律所在业内常被称为“北京市天元律所”，其法人代表为王立华。负责此项目的律师团队成员包括刘艳、徐萍、吴冠雄、史振凯。该律\n\n---\n\n[发行与上市中介机构.md] (得分: 0.025, 来源: hybrid)\n录 1658，中国诚信证券评估有限公司作为评级机构，其职责不包括证券承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空白。\n\n关于记录 1736，上海万国证券公司在宝信软件历史发行中的承销数据，包括承销数量(股)、承销金额(元)和承销比例，均因年代久远或记录不全而缺失。\n\n关于记录 1779，华夏证券在王府井项目中的承销详情，其承销数量(股)、承销金额(元)和承销比例在档案中均未被提及。\n\n关于记录 1780，通商律师事务所作为法律顾问，不承担承销责任，因此其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1781，北京京华信托投资公司在王府井项目中的参与细节，其承\n\n---\n\n[公司概况.md] (得分: 0.016, 来源: hybrid)\n了全面的人民币及外汇业务，包括吸收公众存款、发放贷款、国际结算、结售汇等。截至报告期末，该行已拥有310家分支机构，初步建成了覆盖贵州全省并辐射四川成都的金融服务网络。\n\n档案 397，天创时尚，天创时尚股份有限公司，成立于2004年4月9日。该公司的业务分为两大板块：一是以多品牌全产业链一体化运营的时尚鞋履服饰类业务，其主要产品为中高端时尚女鞋；二是以移动互联网精准营销为核心的信息技术服务业务。\n\n档案 398 的新华百货，银川新华百货商业集团股份有限公司，成立于1997年1月3日。作为宁夏地区的商业龙头，其主要从事商业零售、物流和商业物业出租业务。其零售业态涵盖百货商场、综合购物中心、超市\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td",
-      "is_error": false
+      "name": "sqlite_query",
+      "content": "SQL 错误: no such table: 公司概况",
+      "is_error": true
     },
     {
       "phase": "call",
       "name": "read_file",
       "input": {
-        "filename": "配股大股东认配状况.json",
+        "filename": "公司概况.md",
         "max_lines": 50
       }
     },
     {
       "phase": "result",
       "name": "read_file",
-      "content": "文件: 配股大股东认配状况.json (220 行, 9 列，显示第 1-50 行)\n列: 序号(int64), 公司代码(int64), 公司中文名称(object), 中文名称缩写(object), 所属基金/股票代码(object), 首次信息发布时间(object), 股东名称(object), 应配股数(股)(float64), 实配股数(股)(float64)\n---\n    序号  公司代码           公司中文名称 中文名称缩写 所属基金/股票代码             首次信息发布时间                            股东名称      应配股数(股)     实配股数(股)\n0    1    44   深圳长城开发科技股份有限公司    深科技    000021  1995-04-04 00:00:00                    中国电子信息产业集团公司   26460000.0         0.0\n1    2    44   深圳长城开发科技股份有限公司    深科技    000021  1995-04-04 00:00:00                          博旭有限公司   20790000.0         0.0\n2    3    44   深圳长城开发科技股份有限公司    深科技    000021  1995-04-04 00:00:00                          秉宏有限公司   20790000.0         0.0\n3    4    44   深圳长城开发科技股份有限公司    深科技    000021  1998-03-10 00:00:00                      长城科技股份有限公司   94653000.0         0.0\n4    5    44   深圳长城开发科技股份有限公司    深科技    000021  1998-03-10 00:00:00                        香港博旭有限公司   15912000.0         0.0\n5    6    44   深圳长城开发科技股份有限公司    深科技    000021  1998-03-10 00:00:00                          香港秉宏公司   12285000.0         0.0\n6    7    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1995-04-22 00:00:00               深圳市鸿基(集团)股份有限公司工会   14450000.0         0.0\n7    8    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00             深圳市鸿基(集团)股份有限公司工会基金   20683634.0         0.0\n8    9    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00                      潮州意溪工艺实业公司    1501500.0         0.0\n9   10    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00                     深圳中农信投资实业公司     815100.0         0.0\n10  11    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00                       中国太平洋保险公司     536250.0         0.0\n11  12    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00                      深圳丰华电子有限公司     450450.0         0.0\n12  13    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08 00:00:00           深圳开道投资开发有限公司(原奋高投资公司)     429000.0         0.0\n13  14    63    东旭蓝天新能源股份有限公司   东旭蓝天    000040  1997-04-08",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "王府井 600859 配股 募集资金总额 配股年度",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.026, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n，倪茂生先生在无锡隆盛科技的持股比例高达 24.33%，是一项具有重大影响力的个人持股，对应 49,117,012 股。\n\n关于审查条目509，胡东群先生对华昌达智能装备集团的持股，其投资额不详，持股比例为0.425%，对应2,446,558股。\n\n条目 520 指向福建省财政厅，其对兴业证券的持股比例为 20.27%，构成了对该证券公司的绝对控制地位。该持股对应 1,357,089,734 股。\n\n在条目537的记录中，北京京国瑞国企改革发展基金对北京王府井百货的持股比例为4.45%，相当于50,454,800股。\n\n紧随其后的条目 538 显示，北京首都旅游集团对该零售集团的持股，其比例最\n\n---\n\n[发行与上市中介机构.md] (得分: 0.025, 来源: hybrid)\n(股)、承销金额(元)和承销比例均未被记录。\n\n关于记录 1790，北京会计师事务所作为审计方，其承销数量(股)、承销金额(元)和承销比例等指标不适用。\n\n关于记录 1791，北京市国有资产管理局的角色不涉及承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1792，华夏证券有限公司在王府井项目中的承销细节，包括承销数量(股)、承销金额(元)和承销比例，均未在档案中找到。\n\n关于记录 1799，厦门国际信托在石化油服项目中的参与细节，其承销数量(股)、承销金额(元)和承销比例等量化数据均为缺失。该机构的合规部门正在组织关于最新监管政策的培训。\n\n在对历史发行项目进行梳\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "inspect_data",
-      "input": {
-        "filename": "sub_db.sqlite"
-      }
-    },
-    {
-      "phase": "result",
-      "name": "inspect_data",
-      "content": "不支持 inspect_data 的文件类型: sqlite",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 25 行\n            name\n0        公司行业划分表\n1       股票交易资金流向\n2         股东股权变动\n3       公司股本结构变动\n4     公司报告期管理层持股\n5         A股询价明细\n6           A股增发\n7           股份回购\n8        概念所属公司表\n9           公司分红\n10  利润分配表附注_财务费用\n11    法人配售与战略投资者\n12        股东股权托管\n13          股东户数\n14        股东持股统计\n15   股东股权冻结和质押统计\n16     股东股权冻结和质押\n17      公司主营业务构成\n18        自由流通股本\n19     配股大股东认配状况\n20          日行情表\n21    a股发行申报企业信息\n22       公司实际控制人\n23      股票月度行情数据\n24     限售股票解禁时间表",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "600859 配股年度 募集资金 王府井 1995 1997",
-        "top_k": 20
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.028, 来源: hybrid)\n，倪茂生先生在无锡隆盛科技的持股比例高达 24.33%，是一项具有重大影响力的个人持股，对应 49,117,012 股。\n\n关于审查条目509，胡东群先生对华昌达智能装备集团的持股，其投资额不详，持股比例为0.425%，对应2,446,558股。\n\n条目 520 指向福建省财政厅，其对兴业证券的持股比例为 20.27%，构成了对该证券公司的绝对控制地位。该持股对应 1,357,089,734 股。\n\n在条目537的记录中，北京京国瑞国企改革发展基金对北京王府井百货的持股比例为4.45%，相当于50,454,800股。\n\n紧随其后的条目 538 显示，北京首都旅游集团对该零售集团的持股，其比例最\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[发行与上市中介机构.md] (得分: 0.025, 来源: hybrid)\n(股)、承销金额(元)和承销比例均未被记录。\n\n关于记录 1790，北京会计师事务所作为审计方，其承销数量(股)、承销金额(元)和承销比例等指标不适用。\n\n关于记录 1791，北京市国有资产管理局的角色不涉及承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1792，华夏证券有限公司在王府井项目中的承销细节，包括承销数量(股)、承销金额(元)和承销比例，均未在档案中找到。\n\n关于记录 1799，厦门国际信托在石化油服项目中的参与细节，其承销数量(股)、承销金额(元)和承销比例等量化数据均为缺失。该机构的合规部门正在组织关于最新监管政策的培训。\n\n在对历史发行项目进行梳\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.024, 来源: hybrid)\n持有的股份数量为 42,028,770 股。\n\n对于条目 144，江苏汇鸿国际集团在江苏井神盐化的持股比例为 2.43%，投资金额未披露。这部分股权折合为 18,868,200 股。此项投资显示了其作为战略财务投资者的角色。\n\n关于审查条目171，申萍女士持有西藏海思科药业集团6.02%的股权。该公司的市场部正在策划下一季度的产品推广活动。该持股比例相当于64,997,010股，具体投资金额不详。\n\n条目 172 的记录显示，深圳市领驰基石股权投资基金在安徽聚隆传动科技的持股，其投资额未披露，但持股比例达到了 9.43%。该公司最近为其员工休息室增添了新的娱乐设施。这对应着 18,854,10\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.024, 来源: hybrid)\n金(有限合伙)。其旗舰店正在筹备一次外立面的翻新工程。此类基金的参与，通常意味着目标公司将在公司治理、激励机制和资产重组方面迎来深刻变革。\n\n紧随其后的条目 538 进一步披",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "read_file",
-      "input": {
-        "filename": "briefing.mp4",
-        "max_lines": 200,
-        "start_line": 19500
-      }
-    },
-    {
-      "phase": "result",
-      "name": "read_file",
-      "content": "文件: briefing.mp4 (共 19650 行，显示第 19501-19650 行)\n---\n!:\t\tĞˆ6\tqÈÊ\u0019$+\u0011ßµ)\tŠ\u00113°œ(Ò}‚dÀLğH\u0000»ÀŠFNn\u0018\"\u0001:Ú‚zI$\u0011„ ÜI\n\u0006\\Œ{„°* ¹$c\u0004›(O×\b_ª@\u0013ˆa\u0003]ˆœHÄ\u0011”!¤‚NF4“)à³fj8ñDaCÀGá·Lbo4¤zØäÀŞJ”‰°Vœ\u0012se\u0013ÄÀ”\u001cF±HX•ŸpÒ\u0010¬\u0010‚›°’“­'ÀP'\u0012y1fÉæsU6?”\bµy\u0001\u0017Zk\u0004cğs'î‰Ä·/Y!\\Rdû\u0012\u0011%’¢‹•BD¡¬¡\u0013=’rÄNE’R\u0003?P#IdóÔ\bXÉ“,{¸\u0004\u0011\u0004†:‘<NNê‡2\u0018’d‘rÎH“ñäòvÚIèâµà`\u0001\\e'\nY—;G!\u001d4®NˆD\n'FÆt§\\ºŞšF,,§M€–‘ÆÉæ% u\u0004ÂlœN‚jÉØDá)Ş](@*%\u0010U<ª\u000e}‹ €SZÍ%16pİïŠà7j¤\u0016\u001b:>cù\u001b´\u0004\u0004Ï–ûU§\u0002C$·Ø±u,s háÁË¹ÉD-\u0002}šñã>Âé…SVÓm¥ai¿Ü:6üÂÊ\u0017ŠÿÒ€\u0000±Ü’àU\u0014‰!pBg\nĞ>Á¿üB–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––—y\u0010…----------------------------------------------/!\u001aÔMüB\u0010H\u001aã˜\u0013\u000f\u001a\u001bæs ÂÚ\u001aÑHÜaBB'‡â„ûß‘\tøw£’É_!”ÄÃàHÏA8õ\tÌFtõ\"\u0011«à¥Ù\u000e¼‡\f™k£' ‚ÜB…‚\u0006‡X\u0017ßËk™•3„›ÁğD\u0018;1\u001cÓÅ¿Ø&càhâ> è„d$€%éœ®âCY\tRHPÂ\u0010¨\"x½Ñ,ír8»y\u0006MŸ\\\u0001\u0012“\u0016ƒásP@ ƒjƒØ¿Ï%/n–wÜÈC©ƒ\u001eêI\u0000\fŒ\u0016K‘{>»7ŸãĞa|›Î½C÷/¦•¼sD‹\"b×Üƒ\u0001ŠI¢—ÁÉ\u001dç\u000få¬\u0014\f;\nK\t=\u000eR’¿ur\u001f:·4\u001fq1¼(â.ÿÇä×Ü;–\u0019ğ¨|\u0015¯Oo6ÿ\u0017»\u001e9ç¤\u0003€\u0000\u0000\u0017¯¢?5Ş-¯9İ¼Ï„}•nú\u001dlá¦èÛ\t÷ÍÕkn\u0019·’#…vVFæôw§Kv}<øNŸuc¼´&n`8õØN\n?0] ¤\u001e\u001eL\u0011\u0002«\u001d{@…Ş¤P\u0001¿\u001fè\u0006\u0000}‹hkE¿üB–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––—}ğ…----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------/\u0000\u0000\u0000#AŸ–E\u0015,+ÿ\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\u0000\u0003\u0000\bx!\u001aÔMğCe\u0001\b€¯Ñôåí¯\u0003ƒÓËÇZGqÒS,(ø£âì\u0001\nd¼}ˆ¢ İP\b`|DGÇ\u0003+<]fÊp‚\"Òx—æOÓ¬Úx\u001a©Ói$›a|,\u0017_Éñ%¦º#oÅ“¥:eMÖLÖL”I\b•˜¿\u0015?œ\u0012-‹\u0018ŠÓ›á$”Nš$\u0000’\u0018( ÷×ß»(Á÷¬š\u0018­3¤<òV\u0014•ëœ1JğË\u0017¥š;—\t–\nà_\u001b–û‰ç¦¯-İÛ?5ıŞLøíŸ`ó\u0016Y>ø¾ıJaŒò\bìÀQ@ÊÀÖ\\\u001fš:\u000bö‰\u0015¹ıµÍ’V¨ÁÕw†`¾9±º8 \u00060Ô#•\té_ju\t\tˆ\u001a…ü½Á\u001d×\"¢M!š0ÆŠ\u001eŒ˜T]¥ş\u001e©\\xR…,ñ|cËêÀh¦\u0016Sš-9Š½C›º´€á\u0015!@¬Âuh\u000e8®²ÿ¯aâN\u0018¿ßù¾N\u001cîîĞÇñ%®ÁÅ@\u0006‹‹Ğ\n„}\u0013C¿$š\u0000\u0000\u0000\u0000\u0000\u0000\u0003RÀ`\u0007Ø7ÿˆR",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "王府井 600859 配股 1995 募集资金 179544030",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n金(有限合伙)。其旗舰店正在筹备一次外立面的翻新工程。此类基金的参与，通常意味着目标公司将在公司治理、激励机制和资产重组方面迎来深刻变革。\n\n紧随其后的条目 538 进一步披露，王府井集团股份有限公司的股东名单中还包括北京首都旅游集团有限责任公司。该公司市场部正在对上一个长假期间的客流量数据进行复盘分析。零售业巨头与大型旅游集团的资本联合，预示着双方在“商旅文”融合发展方面存在巨大的战略协同空间。\n\n条目 539 的档案确认，王府井集团股份有限公司 的另一位机构股东为 三胞集团南京投资管理有限公司。来自南京的大型民营投资集团的入股，使得该零售公司的股权\n\n结构更加多元化。公司的法务合规部门正在\n\n---\n\n[发行与上市中介机构.md] (得分: 0.026, 来源: hybrid)\n录 1658，中国诚信证券评估有限公司作为评级机构，其职责不包括证券承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空白。\n\n关于记录 1736，上海万国证券公司在宝信软件历史发行中的承销数据，包括承销数量(股)、承销金额(元)和承销比例，均因年代久远或记录不全而缺失。\n\n关于记录 1779，华夏证券在王府井项目中的承销详情，其承销数量(股)、承销金额(元)和承销比例在档案中均未被提及。\n\n关于记录 1780，通商律师事务所作为法律顾问，不承担承销责任，因此其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1781，北京京华信托投资公司在王府井项目中的参与细节，其承\n\n---\n\n[knowledge.md] (得分: 0.025, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><t\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "王府井 600859 第二条记录 1997 配股 募集资金",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.028, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[发行与上市中介机构.md] (得分: 0.028, 来源: hybrid)\n(股)、承销金额(元)和承销比例均未被记录。\n\n关于记录 1790，北京会计师事务所作为审计方，其承销数量(股)、承销金额(元)和承销比例等指标不适用。\n\n关于记录 1791，北京市国有资产管理局的角色不涉及承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1792，华夏证券有限公司在王府井项目中的承销细节，包括承销数量(股)、承销金额(元)和承销比例，均未在档案中找到。\n\n关于记录 1799，厦门国际信托在石化油服项目中的参与细节，其承销数量(股)、承销金额(元)和承销比例等量化数据均为缺失。该机构的合规部门正在组织关于最新监管政策的培训。\n\n在对历史发行项目进行梳\n\n---\n\n[发行与上市中介机构.md] (得分: 0.026, 来源: hybrid)\n录 1658，中国诚信证券评估有限公司作为评级机构，其职责不包括证券承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空白。\n\n关于记录 1736，上海万国证券公司在宝信软件历史发行中的承销数据，包括承销数量(股)、承销金额(元)和承销比例，均因年代久远或记录不全而缺失。\n\n关于记录 1779，华夏证券在王府井项目中的承销详情，其承销数量(股)、承销金额(元)和承销比例在档案中均未被提及。\n\n关于记录 1780，通商律师事务所作为法律顾问，不承担承销责任，因此其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1781，北京京华信托投资公司在王府井项目中的参与细节，其承\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n金(有限合伙)。其旗舰店正在筹备一次外立面的翻新工程。此类基金的参与，通常意味着目标公司将在公司治理、激励机制和资产重组方面迎来深刻变革。\n\n紧随其后的条目 538 进一步披露，王府井集团股份有限公司的股东名单中还包括北京首都旅游集团有限责任公司。该公司市场部正在对上一个长假期间的客流量数据进行复盘分析。零售业巨头与大型旅游集团的资本联合，预示着双方在“商旅文”融合发展方面存在巨大的战略协同空间。\n\n条目 539 的档案确认，王府井集团股份有限公司 的另一位机构股东为 三胞集团南京投资管理有限公司。来自南京的大型民营投资集团的入股，使得该零售公司的股权\n\n结构更加多元化。公司的法务合规部门正在\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "王府井 600859 第二条 配股 记录 1997",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12,664,805.38元为资本化支出。\n\n档案编号 2336 的晶盛机电，其研发投入高达 182,907,000 元，占营收的 7.21%。在技术密集的光伏与半导体设备行业，如此高强度的投入是其维持技术代差和市场领导地位的基石。\n\n档案编号2346的冀凯股份，研发投入为17,182,040元，占营收的4.28%，专注于提升矿山支护装备的智能化与安全性。\n\n档案编号 2445 的福斯特，其研发投入经期末调整后确认为 202,8\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n92。公司正在考虑为其旗舰店引入新的餐饮合作伙伴。其在资本市场的交易凭证代码为 600859。实体店的客流量恢复情况直接影响其短期业绩表现。\n\n关于记录 1787，本记录继续确认王府井集团股份有限公司（公司代码 1792）为关联主体。其证券简称为“王府井”。公司法务部门正在处理一项商标相关的常规事务。其股票代码为 600859。其供应链管理效率和与供应商的合作关系是其控制成本和保证商品供应的关键。\n\n关于记录 1788，该记录的主体是王府井集团股份有限公司，公司代码 1792。其运营部门正在测试一种新的销售点（POS）终端系统。其证券代码为 600859。对该公司估值时，需充分考虑其持有物业的\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n务所的办公地址在杭州市求是路8号公元大厦北楼20楼。其联系电话为 0571-85055613，传真号码是 0571-85055877。该律所的官方网站和电子邮箱信息未被记录",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 6 行\n           name\n0        A股询价明细\n1          A股增发\n2  利润分配表附注_财务费用\n3    法人配售与战略投资者\n4     配股大股东认配状况\n5    a股发行申报企业信息",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 1 行\n    序号  公司代码       公司中文名称 中文名称缩写  所属基金/股票代码               信息发布日期  一级行业名称 二级行业名称 四级行业代码\n0  123  1792  王府井集团股份有限公司    王府井     600859  2012-12-31 00:00:00  批发和零售业    零售业   None",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "SQL 错误: no such column: 所属基金",
-      "is_error": true
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 9 行\n   cid       name     type  notnull dflt_value  pk\n0    0         序号  INTEGER        0       None   0\n1    1       公司代码  INTEGER        0       None   0\n2    2     公司中文名称     TEXT        0       None   0\n3    3     中文名称缩写     TEXT        0       None   0\n4    4  所属基金/股票代码     TEXT        0       None   0\n5    5   首次信息发布时间     TEXT        0       None   0\n6    6       股东名称     TEXT        0       None   0\n7    7    应配股数(股)     REAL        0       None   0\n8    8    实配股数(股)     REAL        0       None   0",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 2 行\n    序号  公司代码       公司中文名称 中文名称缩写 所属基金/股票代码             首次信息发布时间          股东名称     应配股数(股)     实配股数(股)\n0  141  1792  王府井集团股份有限公司    王府井    600859  1995-08-23 00:00:00   北京市国有资产经营公司  20250000.0  10125000.0\n1  215  1792  王府井集团股份有限公司    王府井    600859  1997-03-24 00:00:00  北京市京联发投资管理中心  27300000.0  27300000.0",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 4 行\n           name\n0          A股增发\n1  利润分配表附注_财务费用\n2    法人配售与战略投资者\n3     配股大股东认配状况",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "返回 28 行\n    cid           name     type  notnull dflt_value  pk\n0     0             序号  INTEGER        0       None   0\n1     1           公司代码  INTEGER        0       None   0\n2     2         公司中文名称     TEXT        0       None   0\n3     3         中文名称缩写     TEXT        0       None   0\n4     4      所属基金/股票代码     TEXT        0       None   0\n5     5         预案公布日期     TEXT        0       None   0\n6     6           增发目的     TEXT        0       None   0\n7     7           发行对象     TEXT        0       None   0\n8     8           认购方式     REAL        0       None   0\n9     9  发行价上限(最高价)(元)     REAL        0       None   0\n10   10  发行价下限(最低价)(元)     REAL        0       None   0\n11   11     承销商指导价格(元)     TEXT        0       None   0\n12   12  发行量上限(不超过)(股)     REAL        0       None   0\n13   13  发行量下限(不少于)(股)     REAL        0       None   0\n14   14       超额配售权(股)     TEXT        0       None   0\n15   15        发行日期起始日     TEXT        0       None   0\n16   16        发行日期截止日     TEXT        0       None   0\n17   17          股权登记日     TEXT        0       None   0\n18   18            除权日     TEXT        0       None   0\n19   19        每股面值(元)     REAL        0       None   0\n20   20         发行量(股)     TEXT        0       None   0\n21   21       发行总市值(元)     TEXT        0       None   0\n22   22      发行费用总额(元)     TEXT        0       None   0\n23   23    承销保荐费用合计(元)     TEXT        0       None   0\n24   24        承销费用(元)     TEXT        0       None   0\n25   25        保荐费用(元)     TEXT        0       None   0\n26   26    预计募集资金总额(元)     REAL        0       None   0\n27   27    实际募集资金总额(元)     TEXT        0       None   0",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "sqlite_query",
-      "input": {}
-    },
-    {
-      "phase": "result",
-      "name": "sqlite_query",
-      "content": "查询返回空结果",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "配股募资记录核对 两条记录 王府井 600859 第二条 1997",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.026, 来源: hybrid)\n下将逐一列明各条目所依据的报告截止日期，以建立精确的时间戳基准。\n\n关于审查条目10，档案记录的有效性基于2011年11月30日的数据快照。该公司的内部审计部门当时正在规划下一财年的工作重点。这一时间点是评估该笔早期投资背景的基准。\n\n针对条目 32 的审查，其相关股权信息的报告周期截止于 2014 年 8 月 23 日。公司的 IT 部门在同一时期完成了一次对所有员工电子邮件账户的安全策略更新。\n\n在条目34的案例中，一份初步的数据传输日志曾将截止日期标记为2014年4月25日。然而，经过对最终归档文件的交叉验证，确认该记录的权威截止日期为2014年4月28日。\n\n依据条目55，与该核心金融\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.026, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.016, 来源: hybrid)\n252 的浙江万安科技股份有限公司，其信息发布日期与兄弟科技股份有限公司相同，均为2021年8月25日。\n\n关于记录 265 的广东东方精工科技股份有限公司，本报告所引用的数据发布于二零二二年三月十五日。该信息对于分析其在专用设备制造业的战略布局非常关键。\n\n关于记录 297 的天津膜天膜科技股份有限公司，相关信息的发布时间为2021年8月26日。该日期的文件支持了我们对其环保专用设备业务的分析。\n\n关于记录 299 的麦克奥迪(厦门)电气股份有限公司，其信息发布时间戳在初步录入时为2021年8月29日，后经最终确认，准确时间为二零二一年八月二十八日。\n\n关于记录 323 的浙江台华新材料股份\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; w",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"王府井/6008\" 第二条 配股 记录",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.028, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n92。公司正在考虑为其旗舰店引入新的餐饮合作伙伴。其在资本市场的交易凭证代码为 600859。实体店的客流量恢复情况直接影响其短期业绩表现。\n\n关于记录 1787，本记录继续确认王府井集团股份有限公司（公司代码 1792）为关联主体。其证券简称为“王府井”。公司法务部门正在处理一项商标相关的常规事务。其股票代码为 600859。其供应链管理效率和与供应商的合作关系是其控制成本和保证商品供应的关键。\n\n关于记录 1788，该记录的主体是王府井集团股份有限公司，公司代码 1792。其运营部门正在测试一种新的销售点（POS）终端系统。其证券代码为 600859。对该公司估值时，需充分考虑其持有物业的\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n务所的办公地址在杭州市求是路8号公元大厦北楼20楼。其联系电话为 0571-85055613，传真号码是 0571-85055877。该律所的官方网站和电子邮箱信息未被记录。\n\n关于记录 3061，大华会计师事务所的办公地址位于北京市海淀区西四环中路16号院7号楼11层1101。其总机电话为 010-58350011，传真号码为 010-58350006。其官方网站和电子邮箱信息在当前档案中缺失。\n\n关于记录 3273，瑞华会计师事务所的办公地址为北京市海淀区西四环中路16号院2号楼4层。其联系电话为 010-62105068，传真号码是 010-88210558。该所的网址和邮箱信息未被提供\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n路产的地理位置、车流量结构以及未来的改扩建投资计划，共同决定了其长期的现金流状况。\n\n关于记录 1356，该记录对应万向德农股份有限公司，市场简称为“万向德农”。其公司代码为 1352。该公司的研发中心近期采购了一批新的实验设备。其在二级市场的交易代码为 600371。作为一家农业科技公司，万向德农的业绩与种子研发、农业政策及气候条件等因素高度相关。其在生物育种技术领域的突破是未来增长的核心看点。\n\n关于记录 1658，本条目描述了华远地产股份有限公司（简称“华远地产”）。公司内部识别码为 1676。一份内部备忘录显示，公司正在评估新的客户关系管理（CRM）系统。其股票交易代码为 600743\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12,664,805.38元为资本化支出。\n\n档案编号 2336 的晶盛机电，其研发投入高达 182,907,000 元，占营收的 7.21%。在技术密集的光伏与半导体设备行业，如此高强度的投入是其维持技术代差和市场领导地位的基石。\n\n档案编号2346的冀凯股份，研发投入为17,182,040元，占营收的4.28%，专注于提升矿山支护装备的智能化与安全性。\n\n档案编号 2445 的福斯特，其研发投入经期末调整后确认为 202,8\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.016, 来源: hybrid)\n252 的浙江万安科技股份有限公司，其信息发布日期与兄弟科技股份有限公司相同，均为2021年8月25日。\n\n关于记录 265 的广东东方精工科技股份有限公司，本报告所引",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "1997 配股看板 答案证据 王府井 600859 募集",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.023, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>98000000.0</td></tr><tr><td colspan=\"3\">本页没有 600859。</td></tr></table>\n\n## 第 4 页\n\n## 大股东认配侧栏\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12,664,805.38元为资本化支出。\n\n档案编号 2336 的晶盛机电，其研发投入高达 182,907,000 元，占营收的 7.21%。在技术密集的光伏与半导体设备行业，如此高强度的投入是其维持技术代差和市场领导地位的基石。\n\n档案编号2346的冀凯股份，研发投入为17,182,040元，占营收的4.28%，专注于提升矿山支护装备的智能化与安全性。\n\n档案编号 2445 的福斯特，其研发投入经期末调整后确认为 202,8\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"600859\" \"1997\" 配股",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><t\n\n---\n\n[knowledge.md] (得分: 0.029, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\ned with `(元)` are in RMB yuan (CNY).\n- Share counts suffixed with `(股)` are in individual shares (not lots of 100).\n- Percentage fields suffixed with `(%)` are on a 0–100 scale unless otherwise noted.\n\n### 4.3 String Matching\n- Stock codes (e.g., `'600859'`) are string-typed. Always quote them.\n- In\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\n stored and filtered as a string.\n- `一级行业名称` — Primary industry classification name.\n- `董事会秘书` / `董秘电话` — Board secretary name and phone; sourced from `公司概况`.\n\n### 2.2 Equity Issuance & Capital Events\n\n| Table | Business Purpose |\n|-------|-----------------|\n| `A股发行申报企业信息` | IPO application filings;\n\n---\n\n[briefing.mp4] (得分: 0.027, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[briefing.mp4] (得分: 0.027, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 ",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "read_file",
-      "input": {
-        "filename": "briefing.mp4",
-        "max_lines": 500,
-        "start_line": 4000
-      }
-    },
-    {
-      "phase": "result",
-      "name": "read_file",
-      "content": "文件: briefing.mp4 (共 19650 行，显示第 4001-4500 行)\n---\n˜ø—Ùş™Q»\u0016ó™Xx\u0001\u001e˜`«&\f\b˜—´¬Š\u0000j(ç²ësP…°İTv_Ì{‡^r-¸\u000fÄè¯­q~á`È!ş¬z:)áP£\n\u0000\u0000\u0000\u0015ë¤¿åöªª#<Ï/Ÿ\u001a$\u0000şú¶O¡c§-;ö\u0012!\u0017áj,cxÌ{“:\u000fã!³\u0017{{VğĞ)«¹«œI7ïHèWœ*-âğ?pú®úé\u0011\u000f$\u001d\\¥Ï\u0015ˆpŸ=¼ãŠ,\u001aÄ‰†Ó”|G¢SšæİôXº°ë¶]¥qN\u0001”x\u000b$%\u001eğ>Á¿üB–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––—|…--------------------------------------------------------------------------------------------------------------------------------------------------------------/\u0000\u0000\u001e¡A›.K¨B\u0010Z!\u00020/€Š\n€€ÀŒ\f@!¿şµ*€\u0001èy€\nÌ…\u0019„µä¿n˜Ÿ%–{?¿)şT”—Pr<i\n\u0016eú=Ú:şúuWì×)È±UÜ{u\u0014\tño±uÁó®Qâs\t¡°«VÎj\n°n‚\u000b\u001a%Ña=“E¿S1z\u0006\u0005j”ŒÀ\u001fŒ6‘Ñ P•9A˜°Ÿ+`¤²œ±\u000fş4â\u0017Z\u0016\u000e<=+—¨á\u0006âãjJE\u001f²¹©9ŠUÆ¯\u001eÄ $B\u0017Ù7¬ÍãešÔë\u001b0_/\u0017íâ\u001aQÇ­ıËÜ\u0012ÆR»‘eËì9İ´x,ƒ*\u0001\u0015L\u0001óë¸İ˜c°F…˜EGn'\u0012Q—Ü\u0004V(í\u0007Æ 0\"Œ}n®wN\u001cñ y=¯]&ü<$ \u0005’Ro$Ê$í£R&\u000fPß²2‡{ä•7•0™\u00025û\u001cgÛ‡®q:\u0011¨N³}°Ñw:mlÁpøVîVYPc™Bê·)\tK¿ş\u001c\u0017\\‰¼\tĞ=\n^\t\bãÅ\u0018;\b™B‚\u0015mÂä)q=nd*S^ÀY\u001cm\u0018—\"$øçı×\u0017tbõ­\u001aùLÓŸ¯“¡‚|Ö W\u0000½ãÌo¿SVn•\n!Q…4ña\u000f«Ã'õÎ[Úq¬·F“–¼·Q\u0013®éó\u0015Æå.I5s0hZèúŞ\nª'~ ÕÆø½ñ\u000bÔw\u0014á{\u0004?\t%¢M%q\u0010«ü\u0015©\u0017`fÃ®’ä>9iXõ¯$t·³\u0010¯§ÓÓ÷âx“öCµÉÁh†#Q}´nÍ\u0011W/ÉÏ2oæ¸ca(~Sò#ä”7,†Gw³\u0018‹0çnˆ]IôÂà\f\u001f$<\u001bÀ&k\u0017ëö$\u001eÊæÖ¼ëBùC†5½À0\u0006u\fÑ‚'iYÙ\nÏĞ\u000bOı`›lº›ìÈ\u0019åĞxØ\u0010UÕ²j\u001fº# µ*\u0017`güç\u0002\u0001Ï3‘k™%,rà@~Ìö\b,‰\":ğ*Ú\u001eåz¶Rr’ì”µrÛiÎ\u0017îÑÀ\u0012ÑÁÕÜz3J8„Õª‘’ÕE×x\u001c†\tÜ?¯z×'¿w¹™VÛŸ¦~TñXÜ)\u0013Ğ^\u0017P'–œj!\u000f\u001b¤X;k¸ƒÈ\u001eËöaAõ\u0011\u000eİ;ÁHƒ/â'£\u0006ÁŒb«‡º‡}İàŒ°¾ß\nå\u0015×Jœ~RR„2~\u0014¤á¦ºÂZp·Å–\u0017Ïúü\u001bqåúØñû¸¹\tşk/Í\tÚ\u0018T¥¸öR:ŒJğª]<J’pín”ÿ\u001e0\u0004A—¤9Û_lSÖäi2×\u0012}ü—\u001f“ÂY¤¹\u000f\n±™\u0004#xm\u0015U T² <Ñ>yz-6Ãc÷¿ÙéK”#ü÷àcUrK~a\u001a™\u0019­ìR9ÊcŸ-\u0018•Nªôøˆeµ6>%W\u0004F1W•Ùa„u^ŸJ\b¡È^\u001ca«‹Ü¯ìC%æn\te\u0013 ËÜ&i^ßƒÑ%¯då¯µí·ıiŠ¦¸>ñYŸ€½\u0017•¼ŞÒ”ÂğBí­\u0011˜¯¶ ”Ÿ@TbÆ<ò\u0011³>|ìò\u0014D\u0018½\u0014_Õ „‹Å&\u001fµÛ\u0017TŒ®¯éØ™0“:—U\n\u0006FîY;•\u001fqß‹‘\u001b}¶`YI…P\"`+Oªjßt=0¨ÇPhõ_\fî\u001dŠaıFÂ(\u0000¶bÀ³N!¹\u0019øiD\u0002ÌÔã±Õşêuüüë0~ÈĞj92@[ìpà4dv¦J/ô˜€å—e-«Ÿá—\n@ûÉ’§ŸIóƒiB\u000bf\u0007ÛeDú\u0010Ãw2ÿè[é½*\u0015a5¤÷ÄÎ©¦(Ç2Í‹›éƒ¥µèqÙ#cX6×§ÕcªgöúçÛû\noz¢­ùªÆUsò|GÒ~\u001f\u0013ª3©‡ˆl\u001a\u001ey\u0000šB#ñg˜ÚX\u001cô§£/€\u0018¼ø÷jÃ¶[+ÿñ\u0015š\u001dpìÕş J¦Ÿó”pëe)gå\u0001¾;\"‘|üùDËÃj‡n\u0004¾¾'ÄïÇ`µ°|õõ>u]\u001d\u0014W½S›a\u0015g\u0003%kMös9>îTİh{Í`Ñ\u0015qà‘ŠÎ3?¯E…kòTgÂœÊ\u0005¥“^+ \u001a\u0016",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"1997\" 配股看板 600859 募集资金总额 答案证据",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[发行与上市中介机构.md] (得分: 0.029, 来源: hybrid)\n录 2487，中国证券登记结算有限责任公司深圳分公司在北京钢研高纳项目中负责股权登记，其承销数量(股)、承销金额(元)和承销比例等指标不适用，记录为空。\n\n关于记录 2659，尽管华泰联合证券是众应互联的保荐机构，但关于其具体的承销数量(股)、承销金额(元)以及承销比例，在当前数据集中并未提供。一份内部流程文件曾提及约 1.5% 的承销比例草案，但此数据未获最终确认，故官方记录中承销比例为未披露。\n\n关于记录 2781，中信证券作为青岛东软载波的承销商，其具体的承销数量(股)和承销金额(元)在公开档案中并未披露。其承销比例也处于数据缺失状态。该券商的IT部门正在测试一个新的内部通讯软件。\n\n关\n\n---\n\n[发行与上市中介机构.md] (得分: 0.029, 来源: hybrid)\n(股)、承销金额(元)和承销比例均未被记录。\n\n关于记录 1790，北京会计师事务所作为审计方，其承销数量(股)、承销金额(元)和承销比例等指标不适用。\n\n关于记录 1791，北京市国有资产管理局的角色不涉及承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1792，华夏证券有限公司在王府井项目中的承销细节，包括承销数量(股)、承销金额(元)和承销比例，均未在档案中找到。\n\n关于记录 1799，厦门国际信托在石化油服项目中的参与细节，其承销数量(股)、承销金额(元)和承销比例等量化数据均为缺失。该机构的合规部门正在组织关于最新监管政策的培训。\n\n在对历史发行项目进行梳\n\n---\n\n[发行与上市中介机构.md] (得分: 0.028, 来源: hybrid)\n数量、金额及比例等核心指标，深入理解中介机构在各发行项目中的角色与贡献。\n\n关于记录 6，针对海问律师事务所参与中国天楹股份有限公司项目的角色，档案中并未提供其承销数量(股)、承销金额(元)或承销比例的具体数据。作为法律顾问，其职责通常不涉及直接的承销承诺，这解释了相关数据的缺失。该机构的合伙人近期参加了一场关于跨境并购的行业研讨会。因此，对该机构的评估应侧重于其法律服务的质量而非量化的承销业绩。\n\n关于记录 134，对于中洲会计师事务所为粤高速提供的服务，其具体的承销数量(股)和承销金额(元)等量化指标并未被记录。作为审计机构，其核心任务是财务报表的审计，而非证券承销。该事务所的IT部门最近\n\n---\n\n[发行与上市中介机构.md] (得分: 0.028, 来源: hybrid)\n或承销金额(元)衡量的指标，均未被记录。一份内部审计报告曾提及 0.5% 的承销比例，但该数据未经最终核实，故官方记录中承销比例为未披露。该券商的风险管理委员会近期审查了其内部交易政策。\n\n关于记录 816，尽管中信证券是宝钢股份发行的主承销商，但关于其具体的承销数量(股)、承销金额(元)以及最终的承销比例，在当前数据集中均显示为缺失。这对于分析头部券商在大型项目中的具体分配情况造成了一定的障碍。\n\n关于记录 1018，广发证券（合并前）在锦州港项目中的承销详情，包括承销数量(股)和承销金额(元)，均未在档案中列出。其承销比例也同样处于数据缺失状态。公司的品牌部门正在策划一个新的市场推广活动。\n\n---\n\n[发行与上市中介机构.md] (得分: 0.027, 来源: hybrid)\n西证券在天圣制药项目中的承销业绩，包括承销数量(股)和承销金额(元)，均未被记录。其承销比例也未予披露。\n\n关于记录 3779，中信建投证券在通灵股份项目中的具体承销承诺，如",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"1997\" \"配股看板\" table 王府井 600859 答案证据2/2",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><t\n\n---\n\n[briefing.mp4] (得分: 0.031, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[briefing.mp4] (得分: 0.030, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[briefing.mp4] (得分: 0.028, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>98000000.0</td></tr><tr><td colspan=\"3\">本页没有 600859。</td></tr></table>\n\n## 第 4 页\n\n## 大股东认配侧栏\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[knowledge.md] (得分: 0.016, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n的研发投入与人力资本数据，均反映了该公司在 2019 财年结束时的状况。该公司的IT部门近期也完成了一次对内部协同办公软件的升级。这一清晰的时间戳为我们评估其在特定时期内的",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"1997\" \"600859\" 王府井 \"配股募资\" 募集资金",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.029, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n子的设施管理团队正在对中央空调系统进行季度维护。需要评估这种跨行业投资背后的战略意图，是纯粹的财务投资还是寻求产业转型。\n\n文件索引304显示，零售集团王府井集团股份有限公司（简称：王府井）的股权结构中，包含了一家在天津注册的股权投资合伙企业，即福海国盛(天津)股权投资合伙企业。该公司的公共关系部门正在筹备一场投资者交流活动。私募基金的参与可能会推动公司在资本运作和业务模式创新上采取更积极的策略。\n\n档案 324 表明，上海新炬网络信息技术股份有限公司（简称：新炬网络）的股东中存在自然人孙正暘。对该自然人股东的技术背景和行业经验的调查，有助于理解其投资逻辑。公司的财务部门正在进行年中预算的复核\n\n---\n\n[发行与上市中介机构.md] (得分: 0.027, 来源: hybrid)\n录 1658，中国诚信证券评估有限公司作为评级机构，其职责不包括证券承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空白。\n\n关于记录 1736，上海万国证券公司在宝信软件历史发行中的承销数据，包括承销数量(股)、承销金额(元)和承销比例，均因年代久远或记录不全而缺失。\n\n关于记录 1779，华夏证券在王府井项目中的承销详情，其承销数量(股)、承销金额(元)和承销比例在档案中均未被提及。\n\n关于记录 1780，通商律师事务所作为法律顾问，不承担承销责任，因此其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1781，北京京华信托投资公司在王府井项目中的参与细节，其承\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n金(有限合伙)。其旗舰店正在筹备一次外立面的翻新工程。此类基金的参与，通常意味着目标公司将在公司治理、激励机制和资产重组方面迎来深刻变革。\n\n紧随其后的条目 538 进一步披露，王府井集团股份有限公司的股东名单中还包括北京首都旅游集团有限责任公司。该公司市场部正在对上一个长假期间的客流量数据进行复盘分析。零售业巨头与大型旅游集团的资本联合，预示着双方在“商旅文”融合发展方面存在巨大的战略协同空间。\n\n条目 539 的档案确认，王府井集团股份有限公司 的另一位机构股东为 三胞集团南京投资管理有限公司。来自南京的大型民营投资集团的入股，使得该零售公司的股权\n\n结构更加多元化。公司的法务合规部门正在\n\n---\n\n[发行与上市中介机构.md] (得分: 0.025, 来源: hybrid)\n构的初步梳理，本报告将继续深入剖析在后续资本市场活动中扮演关键角色的其他专业服务机构，以构建完整的交易生态图谱。\n\n关于记录 2066，浙江网盛生意宝股份有限公司的资金监管服务由工行上海市淮海中路第二支行提供。关于该银行分支机构的简称、负责人以及具体业务经办人的信息，在当前数据集中均显示为缺失。该分支机构的地理位置便利，便于企业日常业务往来。对募集资金的有效监管是确保资金按预定用途使用的重要保障。\n\n关于记录 2214，光大证券股份有限公司的法律顾问为北京市天元律师事务所。这家律所在业内常被称为“北京市天元律所”，其法人代表为王立华。负责此项目的律师团队成员包括刘艳、徐萍、吴冠雄、史振凯。该律\n\n---\n\n[发行与上市中介机构.md] (得分: 0.025, 来源: hybrid)\n或承销金额(元)衡量的指标，均未被记录。一份内部审计报告曾提及 0.5% 的承销比例，但该数据未经最终核实，故官方记录中承销比例为未披露。该券商的风险管理委员会近期审查了其内",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"1997\" \"配股看板\" table border 600859 王府井",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><t\n\n---\n\n[briefing.mp4] (得分: 0.032, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[briefing.mp4] (得分: 0.031, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>98000000.0</td></tr><tr><td colspan=\"3\">本页没有 600859。</td></tr></table>\n\n## 第 4 页\n\n## 大股东认配侧栏\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出，12,664,805.38元为资本化支出。\n\n档案编号 2336 的晶盛机电，其研发投入高达 182,907,000 元，占营收的 7.21%。在技术密集的光伏与半导体设备行业，如此高强度的投入是其维持技术代差和市场领导地位的基石。\n\n档案编号2346的冀凯股份，研发投入为17,182,040元，占营收的4.28%，专注于提升矿山支护装备的智能化与安全性。\n\n档案编号 2445 的福斯特，其研发投入经期末调整后确认为 202,8\n\n---\n\n[briefing.mp4] (得分: 0.015, 来源: hybrid)\nign: center; word-wrap: break-word;'>1998 年全市场</td><td style='text-align: center; word",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "1997 配股看板 答案证据 王府井 600859 募集 1997-12-31",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,000 股</td></tr><tr><td colspan=\"3\">这是股数侧栏，不是募集资金总额(元)字段。</td></tr></table>\n\n## 第 5 页\n\n配股募资记录核对\n\n## 1997 配股看板\n\n答案证据2/2\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.016, 来源: hybrid)\n252 的浙江万安科技股份有限公司，其信息发布日期与兄弟科技股份有限公司相同，均为2021年8月25日。\n\n关于记录 265 的广东东方精工科技股份有限公司，本报告所引用的数据发布于二零二二年三月十五日。该信息对于分析其在专用设备制造业的战略布局非常关键。\n\n关于记录 297 的天津膜天膜科技股份有限公司，相关信息的发布时间为2021年8月26日。该日期的文件支持了我们对其环保专用设备业务的分析。\n\n关于记录 299 的麦克奥迪(厦门)电气股份有限公司，其信息发布时间戳在初步录入时为2021年8月29日，后经最终确认，准确时间为二零二一年八月二十八日。\n\n关于记录 323 的浙江台华新材料股份\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; w",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "大股东认配侧栏 王府井 600859 27,300,000 实配",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[企业之间参股情况.pdf] (得分: 0.031, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.029, 来源: hybrid)\n应23,678,020股。\n\n在条目430的记录中，王亚娟女士对锡百川化工的投资，其持股比例最初上报为1.4%，后经审计调整为1.41%，对应8,000,000股。\n\n最后的审查条目435确认，深圳市远致投资有限公司对科陆电子的持股比例为24.19%，构成了对该公司的控股地位，对应股份数量为340,672,400股。\n\n本报告将继续对剩余批次的股权交易进行量化审查，以确保尽职调查的全面性与精确性。\n\n关于审查条目456，记录确认林振宇先生在杭州壹网壹创科技的持股比例为10.24%。该公司的IT部门正在对内部服务器进行例行安全扫描。该比例对应24,446,382股，具体的投资金额未披露，这表明其\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.029, 来源: hybrid)\n3300 的华夏航空，其研发投入为 20,305,492.17 元。尽管绝对值不低，但相较于其庞大的运营收入，占比仅为 0.43%。这笔投入可能主要用于航线优化算法、收益管理系统等运营技术层面的改进，而非硬件研发。\n\n档案编号 3333 的朝阳科技，其研发投入为 34,540,678.81 元，占营收的 4.17%。这笔完全费用化的投入，是其在高精度电声元器件领域维持技术优势和产品迭代速度的基础。\n\n档案编号 3339 的南京聚隆，其研发投入为 35,962,185.47 元，占营收的 3.98%。该笔费用化支出确保了其在高性能改性塑料配方开发上的持续竞争力。\n\n关于档案编号3515的科拓生物\n\n---\n\n[briefing.mp4] (得分: 0.028, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n，倪茂生先生在无锡隆盛科技的持股比例高达 24.33%，是一项具有重大影响力的个人持股，对应 49,117,012 股。\n\n关于审查条目509，胡东群先生对华昌达智能装备集团的持股，其投资额不详，持股比例为0.425%，对应2,446,558股。\n\n条目 520 指向福建省财政厅，其对兴业证券的持股比例为 20.27%，构成了对该证券公司的绝对控制地位。该持股对应 1,357,089,734 股。\n\n在条目537的记录中，北京京国瑞国企改革发展基金对北京王府井百货的持股比例为4.45%，相当于50,454,800股。\n\n紧随其后的条目 538 显示，北京首都旅游集团对该零售集团的持股，其比例最\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\nlign: center; word-wrap: break-word;'>1996-12-31</td><td style='text-align: center; word-wrap: break-word;'>98000000.0</td></tr><tr><td colspan=\"3\">本页没有 600859。</td></tr></table>\n\n## 第 4 页\n\n## 大股东认配侧栏\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; wo\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n达102,429,347.53元，且全部进行了费用化处理。这一数字占其营业收入的比例达到了惊人的21.18%，这在软件与服务行业中也属高位，清晰地表明其将技术创新视为生命",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "1997 配股看板 王府井 600859 募集资金总额 元",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total repurchase amount and announcement date |\n\nKey Fields:\n- `预案公布日期` / `预案公布日` — Announcement date of the plan. Used for temporal filtering. For\n\n---\n\n[发行与上市中介机构.md] (得分: 0.027, 来源: hybrid)\n(股)、承销金额(元)和承销比例均未被记录。\n\n关于记录 1790，北京会计师事务所作为审计方，其承销数量(股)、承销金额(元)和承销比例等指标不适用。\n\n关于记录 1791，北京市国有资产管理局的角色不涉及承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1792，华夏证券有限公司在王府井项目中的承销细节，包括承销数量(股)、承销金额(元)和承销比例，均未在档案中找到。\n\n关于记录 1799，厦门国际信托在石化油服项目中的参与细节，其承销数量(股)、承销金额(元)和承销比例等量化数据均为缺失。该机构的合规部门正在组织关于最新监管政策的培训。\n\n在对历史发行项目进行梳\n\n---\n\n[发行与上市中介机构.md] (得分: 0.027, 来源: hybrid)\n录 1658，中国诚信证券评估有限公司作为评级机构，其职责不包括证券承销，故其承销数量(股)、承销金额(元)和承销比例的记录为空白。\n\n关于记录 1736，上海万国证券公司在宝信软件历史发行中的承销数据，包括承销数量(股)、承销金额(元)和承销比例，均因年代久远或记录不全而缺失。\n\n关于记录 1779，华夏证券在王府井项目中的承销详情，其承销数量(股)、承销金额(元)和承销比例在档案中均未被提及。\n\n关于记录 1780，通商律师事务所作为法律顾问，不承担承销责任，因此其承销数量(股)、承销金额(元)和承销比例的记录为空。\n\n关于记录 1781，北京京华信托投资公司在王府井项目中的参与细节，其承\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先生持有山东龙泉管道工程 8.88% 的股份，相当于 50,371,530 股。\n\n根据记录296，安徽省安粮集团在北京化二的持股比例为4.31%，对应188,014,200股。\n\n条目 300 的审查档案显示，雅戈尔集团对汉麻产业投资的持股比例为 1.94%，相当于 20,32\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.025, 来源: hybrid)\n的四川美丰化工股份有限公司，其主营业务为尿素、复合肥、车用尿素、三聚氰胺、硝酸、硝铵、包装塑料制品及LNG(液化天然气)等产品的制造与销售。该公司法定经营范围明确了其从事化学肥料、尿素、柴油机尾气处理液的研发、生产与销售。其产品线十分丰富，包括尿基复合肥、硝硫基复合肥、普通尿素以及车用尿素产品，同时还经营液化天然气等其他化工产品。公司的兼营业务包括石灰、金属门柜制造、销售，进一步拓宽了其业务边界。\n\n针对记录 39 的三湘印象股份有限公司，公司确立了“加快发展文化产业,稳步发展房地产业,推动两大产业协同发展”的战略。其主营业务被定义为文化业务和房地产业务两大板块。公司的法定经营范围包括在合法取\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\n 27,300,000 股</td><td style='text-align: center; word-wrap: break-word;'>实配 27,300,00",
-      "is_error": false
-    },
-    {
-      "phase": "call",
-      "name": "search_data_space",
-      "input": {
-        "query": "\"已定位的目标记录\" 王府井 600859 1997",
-        "top_k": 10
-      }
-    },
-    {
-      "phase": "result",
-      "name": "search_data_space",
-      "content": "[briefing.mp4] (得分: 0.029, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: break-word;'>419524992.0</td></tr></table>\n\n## 第 6 页\n\n## 配股募资记录核对 两条记录待写入\n\n## 已定位的目标记录\n\n王府井/600859\n\n1995-12-31 00:00:00\n\n179544030.0\n\n王府井/6008\n\n---\n\n[briefing.mp4] (得分: 0.028, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.026, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>1995 年全市场</td><td style='text-align: center; word-wrap: break-word;'>12 家</td><t\n\n---\n\n[公司经营范围与行业变更.md] (得分: 0.024, 来源: hybrid)\n的四川美丰化工股份有限公司，其主营业务为尿素、复合肥、车用尿素、三聚氰胺、硝酸、硝铵、包装塑料制品及LNG(液化天然气)等产品的制造与销售。该公司法定经营范围明确了其从事化学肥料、尿素、柴油机尾气处理液的研发、生产与销售。其产品线十分丰富，包括尿基复合肥、硝硫基复合肥、普通尿素以及车用尿素产品，同时还经营液化天然气等其他化工产品。公司的兼营业务包括石灰、金属门柜制造、销售，进一步拓宽了其业务边界。\n\n针对记录 39 的三湘印象股份有限公司，公司确立了“加快发展文化产业,稳步发展房地产业,推动两大产业协同发展”的战略。其主营业务被定义为文化业务和房地产业务两大板块。公司的法定经营范围包括在合法取\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n达102,429,347.53元，且全部进行了费用化处理。这一数字占其营业收入的比例达到了惊人的21.18%，这在软件与服务行业中也属高位，清晰地表明其将技术创新视为生命线的核心战略。\n\n接下来，档案编号2687的光力科技，其研发投入总额为7,610,289.90元，占营收的11.63%。这笔完全费用化的支出，反映了公司在半导体封测这一高技术壁垒领域的坚定投入，旨在通过技术突破获取更高的市场份额。\n\n档案编号 2783 的佳发教育，其研发投入结构兼顾了当期与未来。总投入41,809,445.43元中，35,379,248.89元被费用化，用于现有产品的迭代升级；另有6,430,196.54元被\n\n---\n\n[发行与上市中介机构.md] (得分: 0.016, 来源: hybrid)\n已完成节能改造。该公司的证券代码仍为 600859。投资者关注其免税业务牌照的获取与运营进展，这被视为公司新的重要增长点。\n\n关于记录 1781，本项记录再次关联到王府井集团股份有限公司。其内部识别码为 1792，证券简称为“王府井”。该公司的人力资源部发布了最新的员工培训计划。其在上海证券交易所的交易代码稳定在 600859。对该公司进行分析时，必须考虑消费趋势变化对其商品组合和门店布局的影响。\n\n关于记录 1782，该条目继续指向王府井集团股份有限公司。其公司代码为 1792，股票代码为 600859。公司安保部门近期加强了对旗下商场的巡逻频率。这家商业零售企业的品牌价值和客户忠诚度是其重\n\n---\n\n[公司研发投入与产出.pdf] (得分: 0.016, 来源: hybrid)\n示技术领域保持竞争力的保障。\n\n关于档案编号2207的东方精工，其研发总投入为169,319,700元，占营收的1.70%。其中，156,654,900元为费用化支出",
+      "content": "文件: 公司概况.md (共 732 行，显示第 1-50 行)\n---\n### 目标公司资本结构与公司治理沿革的深度审查报告\n\n关于档案 17 的审查发现，该实体为 浙江中胤时尚股份有限公司，其在商业活动中普遍使用“中胤时尚”这一简称。初步文件审查显示其内部识别码为 10034990，但经过与工商注册主文件的交叉验证，最终确认其准确的公司代码为 10034985。据悉，该公司近期完成了对其行政办公区域的照明系统节能改造。基于其命名，初步判断其主营业务与消费品或设计行业高度相关，这预示着其无形资产价值可能在资本结构中占有重要地位。调查还发现，该公司的年度后勤供应商招标流程记录于上季度末完成。后续审计需穿透其子公司结构，以精确绘制其完整的业务版图。\n\n档案 22 指向 甘肃莫高实业发展股份有限公司，该公司以“莫高股份”之名为市场所熟知。其内部注册的公司代码被确认为 1480。此公司的法人实体结构清晰，未发现别名混用的情况。一份内部备忘录显示，该公司正在评估更换其园区内的绿化维护服务商。从其注册地与名称判断，该公司可能深度参与了区域性的农业或资源开发项目。此实体的IT部门最近发布了一项关于内部数据备份协议的更新指令。因此，其资产负债表中的土地使用权和生物资产项目值得重点关注。\n\n根据档案 45 的记录，审查对象为 诺德投资股份有限公司，该公司对外简称为“诺德股份”。审计团队在核对早期归档文件时，发现一个标记为 1125 的临时代码，但最终经过数据总线的权威性校验，确认其正式的公司代码为 1120。该公司的股东名册中存在多层嵌套结构，暗示了复杂的资本安排。值得注意的是，该公司上个月调整了员工通勤班车的路线和时刻表。这种投资导向的命名通常意味着其业务模式涉及股权投资、资产管理或多元化控股，需要对关联交易进行严格审查。\n\n档案 53 的资料确认了 江苏新瀚新材料股份有限公司 的法人身份，其市场简称为“新瀚新材”。该公司的官方公司代码为 222534。该公司最近批准了一项关于更新员工餐厅菜单的预算。作为一家专注于新材料领域的企业，其研发投入、专利组合以及在建工程将是本次尽职调查的核心审查内容。其注册地址的物理勘察记录显示，厂区安保巡逻频次符合行业标准。对该公司固定资产的审计必须与其技术迭代周期相结合进行评估。\n\n档案 58 详细记录了 北京双杰电气股份有限公司 的情况，该公司以“双杰电气”作为其通用简称。其公司代码被明确标识为 76056。该公司的行政部门近期采购了一批新的办公设备。从实体名称可推断，该公司深耕于电气设备制造业，其存货周转率和应收账款账期是衡量其运营健康度的关键指标。此外，一份内部通告提及了关于办公楼消防演习的安排。其供应链的稳定性和主要客户的信用状况将是评估其未来现金流的重要依据。\n\n关于档案 59 的调查，目标实体为 山河智能装备股份有限公司，商号简称为“山河智能”。在对历史数据进行溯源时，一个源自辅助系统的代码 4020 曾被引用，后经主数据管理系统核准，其无争议的公司代码为 4022。该公司的后勤部门正在就年度办公用品采购进行供应商询价。作为装备制造企业，其生产线的产能利用率、订单积压情况以及技术更新的资本支出计划，对评估其资产价值至关重要。此实体的命名策略直接反映了其在重工业及自动化领域的市场定位。\n\n档案 61 的内容涉及 青岛征和工业股份有限公司，市场通称为“征和工业”。该公司的法人识别代码为 231508。该公司最近更新了其内部访客登记管理系统。其名称中的“工业”字样表明其业务根植于传统或先进制造业，可能涉及复杂的供应链和生产流程。对该公司进行审查时，必须详细分析其主要原材料的采购成本波动风险。一份会议纪要显示，管理层讨论了优化仓库存储空间的方案。\n\n档案 108 的审查指向 广东粤海饲料集团股份有限公司，该公司以“粤海饲料”为简称。审计过程中，一份来自地方监管机构的早期报告曾将其代码误记为 10009150，但公司章程及后续所有正式文件中均一致表明，其正确的公司代码是 10009158。该集团的子公司间存在频繁的内部资源调拨，这需要进行细致的关联交易审查。值得注意的是，该集团在上一财年更换了其法律顾问团队。其业务特性决定了其成本结构对大宗农产品价格高度敏感，相关套期保值策略的有效性应被纳入评估范围。\n\n档案 112 确认了 江山欧派门业股份有限公司 的身份信息，其简称为“江山欧派”。该公司的注册代码为 194960。该公司的人力资源部门近期组织了一次全员性的职业健康培训。作为一家专注于特定建筑材料（门业）的企业，其品牌价值、渠道控制能力和房地产市场的景气度是影响其估值的核心变量。该公司上周对公司网站的“投资者关系”页面进行了一次内容更新。\n\n档案 122 的记录显示，目标实体是 长春奥普光电技术股份有限公",
       "is_error": false
     }
   ],
@@ -471,280 +92,59 @@
     {
       "type": "done",
       "usage": {
-        "input_tokens": 1533527,
-        "output_tokens": 5463
+        "input_tokens": 101299,
+        "output_tokens": 992
       },
       "tool_calls_log": [
         {
           "name": "read_file",
           "input": {
-            "filename": "knowledge.md"
+            "filename": "briefing.mp4"
           },
-          "output_preview": "文件: knowledge.md (共 167 行，显示第 1-100 行)\n---\n# Knowledge Guide: Chinese Stock Market Corporate Database (`enq-cnds-cndv-ccks_stock`)\n\n## 1. Business Context & Scope\n\nThis database serves as a comprehens"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "rights issue 配股 零售 company retail raised amount",
-            "top_k": 10
-          },
-          "output_preview": "[knowledge.md] (得分: 0.033, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total re"
-        },
-        {
-          "name": "read_file",
-          "input": {
-            "filename": "briefing.mp4",
-            "max_lines": 10
-          },
-          "output_preview": "文件: briefing.mp4 (共 19650 行，显示第 1-10 行)\n---\n\u0000\u0000\u0000 ftypisom\u0000\u0000\u0002\u0000isomiso2avc1mp41\u0000\u0001†«moov\u0000\u0000\u0000lmvhd\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003è\u0000\u0001\\ë\u0000\u0001\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000@\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000ªtrak\u0000"
-        },
-        {
-          "name": "read_file",
-          "input": {
-            "filename": "企业之间参股情况.pdf",
-            "max_lines": 200
-          },
-          "output_preview": "文件: 企业之间参股情况.pdf (PDF, 728 行，显示第 1-200 行)\n---\n--- 第 1 页 ---\n尽职调查报告：目标公司股权结构与资本沿革的法证审查\n关于审查条目 10 的调查显示，一家位于江苏的材料科学公司，即 江苏百川高科新\n材料股份有限公司（简称：百川股份），其股东名单中包括一个重要的双边资本实\n体。该股东被确认为 中国-比利时直接股权投资基金。该基金的参与表明了国际资"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "王府井 配股 rights issue 募集资金",
-            "top_k": 10
-          },
-          "output_preview": "[knowledge.md] (得分: 0.032, 来源: hybrid)\nrpose and announcement dates |\n| `A股配股` | Rights issues (配股) with year, target stock code, and funds raised |\n| `股份回购` | Share buyback transactions with total re"
-        },
-        {
-          "name": "read_file",
-          "input": {
-            "filename": "配股大股东认配状况.json",
-            "max_lines": 50
-          },
-          "output_preview": "文件: 配股大股东认配状况.json (220 行, 9 列，显示第 1-50 行)\n列: 序号(int64), 公司代码(int64), 公司中文名称(object), 中文名称缩写(object), 所属基金/股票代码(object), 首次信息发布时间(object), 股东名称(object), 应配股数(股)(float64), 实配股数(股)(float64)\n---\n    序号  "
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "王府井 600859 配股 募集资金总额 配股年度",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.033, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "inspect_data",
-          "input": {
-            "filename": "sub_db.sqlite"
-          },
-          "output_preview": "不支持 inspect_data 的文件类型: sqlite"
+          "output_preview": "文件: briefing.mp4 (视频/逐帧OCR, 72 行，显示第 1-72 行)\n---\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n\n<table border=1 style='margin: auto; word-wrap: br"
         },
         {
           "name": "sqlite_query",
           "input": {
             "sql": "SELECT name FROM sqlite_master WHERE type='table';"
           },
-          "output_preview": "返回 25 行\n            name\n0        公司行业划分表\n1       股票交易资金流向\n2         股东股权变动\n3       公司股本结构变动\n4     公司报告期管理层持股\n5         A股询价明细\n6           A股增发\n7           股份回购\n8        概念所属公司表\n9           公司分红\n10  利"
+          "output_preview": "返回 25 行\n            name\n0        公司实际控制人\n1        公司行业划分表\n2      限售股票解禁时间表\n3       公司主营业务构成\n4     a股发行申报企业信息\n5     公司报告期管理层持股\n6         自由流通股本\n7       公司股本结构变动\n8         A股询价明细\n9           A股增发\n10   "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT name, sql FROM sqlite_master WHERE type='table' AND name LIKE '%配股%' OR name LIKE '%A股配股%';"
+          },
+          "output_preview": "返回 1 行\n        name                                                                                                                                                                                     "
         },
         {
           "name": "search_data_space",
           "input": {
-            "query": "600859 配股年度 募集资金 王府井 1995 1997",
-            "top_k": 20
+            "query": "配股 募集资金 王府井 600859"
           },
-          "output_preview": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\nrpose and announc"
+          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: br"
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM sqlite_master WHERE sql LIKE '%配股%';"
+          },
+          "output_preview": "返回 1 行\n    type       name   tbl_name  rootpage                                                                                                                                                         "
+        },
+        {
+          "name": "sqlite_query",
+          "input": {
+            "sql": "SELECT * FROM 公司概况 LIMIT 5;"
+          },
+          "output_preview": "SQL 错误: no such table: 公司概况"
         },
         {
           "name": "read_file",
           "input": {
-            "filename": "briefing.mp4",
-            "max_lines": 200,
-            "start_line": 19500
+            "filename": "公司概况.md",
+            "max_lines": 50
           },
-          "output_preview": "文件: briefing.mp4 (共 19650 行，显示第 19501-19650 行)\n---\n!:\t\tĞˆ6\tqÈÊ\u0019$+\u0011ßµ)\tŠ\u00113°œ(Ò}‚dÀLğH\u0000»ÀŠFNn\u0018\"\u0001:Ú‚zI$\u0011„ ÜI\n\u0006\\Œ{„°* ¹$c\u0004›(O×\b_ª@\u0013ˆa\u0003]ˆœHÄ\u0011”!¤‚NF4“)à³fj8ñDaCÀGá·Lbo4¤zØäÀŞJ”‰°Vœ\u0012se\u0013ÄÀ”\u001cF±HX•ŸpÒ\u0010¬\u0010‚›°’“­"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "王府井 600859 配股 1995 募集资金 179544030",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.027, 来源: hybrid)\n该比例相当于453，250，000"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "王府井 600859 第二条记录 1997 配股 募集资金",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.028, 来源: hybrid)\n该比例相当于453，250，000"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "王府井 600859 第二条 配股 记录 1997",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.025, 来源: hybrid)\n该比例相当于453，250，000"
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT name FROM sqlite_master WHERE name LIKE '%配%' OR name LIKE '%right%' OR name LIKE '%A股%';"
-          },
-          "output_preview": "返回 6 行\n           name\n0        A股询价明细\n1          A股增发\n2  利润分配表附注_财务费用\n3    法人配售与战略投资者\n4     配股大股东认配状况\n5    a股发行申报企业信息"
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT * FROM 公司行业划分表 WHERE 中文名称缩写 LIKE '%王府%' OR 公司中文名称 LIKE '%王府%';"
-          },
-          "output_preview": "返回 1 行\n    序号  公司代码       公司中文名称 中文名称缩写  所属基金/股票代码               信息发布日期  一级行业名称 二级行业名称 四级行业代码\n0  123  1792  王府井集团股份有限公司    王府井     600859  2012-12-31 00:00:00  批发和零售业    零售业   None"
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT * FROM 配股大股东认配状况 WHERE 所属基金/股票代码 = '600859';"
-          },
-          "output_preview": "SQL 错误: no such column: 所属基金"
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "PRAGMA table_info(配股大股东认配状况);"
-          },
-          "output_preview": "返回 9 行\n   cid       name     type  notnull dflt_value  pk\n0    0         序号  INTEGER        0       None   0\n1    1       公司代码  INTEGER        0       None   0\n2    2     公司中文名称     TEXT        0     "
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT * FROM 配股大股东认配状况 WHERE `所属基金/股票代码` = '600859';"
-          },
-          "output_preview": "返回 2 行\n    序号  公司代码       公司中文名称 中文名称缩写 所属基金/股票代码             首次信息发布时间          股东名称     应配股数(股)     实配股数(股)\n0  141  1792  王府井集团股份有限公司    王府井    600859  1995-08-23 00:00:00   北京市国有资产经营公司  20250000.0  "
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT name FROM sqlite_master WHERE name LIKE '%配%' OR name LIKE '%募%' OR name LIKE '%增发%';"
-          },
-          "output_preview": "返回 4 行\n           name\n0          A股增发\n1  利润分配表附注_财务费用\n2    法人配售与战略投资者\n3     配股大股东认配状况"
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "PRAGMA table_info(A股增发);"
-          },
-          "output_preview": "返回 28 行\n    cid           name     type  notnull dflt_value  pk\n0     0             序号  INTEGER        0       None   0\n1     1           公司代码  INTEGER        0       None   0\n2     2         公司中文名称  "
-        },
-        {
-          "name": "sqlite_query",
-          "input": {
-            "sql": "SELECT * FROM A股增发 WHERE `所属基金/股票代码` = '600859';"
-          },
-          "output_preview": "查询返回空结果"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "配股募资记录核对 两条记录 王府井 600859 第二条 1997",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[企业之间参股情况.pdf] (得分: 0.026, 来源: hybrid)\n下将逐一列明各条目所依据的报告截止"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"王府井/6008\" 第二条 配股 记录",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.028, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.016, 来源: hybrid)\ner; word-wrap: br"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "1997 配股看板 答案证据 王府井 600859 募集",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"600859\" \"1997\" 配股",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[briefing.mp4] (得分: 0.031, 来源: hybrid)\n## 第 1 页\n\n## 目标股票"
-        },
-        {
-          "name": "read_file",
-          "input": {
-            "filename": "briefing.mp4",
-            "max_lines": 500,
-            "start_line": 4000
-          },
-          "output_preview": "文件: briefing.mp4 (共 19650 行，显示第 4001-4500 行)\n---\n˜ø—Ùş™Q»\u0016ó™Xx\u0001\u001e˜`«&\f\b˜—´¬Š\u0000j(ç²ësP…°İTv_Ì{‡^r-¸\u000fÄè¯­q~á`È!ş¬z:)áP£\n\u0000\u0000\u0000\u0015ë¤¿åöªª#<Ï/Ÿ\u001a$\u0000şú¶O¡c§-;ö\u0012!\u0017áj,cxÌ{“:\u000fã!³\u0017{{VğĞ)«¹«œI7ïHèWœ*-âğ?pú®úé\u0011\u000f$\u001d\\¥Ï\u0015ˆpŸ"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"1997\" 配股看板 600859 募集资金总额 答案证据",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.031, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"1997\" \"配股看板\" table 王府井 600859 答案证据2/2",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'>"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"1997\" \"600859\" 王府井 \"配股募资\" 募集资金",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.029, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"1997\" \"配股看板\" table border 600859 王府井",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n<table border=1 style='margin: auto; word-wrap: break-word;'>"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "1997 配股看板 答案证据 王府井 600859 募集 1997-12-31",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.030, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.028, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "大股东认配侧栏 王府井 600859 27,300,000 实配",
-            "top_k": 10
-          },
-          "output_preview": "[企业之间参股情况.pdf] (得分: 0.031, 来源: hybrid)\n该比例相当于453，250，000股。\n\n档案 226 表明，苏州蓝贰创业投资有限公司对苏州科达科技的持股比例为 0.97%，对应 4,898,159 股。\n\n关于条目231，上海科技投资公司对万达信息的持股，其投资金额未披露，但持股比例为4.7573%，折合54,744,000股。\n\n条目 282 的调查确认，王维华先"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "1997 配股看板 王府井 600859 募集资金总额 元",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.032, 来源: hybrid)\n## 第 1 页\n\n## 目标股票配股记录\n\n## 目标代码：600859\n\n需要从分散页面里合并同一股票的配股年度和募集资金总额(元)，不看市场总额。\n\n## 第 2 页\n\n## 全市场规模概览\n\n---\n\n[knowledge.md] (得分: 0.030, 来源: hybrid)\nrpose and announc"
-        },
-        {
-          "name": "search_data_space",
-          "input": {
-            "query": "\"已定位的目标记录\" 王府井 600859 1997",
-            "top_k": 10
-          },
-          "output_preview": "[briefing.mp4] (得分: 0.029, 来源: hybrid)\ner; word-wrap: break-word;'>长航凤凰 / 000520</td><td style='text-align: center; word-wrap: break-word;'>1997-12-31</td><td style='text-align: center; word-wrap: bre"
+          "output_preview": "文件: 公司概况.md (共 732 行，显示第 1-50 行)\n---\n### 目标公司资本结构与公司治理沿革的深度审查报告\n\n关于档案 17 的审查发现，该实体为 浙江中胤时尚股份有限公司，其在商业活动中普遍使用“中胤时尚”这一简称。初步文件审查显示其内部识别码为 10034990，但经过与工商注册主文件的交叉验证，最终确认其准确的公司代码为 10034985。据悉，该公司近期完成了对其行政办"
         }
       ]
     }

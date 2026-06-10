@@ -44,7 +44,8 @@ def norm_cell(v: str) -> str:
             return str(int(round(fv)))
         return f"{fv:.2f}"
     except ValueError:
-        return s.lower()
+        # 字符串：小写 + 去除所有内部空白（gold "锦 州 港" vs agent "锦州港"）
+        return re.sub(r"\s+", "", s.lower())
 
 
 def norm_row(row: tuple) -> tuple:
@@ -117,10 +118,29 @@ def parse_df_tostring(text: str) -> list[list[tuple]]:
     return blocks
 
 
+def parse_answer_block(text: str) -> list[list[tuple]]:
+    """抽取 agent 显式输出的 ```answer CSV 块（最高优先级，已是干净结果集）。
+    用 csv 模块解析，正确处理字段内含逗号/引号的情况。"""
+    blocks = []
+    for m in re.finditer(r"```answer\s*\n(.*?)```", text, re.DOTALL):
+        body = m.group(1).strip()
+        if not body:
+            continue
+        try:
+            rows = [tuple(r) for r in csv.reader(io.StringIO(body)) if r]
+        except Exception:
+            rows = []
+        if rows:
+            blocks.append(rows)
+    return blocks
+
+
 def extract_candidates(result: dict) -> list[list[tuple]]:
     """从 agent result.json 抽取所有候选结果集。"""
     cands = []
     answer = result.get("answer", "")
+    # ```answer 块优先（agent 显式给出的干净结果集）
+    cands.extend(parse_answer_block(answer))
     cands.extend(parse_markdown_tables(answer))
     cands.extend(parse_df_tostring(answer))
     for t in result.get("tool_log", []):
@@ -139,8 +159,10 @@ def extract_candidates(result: dict) -> list[list[tuple]]:
 
 
 def project_columns(cand_rows: list[tuple], ncol: int) -> list[list[tuple]]:
-    """gold 有 ncol 列。候选表可能多列，尝试所有 ncol 列的子集投影。
-    简化：若候选列数==ncol 直接用；否则尝试每个连续/单列投影。"""
+    """gold 有 ncol 列。候选表可能多列且列序/位置不定，尝试列子集投影。
+    单列：每列各试一遍。多列：试所有 ncol 列组合（含非连续，如取第0和第2列），
+    组合数有上限保护。"""
+    import itertools
     variants = []
     if not cand_rows:
         return variants
@@ -149,11 +171,12 @@ def project_columns(cand_rows: list[tuple], ncol: int) -> list[list[tuple]]:
         for ci in range(width):
             variants.append([(r[ci],) for r in cand_rows if ci < len(r)])
     else:
-        # 连续列窗口
-        for start in range(0, max(1, width - ncol + 1)):
-            cols = list(range(start, start + ncol))
-            if cols[-1] < width:
-                variants.append([tuple(r[ci] for ci in cols) for r in cand_rows if cols[-1] < len(r)])
+        combos = list(itertools.combinations(range(width), ncol))
+        # 列数过多时只保留组合数可控的情况，避免爆炸
+        if len(combos) > 60:
+            combos = [tuple(range(s, s + ncol)) for s in range(0, width - ncol + 1)]
+        for cols in combos:
+            variants.append([tuple(r[ci] for ci in cols) for r in cand_rows if cols[-1] < len(r)])
         if width == ncol:
             variants.append([tuple(r) for r in cand_rows])
     return variants
@@ -176,11 +199,12 @@ def score_task(task_id: str, runs_dir: Path) -> dict:
             if sc["f1"] > best["f1"]:
                 best = sc
 
-    # 单值 gold 兜底：值是否出现在答案文本里
+    # 单值 gold 兜底：唯一值是否出现在答案文本里（空白无关）。
+    # 仅限单行单列，避免多值在无关上下文里各自命中造成误判。
     if len(gold) == 1 and ncol == 1 and best["f1"] < 0.99:
         gval = norm_cell(gold[0][0])
-        ans_norm = result.get("answer", "").lower().replace(",", "")
-        if gval and (gval in ans_norm):
+        ans_norm = re.sub(r"\s+", "", result.get("answer", "").lower()).replace(",", "")
+        if gval and gval in ans_norm:
             best = {"f1": 1.0, "recall": 1.0, "precision": 1.0, "matched": 1,
                     "gold_n": 1, "cand_n": 1, "via": "text_match"}
 

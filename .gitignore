@@ -37,4 +37,5 @@ chroma_data/
 .DS_Store
 Thumbs.db
 
-需求
+# 评估目录，不上传
+/eval/
