@@ -603,12 +603,13 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
         return r.get("error", "查询执行失败")
     if r.get("result") is not None:
         out = r["result"]
-        # DataFrame.to_string 可能很长，截断
-        if len(out) > 6000:
-            return out[:6000] + "\n...(结果已截断)"
+        # DataFrame.to_string 可能很长。放宽到 6 万字符，让"列出全部"类结果完整返回；
+        # 仍超限才截断并提示改用聚合。
+        if len(out) > 60000:
+            return out[:60000] + "\n...(结果过大已截断，建议用聚合/筛选缩小范围或分批查询)"
         return out
     if r.get("stdout"):
-        return r["stdout"][:6000]
+        return r["stdout"][:60000]
     return "执行完成（无返回值，可将结果赋给 result 变量）"
 
 
@@ -638,7 +639,7 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     df = pd.DataFrame(result["rows"])
     output = f"返回 {result['row_count']} 行"
     if result.get("truncated"):
-        output += "（已截断至2000行）"
+        output += "（结果较大，已截断至前 10000 行；如需完整数据请用更精确的 WHERE/聚合缩小范围，或分批查询）"
     # 强制输出全部行（默认 to_string 超过 display.max_rows 会省略中间行），
     # 否则列表型答案会被显示截断，导致 recall 偏低。
     output += f"\n{df.to_string(max_rows=None)}"
@@ -670,18 +671,18 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
 
     parts = []
     stdout_text = r.get("stdout") or ""
-    if len(stdout_text) > 10000:
-        stdout_text = stdout_text[:10000] + "\n...(输出已截断)"
+    if len(stdout_text) > 60000:
+        stdout_text = stdout_text[:60000] + "\n...(输出过大已截断，建议用聚合/筛选缩小范围)"
     if stdout_text:
         parts.append(f"输出:\n{stdout_text}")
     if r.get("result") is not None:
-        parts.append(f"result = {r['result'][:4000]}")
+        parts.append(f"result = {r['result'][:60000]}")
     stderr_text = r.get("stderr") or ""
     if stderr_text:
         parts.append(f"警告:\n{stderr_text[:2000]}")
     if not parts:
         parts.append("代码执行成功（无输出，可将结果赋给 result 变量以便查看）")
-    return "\n".join(parts)[:12000]
+    return "\n".join(parts)[:120000]
 
 
 def _tool_generate_chart(args: dict) -> str:

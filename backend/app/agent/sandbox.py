@@ -201,6 +201,30 @@ def _install_fs_guard(pd, np, preload):
             setattr(np, fn, _np_guard(getattr(np, fn)))
 
 
+def _load_json_df(pd, path):
+    """在沙箱内加载 JSON 为 DataFrame，与 file_loader._load_json 行为一致。
+
+    很多真实数据是嵌套结构（如 {"table": ..., "records": [...]}），直接
+    pd.read_json 会把它读成一行两列的怪表，导致后续按业务列名取数全部 KeyError。
+    path 来自 preload（已授权的数据空间文件），属可信预加载，故可直接读取。
+    """
+    import json as _json
+    with open(path, "r", encoding="utf-8") as _fh:
+        data = _json.load(_fh)
+    if isinstance(data, list):
+        return pd.DataFrame(data)
+    if isinstance(data, dict):
+        # 取第一个 list 型字段作为记录集（兼容 records / data / rows 等命名）
+        for key in ("records", "data", "rows", "items"):
+            if isinstance(data.get(key), list):
+                return pd.DataFrame(data[key])
+        for v in data.values():
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return pd.DataFrame(v)
+        return pd.DataFrame([data])
+    return pd.read_json(path)
+
+
 def _child_entry(code, preload, cpu_seconds, mem_bytes, fsize_bytes, conn):
     """子进程入口：施加限额 → 构造受限命名空间 → exec → 回传 stdout/错误。
 
@@ -229,7 +253,7 @@ def _child_entry(code, preload, cpu_seconds, mem_bytes, fsize_bytes, conn):
                 elif kind == "excel":
                     g[var_name] = pd.read_excel(path)
                 elif kind == "json":
-                    g[var_name] = pd.read_json(path)
+                    g[var_name] = _load_json_df(pd, path)
             except Exception:
                 pass
 
