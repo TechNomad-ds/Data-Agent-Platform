@@ -283,6 +283,64 @@ def _load_df(file_path: Path, ext: str) -> pd.DataFrame:
     return load_dataframe(file_path, ext)
 
 
+def _resolve_tool_name(name: str, valid_names) -> str | None:
+    """把模型拼错的工具名纠正到最接近的合法工具名。
+
+    策略（从严到松）：
+    1. 归一化（小写、去空格/连字符）后精确命中；
+    2. 一个合法名是输入的子串、或输入是合法名的子串（如 read_fil ⊂ read_file，
+       searchearch_data_space ⊃ search_data_space）；
+    3. 编辑距离最近，且距离 <= 阈值（按长度自适应，最多 2/3 长度）。
+    返回纠正后的合法名，无法判定时返回 None（避免误纠正成无关工具）。
+    """
+    valid = list(valid_names)
+
+    def norm(s: str) -> str:
+        return s.lower().replace("_", "").replace("-", "").replace(" ", "")
+
+    target = norm(name)
+    if not target:
+        return None
+
+    norm_map = {norm(v): v for v in valid}
+    # 1. 归一化精确命中
+    if target in norm_map:
+        return norm_map[target]
+
+    # 2. 子串包含（双向）
+    contains = [
+        v for v in valid
+        if norm(v) in target or target in norm(v)
+    ]
+    if len(contains) == 1:
+        return contains[0]
+
+    # 3. 编辑距离
+    def lev(a: str, b: str) -> int:
+        prev = list(range(len(b) + 1))
+        for i, ca in enumerate(a, 1):
+            cur = [i]
+            for j, cb in enumerate(b, 1):
+                cur.append(min(
+                    prev[j] + 1,
+                    cur[j - 1] + 1,
+                    prev[j - 1] + (ca != cb),
+                ))
+            prev = cur
+        return prev[-1]
+
+    best, best_d = None, None
+    for v in valid:
+        d = lev(target, norm(v))
+        if best_d is None or d < best_d:
+            best, best_d = v, d
+    if best is not None and best_d is not None:
+        threshold = max(2, len(norm(best)) // 3)
+        if best_d <= threshold:
+            return best
+    return None
+
+
 async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     try:
         handlers = {
@@ -303,7 +361,15 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
         }
         handler = handlers.get(tool_name)
         if not handler:
-            return f"未知工具: {tool_name}"
+            # 模型（尤其小参数量模型）常拼错工具名（如 reade_file / read_fil /
+            # searchearch_data_space），严格匹配会直接浪费一整步。这里做一次
+            # 容错纠正：归一化后精确命中，否则取编辑距离最近且足够相似的工具名。
+            corrected = _resolve_tool_name(tool_name, handlers.keys())
+            if corrected:
+                handler = handlers[corrected]
+                tool_name = corrected
+            else:
+                return f"未知工具: {tool_name}（可用工具: {', '.join(handlers.keys())}）"
         result = handler(arguments, user_id, data_space_id)
         if hasattr(result, "__await__"):
             return await result
