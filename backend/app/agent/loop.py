@@ -704,6 +704,8 @@ class AgentLoop:
         # 在倒数第二步触发，给模型一整轮来组织最终答案。
         finalize_step = max(0, self.max_iterations - 1)
         finalize_injected = False
+        # 累积 Agent 已产出的全部正文文本，用于判断是否已给出 ```answer 块。
+        accumulated_text = ""
 
         for iteration in range(self.max_iterations):
             if self._abort_check():
@@ -802,8 +804,30 @@ class AgentLoop:
                                 "input_json": tc["function"]["arguments"],
                             })
 
-                # 没有工具调用 → Agent 完成
+                # 没有工具调用 → Agent 认为自己完成了
                 if not tool_uses:
+                    accumulated_text += full_text
+                    # 早退补救：数据查询任务理应以 ```answer 块收尾。若 Agent 不再调
+                    # 工具却没产出 answer 块（典型："这不是我要的数据/需要进一步确认"
+                    # 之类的放弃式结尾），补一轮逼它用现有信息给出最终答案块。只补一次，
+                    # 且必须还有迭代余量；force_finalize 轮（已被要求收尾）不再重复。
+                    has_answer_block = "```answer" in accumulated_text
+                    if (not has_answer_block and not finalize_injected
+                            and iteration < finalize_step):
+                        messages.append({
+                            "role": "assistant",
+                            "content": full_text or "（已完成分析）",
+                        })
+                        messages.append({
+                            "role": "user",
+                            "content": "（系统提示）你还没有给出 ```answer 块。本任务要的是确定的数据结果，"
+                                       "不要以反问、\"需要进一步确认\"或\"这不是全国/汇总数据\"之类的说明收尾。"
+                                       "请基于你已读到的数据，直接把题面所要求的那些行和列整理出来，"
+                                       "在末尾输出标准 ```answer 块（首行列名，其后每行一条记录，CSV 格式，列出全部满足条件的行）。"
+                                       "如果文档本身就是逐条记录，就照实把每条记录作为一行输出，不要擅自加总或二次解读。",
+                        })
+                        finalize_injected = True
+                        continue
                     credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
                     if charge_credits:
                         await self._deduct_credits(user_id, credits_used, model_name)
@@ -814,6 +838,9 @@ class AgentLoop:
                         "tool_calls_log": tool_calls_log,
                     }
                     return
+
+                # 本轮有工具调用：累积正文文本，供后续 answer 块检测使用
+                accumulated_text += full_text
 
                 # 构建 assistant 消息（格式因后端而异）
                 if active_backend == "anthropic":
