@@ -153,6 +153,8 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 - **绝不向用户反问来代替查数**：本任务要的是数据结果，不是对话。不要问"你想看哪个省份/年份/维度吗？"这类问题；自己依据问题口径把结果算出来直接给。问题里的口径（字段、阈值、分组维度）以题面和视频/文档为准，不确定时按最直接的字面理解执行，不要停下来等用户澄清。
 - **读准字段，不要张冠李戴**：当存在名字相近的多个字段/指标（如"在任基金数" vs "旗下基金总数"、"本日"vs"近一周"），先回到题面确认问题问的到底是哪一个，再取对应字段。取错相近字段是常见且致命的错误。
 - **文档里的结构化数据用代码解析，不要手抄**：当 (实体, 数值) 这类成对数据被写在 Markdown/PDF 的叙述文字里（每段一条记录、可能有几十上百条），不要在 execute_python 里手敲硬编码列表——那样必然漏行或抄错。正确做法是用 read_file 取得全文后，在 execute_python / pandas_query 里用正则按统一模式批量抽取所有记录，再筛选排序。注意这类文档常埋"陷阱值"（"初步为 X，经核实后确认为 Y"），要取**最终确认值**，忽略被修正掉的初值。
+- **表名查不到 ≠ 数据不存在**：当 knowledge.md 或视频/题面提到某个表（如 mf_xxx），但 sqlite_query 列不出这张表、inspect_data 也说不支持时，**绝不要据此判定"数据缺失"或"无此表"而放弃**。这类表的数据极可能以**同名的 .md / .pdf 文档**形式存在（如 mf_xxx.md、mf_xxx.pdf），只是没进 SQL 引擎。务必用 read_file 把该同名文档**完整读完**（注意分页，文件几百行就一直读到末尾），再从叙述文字里按统一模式正则抽取所需字段。同名相近的表/文档可能是干扰项，认准题面/knowledge.md 指定的那个名字。
+- **同一份数据可能拆成两段**：一份文档里"档案信息段"（记录号↔名称/代码的映射）和"指标数值段"（记录号↔各项数值）可能分处不同位置，需按记录号/识别码把两段 JOIN 起来才能得到完整的 (名称, 数值) 行。读全文、两段都抽、再按键关联，不要只读前半段就下结论。
 - **答案要落进 ```answer 块**：分析做到一半不要停。无论中间过程多长，最后一定要回到题面要求，输出与正文一致的 ```answer 块；没有这个块等于没回答。
 
 ## 没有数据空间时
@@ -697,10 +699,28 @@ class AgentLoop:
 
         yield {"type": "thinking", "content": "正在分析问题..."}
 
+        # 撞步数上限前，预留一步强制收尾：注入一条指令让 Agent 用已有信息
+        # 立即产出 ```answer 块，而不是悄无声息地耗尽步数、留下半截分析。
+        # 在倒数第二步触发，给模型一整轮来组织最终答案。
+        finalize_step = max(0, self.max_iterations - 1)
+        finalize_injected = False
+
         for iteration in range(self.max_iterations):
             if self._abort_check():
                 yield {"type": "text", "delta": "\n\n[已被用户中断]"}
                 break
+
+            # 接近上限时强制收尾：禁用工具 + 注入收尾指令，逼模型给最终答案。
+            force_finalize = iteration >= finalize_step
+            if force_finalize and not finalize_injected:
+                messages.append({
+                    "role": "user",
+                    "content": "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
+                               "请立即基于你已经获取到的信息，直接给出最终答案，并务必在末尾输出与题面要求一致的 ```answer 块"
+                               "（列名+全部数据行，CSV 格式）。如果某些信息仍不完整，就用现有最可靠的数据作答，不要再说"
+                               "\"还需要进一步查询\"或留下空答案。",
+                })
+                finalize_injected = True
 
             try:
                 full_text = ""
@@ -714,7 +734,7 @@ class AgentLoop:
                         max_tokens=settings.anthropic_max_tokens,
                         system=system_blocks,
                         messages=messages,
-                        tools=tools,
+                        tools=[] if force_finalize else tools,
                     )
                     async with response_stream as stream:
                         async for event in stream:
@@ -743,7 +763,7 @@ class AgentLoop:
                     response = await client.chat.completions.create(
                         model=model_name,
                         messages=oai_messages,
-                        tools=openai_tools if openai_tools else None,
+                        tools=None if force_finalize else (openai_tools if openai_tools else None),
                         stream=True,
                     )
                     tool_calls_data = []
