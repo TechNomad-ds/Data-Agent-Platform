@@ -315,25 +315,30 @@ async def upload_files_to_space(
 
         # ZIP 文件：解压后每个子文件单独入库并关联到数据空间
         if file_type == "zip":
-            MAX_ZIP_FILES = 100
+            MAX_ZIP_FILES = 1000
             MAX_ZIP_TOTAL_SIZE = 500 * 1024 * 1024  # 500MB 解压上限
             tmp_dir = user_storage / f"_zip_tmp_{uuid.uuid4()}"
             tmp_dir.mkdir(parents=True, exist_ok=True)
             try:
                 zf = zipfile.ZipFile(str(temp_path), "r")
                 # 安全检查：路径遍历、文件数量、总大小
+                # 计数只针对真正会入库的文件（排除目录、垃圾文件、不支持的扩展名），
+                # 避免代码仓库类 zip 里大量无关文件把计数撑爆。
                 total_uncompressed = 0
                 valid_count = 0
                 for info in zf.infolist():
                     if info.filename.startswith('/') or '..' in info.filename:
                         shutil.rmtree(tmp_dir, ignore_errors=True)
                         raise HTTPException(status_code=400, detail=f"zip 文件包含不安全的路径: {info.filename}")
-                    if not info.is_dir():
-                        valid_count += 1
-                        total_uncompressed += info.file_size
+                    if info.is_dir() or _is_junk_path(info.filename):
+                        continue
+                    if get_file_type(info.filename) not in ALLOWED_EXTENSIONS:
+                        continue
+                    valid_count += 1
+                    total_uncompressed += info.file_size
                 if valid_count > MAX_ZIP_FILES:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
-                    raise HTTPException(status_code=400, detail=f"zip 文件包含过多文件({valid_count}个，上限{MAX_ZIP_FILES}个)")
+                    raise HTTPException(status_code=400, detail=f"zip 文件包含过多有效文件({valid_count}个，上限{MAX_ZIP_FILES}个)")
                 if total_uncompressed > MAX_ZIP_TOTAL_SIZE:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
                     raise HTTPException(status_code=400, detail=f"zip 解压后总大小超过限制(500MB)")

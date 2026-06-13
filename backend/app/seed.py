@@ -49,15 +49,18 @@ def _build_seed_models() -> list[dict]:
 
 
 async def seed_admin():
-    """内置管理员账号（如果不存在则创建）"""
+    """内置管理员账号（如果不存在则创建）。
+
+    凭据从配置（.env）读取，不再硬编码在代码里，避免随仓库泄露。
+    """
     from app.models.user import User
     from app.models.credit import CreditAccount
     from app.core.security import hash_password
     from datetime import datetime, timezone
 
-    ADMIN_EMAIL = "pkudcai@datamind.local"
-    ADMIN_USERNAME = "pkudcai"
-    ADMIN_PASSWORD = "pkudcai2026"
+    ADMIN_EMAIL = settings.admin_email
+    ADMIN_USERNAME = settings.admin_username
+    ADMIN_PASSWORD = settings.admin_password
 
     async with get_session_factory()() as db:
         result = await db.execute(select(User).where(User.username == ADMIN_USERNAME))

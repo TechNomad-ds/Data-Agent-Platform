@@ -241,8 +241,11 @@ async def _get_file_path(filename: str, user_id: uuid.UUID, data_space_id: uuid.
                 .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
                 .where(File.user_id == user_id, File.filename == filename, DataSpaceFile.data_space_id == data_space_id)
             )
+        # 同一空间内可能存在同名文件（如 zip 解压出多份 package.json / incident_records.csv），
+        # 此时不能用 scalar_one_or_none()——它在多行时会抛 MultipleResultsFound，导致
+        # read_file / pandas_query / sqlite_query 全部失败。取第一个匹配即可。
         result = await db.execute(query)
-        file = result.scalar_one_or_none()
+        file = result.scalars().first()
         if not file:
             return None
         return Path(settings.storage_root) / file.storage_path
@@ -272,7 +275,8 @@ async def _get_profile_ocr_text(filename: str, user_id: uuid.UUID, data_space_id
                 DataProfile.data_space_id == data_space_id,
             )
         )
-        profile = result.scalar_one_or_none()
+        # 同名文件可能匹配多个 profile，取第一个即可（避免 MultipleResultsFound）
+        profile = result.scalars().first()
         if not profile:
             return None
         return (profile.profile_data or {}).get("ocr_text")

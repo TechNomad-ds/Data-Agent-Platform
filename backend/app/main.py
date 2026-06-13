@@ -42,6 +42,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动 embedding 预热失败: {e}")
 
+    # 启动自愈：补跑因进程重启（--reload / 崩溃 / 部署）而中断的画像任务。
+    # 放后台执行，不阻塞启动；避免大量待补文件拖慢服务可用时间。
+    try:
+        import asyncio
+        from app.services.preprocessing import recover_unprocessed_files
+        asyncio.create_task(recover_unprocessed_files())
+        logger.info("启动自愈任务已在后台启动")
+    except Exception as e:
+        logger.warning(f"启动自愈任务失败: {e}")
+
     yield
 
     # 关闭 Redis 连接

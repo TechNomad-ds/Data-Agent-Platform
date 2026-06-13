@@ -142,7 +142,8 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 
 ## 注意事项
 
-- 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，列出所有文件，不要遗漏任何一个
+- 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，要基于上方"数据空间"信息给出**完整的全局概览**：先报总文件数和按类型的构成（如"共 601 个文件：377 个 Python 代码、112 个 Markdown 文档、2 个 CSV 数据…"），再指出其中哪些是可直接分析的结构化数据文件。**绝不要只说"有两个 csv 文件"就收尾**——那会让用户误以为你看不到其余文件。文件多时按类型归纳，文件少时逐个列出。
+- 当一个空间里数据文件很少、代码/文档很多时（典型：用户上传了整个代码仓库），明确告诉用户这一构成，并说明你可以分析其中的数据文件、也可以阅读代码和文档；让用户知道你对全部文件都有认知，只是分析会聚焦在真正的数据上。
 - 代码文件（.py/.sql/.r 等）也是数据空间的重要组成部分，可能包含数据处理逻辑或分析脚本
 - 如果工具调用失败，立即换一种方法。例如 pandas_query 失败可以试 sqlite_query 或先用 read_file 看清数据再分析。读取文件内容一律用 read_file 工具（支持 CSV/Excel/PDF/Word/代码/数据库等所有格式），不要在 execute_python 里用 open() 读文件——沙箱出于安全禁止 open。不要把错误信息原样转述给用户，直接换方法解决
 - 如果发现重要模式或用户偏好，用 save_memory 记住
@@ -230,15 +231,58 @@ class AgentLoop:
                     return f"{n / 1024 / 1024:.1f}MB"
                 return f"{n / 1024:.0f}KB"
 
-            file_list = "\n".join(
-                f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
-                for f in files
-            )
+            from collections import Counter
 
-            return f"""数据空间名称: {space.name}
+            def _summarize_by_label(file_list: list) -> str:
+                """按"显示标签"聚合计数（png/jpg/gif 都算"图片"，yaml/yml 都算"配置文件"），
+                避免出现"36 个 图片, 12 个 图片"这种按扩展名拆开的重复项。"""
+                label_counts: Counter = Counter()
+                for f in file_list:
+                    label_counts[self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)] += 1
+                return ", ".join(f"{cnt} 个 {label}" for label, cnt in label_counts.most_common())
+
+            # 数据型文件（真正可分析的）。csv/excel/数据库等是明确的数据；json/jsonl 比较
+            # 含糊（可能是数据，也可能是 package.json 这类项目配置），所以排在明确数据之后。
+            CORE_DATA_EXTS = {"csv", "tsv", "xlsx", "xls", "parquet", "feather", "dta", "sav", "sas7bdat", "sqlite", "db", "sqlite3"}
+            JSON_EXTS = {"json", "jsonl"}
+            DATA_EXTS = CORE_DATA_EXTS | JSON_EXTS
+            data_files = [f for f in files if f.file_type in DATA_EXTS]
+            other_files = [f for f in files if f.file_type not in DATA_EXTS]
+            # 明确的数据文件排在前，json 类排后
+            data_files.sort(key=lambda f: 0 if f.file_type in CORE_DATA_EXTS else 1)
+
+            # 文件数较少时：直接全量列出（保持原行为）
+            if len(files) <= 30:
+                file_list = "\n".join(
+                    f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
+                    for f in files
+                )
+                return f"""数据空间名称: {space.name}
 描述: {space.description or '无'}
 共 {len(files)} 个文件:
 {file_list or '  (空)'}"""
+
+            # 文件很多（如上传了整个代码仓库）：给出按类型的完整构成 + 重点列出数据文件，
+            # 避免上千行文件名挤爆上下文，也避免 Agent 误以为"只有几个文件"。
+            type_summary = _summarize_by_label(files)
+
+            data_list = "\n".join(
+                f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
+                for f in data_files[:40]
+            ) or "  (无结构化数据文件)"
+            data_more = f"\n  ...（还有 {len(data_files) - 40} 个数据/JSON 文件）" if len(data_files) > 40 else ""
+
+            # 非数据文件只给出按类型计数，必要时 Agent 可用工具进一步查看
+            other_line = _summarize_by_label(other_files)
+
+            return f"""数据空间名称: {space.name}
+描述: {space.description or '无'}
+共 {len(files)} 个文件。按类型构成：{type_summary}
+
+可分析的数据文件（{len(data_files)} 个，CSV/Excel/数据库等在前，JSON 类在后——注意 package.json/tsconfig.json 等多为项目配置而非业务数据）：
+{data_list}{data_more}
+
+其余 {len(other_files)} 个文件（代码/文档/图片/配置等，需要时可用 read_file 查看）：{other_line or '无'}"""
 
     async def _build_schema_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
         """预注入 schema + 质量信息。
@@ -276,10 +320,20 @@ class AgentLoop:
             all_columns: dict[str, dict[str, set]] = {}
             MAX_SCHEMA_COLS = 30
             TABULAR_EXTS = {"csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"}
+            # 可分析的数据型扩展（含数据库），schema 预注入时优先保证这些文件入选，
+            # 避免代码仓库类空间里几百个 .py/.md 把仅有的几个数据文件挤出前 N。
+            DATA_EXTS = TABULAR_EXTS | {"sqlite", "db", "sqlite3"}
 
+            # 数据文件优先排序：数据型在前、其余在后，再截断。这样 601 文件里的 2 个 csv
+            # 一定会进入 schema 预注入，而不是被前 15 个代码文件占满名额。
+            sorted_files = sorted(
+                all_files,
+                key=lambda f: 0 if f.file_type in DATA_EXTS else 1,
+            )
+            MAX_SCHEMA_FILES = 25
 
-            # 遍历所有文件
-            for f in all_files[:15]:
+            # 遍历文件（数据文件优先）
+            for f in sorted_files[:MAX_SCHEMA_FILES]:
                 fid = str(f.id)
                 profile = profile_map.get(fid)
 

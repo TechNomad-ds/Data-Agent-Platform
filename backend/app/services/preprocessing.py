@@ -115,6 +115,51 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
             return {"error": str(e)}
 
 
+async def recover_unprocessed_files() -> int:
+    """启动时自愈：补跑所有缺失画像的文件。
+
+    后台预处理是 asyncio 任务，进程重启（uvicorn --reload / 崩溃 / 部署）会直接
+    丢掉正在跑的任务，导致文件永远停在"无画像"状态、前端进度卡死。这里在每次启动时
+    扫描出所有「已关联到数据空间、但没有 ready 画像」的文件，逐个补跑。
+    error 状态的也重试（可能是上次 bug 导致，修复后应能成功）。
+
+    返回补跑的文件数。
+    """
+    import logging
+    logger = logging.getLogger("preprocessing")
+    from app.models.data_space import DataSpaceFile
+
+    async with get_session_factory()() as db:
+        # 所有 (file_id, data_space_id) 关联
+        link_rows = await db.execute(
+            select(DataSpaceFile.file_id, DataSpaceFile.data_space_id)
+        )
+        links = link_rows.all()
+
+        # 已 ready 的 (file_id, data_space_id) 集合
+        ready_rows = await db.execute(
+            select(DataProfile.file_id, DataProfile.data_space_id).where(
+                DataProfile.status == "ready"
+            )
+        )
+        ready_set = {(r[0], r[1]) for r in ready_rows.all()}
+
+    pending = [(fid, sid) for fid, sid in links if (fid, sid) not in ready_set]
+    if not pending:
+        return 0
+
+    logger.info(f"启动自愈：检测到 {len(pending)} 个文件缺少画像，开始补跑")
+    done = 0
+    for fid, sid in pending:
+        try:
+            await preprocess_file(fid, sid)
+            done += 1
+        except Exception as e:
+            logger.warning(f"自愈补跑文件 {fid} 失败: {e}")
+    logger.info(f"启动自愈完成：补跑 {done}/{len(pending)} 个文件")
+    return done
+
+
 def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
     """生成表格数据画像 - 支持多种格式"""
     df = _load_tabular(file_path, ext)
@@ -159,7 +204,10 @@ def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
             "unique_count": int(df[col].nunique()),
         }
 
-        if pd.api.types.is_numeric_dtype(df[col]):
+        # 注意：布尔列在 pandas 里 is_numeric_dtype 也返回 True，但对布尔做
+        # describe/分位数/IQR 异常值会触发 numpy "boolean subtract" 报错，且统计意义
+        # 不大。这里显式排除布尔列，按类别列（top_values）处理。
+        if pd.api.types.is_numeric_dtype(df[col]) and not pd.api.types.is_bool_dtype(df[col]):
             desc = df[col].describe()
             col_info["stats"] = {
                 "mean": _safe_float(desc.get("mean")),

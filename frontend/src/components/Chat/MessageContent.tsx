@@ -17,6 +17,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
 import ChartMessage from '@/components/Charts/ChartMessage'
+import AnswerCard from './AnswerCard'
 import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
@@ -129,15 +130,41 @@ function UserAvatar() {
 }
 
 function MarkdownBlock({ content }: { content: string }) {
-  const parts = content.split(/```chart\n([\s\S]*?)```/)
-  if (parts.length === 1) return <MarkdownRaw content={content} />
+  // 统一拆分特殊代码块：```chart 和 ```answer
+  const SPECIAL_BLOCK_RE = /```(chart|answer)\n([\s\S]*?)```/g
+  const parts: { type: 'markdown' | 'chart' | 'answer'; content: string }[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = SPECIAL_BLOCK_RE.exec(content)) !== null) {
+    // match 前的普通 markdown
+    if (match.index > lastIndex) {
+      parts.push({ type: 'markdown', content: content.slice(lastIndex, match.index) })
+    }
+    parts.push({ type: match[1] as 'chart' | 'answer', content: match[2] })
+    lastIndex = match.index + match[0].length
+  }
+  // 剩余尾部
+  if (lastIndex < content.length) {
+    parts.push({ type: 'markdown', content: content.slice(lastIndex) })
+  }
+
+  if (parts.length === 0) return <MarkdownRaw content={content} />
+
   return (
     <>
-      {parts.map((part, i) =>
-        i % 2 === 0
-          ? part.trim() && <MarkdownRaw key={i} content={part} />
-          : <ChartMessage key={i} chartJson={part} />
-      )}
+      {parts.map((part, i) => {
+        if (part.type === 'markdown') {
+          return part.content.trim() ? <MarkdownRaw key={i} content={part.content} /> : null
+        }
+        if (part.type === 'chart') {
+          return <ChartMessage key={i} chartJson={part.content} />
+        }
+        if (part.type === 'answer') {
+          return <AnswerCard key={i} raw={part.content} />
+        }
+        return null
+      })}
     </>
   )
 }

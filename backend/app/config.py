@@ -16,12 +16,27 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
+    # 内置管理员账号（首次启动自动创建）。生产环境务必在 .env 覆盖密码，
+    # 切勿把真实密码写进代码或提交到版本库。
+    admin_username: str = "admin"
+    admin_email: str = "admin@datamind.local"
+    admin_password: str = "changeme-admin-password"
+
     def validate_secret_key(self) -> None:
         if self.secret_key == "your-secret-key-change-in-production":
             import warnings
             warnings.warn(
                 "⚠️  SECRET_KEY 使用了默认值，请在 .env 中设置安全的随机密钥！"
                 "  生成方式: python -c \"import secrets; print(secrets.token_urlsafe(32))\"",
+                stacklevel=2,
+            )
+
+    def validate_admin_password(self) -> None:
+        if self.admin_password == "changeme-admin-password":
+            import warnings
+            warnings.warn(
+                "⚠️  ADMIN_PASSWORD 使用了默认值，请在 .env 中设置强密码！"
+                "  否则任何知道默认值的人都能登录管理员账号。",
                 stacklevel=2,
             )
 
@@ -81,3 +96,4 @@ class Settings(BaseSettings):
 
 settings = Settings()
 settings.validate_secret_key()
+settings.validate_admin_password()
