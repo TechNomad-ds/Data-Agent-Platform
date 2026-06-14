@@ -236,6 +236,16 @@ async def test_model_connection(
     """测试模型连通性"""
     from openai import AsyncOpenAI
     api_key = data.api_key if data.api_key and data.api_key != "use-saved" else settings.openai_api_key
+    if not api_key:
+        try:
+            from app.core.redis_client import get_redis
+            from app.core.security import decrypt_api_key
+            redis = await get_redis()
+            encrypted = await redis.get("global:api_key")
+            if encrypted:
+                api_key = decrypt_api_key(encrypted)
+        except Exception:
+            api_key = ""
     api_base = data.api_base or settings.openai_api_base
     if not api_key:
         return {"status": "error", "message": "未配置 API Key，请先保存全局 API 配置"}
@@ -303,7 +313,7 @@ async def update_global_api(
         settings.openai_api_base = base
 
     if data.api_key:
-        await redis.set("global:api_key", data.api_key)
+        await redis.set("global:api_key", encrypt_api_key(data.api_key))
         settings.openai_api_key = data.api_key
 
     # 同步到所有模型
@@ -350,6 +360,7 @@ async def update_ocr_config(
 ):
     """更新 OCR 配置（存入 Redis，即时生效）"""
     from app.core.redis_client import get_redis
+    from app.core.security import encrypt_api_key
     redis = await get_redis()
 
     if data.ocr_base:
@@ -357,7 +368,7 @@ async def update_ocr_config(
         await redis.set("global:ocr_base", base)
         settings.ocr_api_base = base
     if data.ocr_token:
-        await redis.set("global:ocr_token", data.ocr_token)
+        await redis.set("global:ocr_token", encrypt_api_key(data.ocr_token))
         settings.ocr_api_key = data.ocr_token
     if data.ocr_model:
         await redis.set("global:ocr_model", data.ocr_model)

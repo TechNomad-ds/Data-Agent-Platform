@@ -38,9 +38,15 @@ async def _get_ocr_settings() -> dict:
     model = settings.ocr_model
     try:
         from app.core.redis_client import get_redis
+        from app.core.security import decrypt_api_key
         redis = await get_redis()
         base = (await redis.get("global:ocr_base")) or base
-        token = (await redis.get("global:ocr_token")) or token
+        stored_token = await redis.get("global:ocr_token")
+        if stored_token:
+            try:
+                token = decrypt_api_key(stored_token)
+            except ValueError:
+                token = stored_token
         model = (await redis.get("global:ocr_model")) or model
     except Exception as e:
         logger.warning(f"读取 Redis OCR 配置失败，使用默认值: {e}")

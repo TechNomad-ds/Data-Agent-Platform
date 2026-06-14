@@ -28,7 +28,12 @@ async def lifespan(app: FastAPI):
             settings.openai_api_base = global_api_base
             logger.info("从 Redis 恢复全局 API 地址")
         if global_api_key:
-            settings.openai_api_key = global_api_key
+            from app.core.security import decrypt_api_key
+            try:
+                settings.openai_api_key = decrypt_api_key(global_api_key)
+            except ValueError:
+                settings.openai_api_key = global_api_key
+                logger.warning("检测到明文全局 API Key，请在管理后台重新保存以加密")
             logger.info("从 Redis 恢复全局 API Key")
         for key, meta in RUNTIME_CONFIG_KEYS.items():
             cached = await redis.get(f"config:{key}")
