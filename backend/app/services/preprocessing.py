@@ -1,4 +1,5 @@
 """数据预处理服务 - 文件上传后自动分析生成数据画像"""
+import asyncio
 import uuid
 import json
 from pathlib import Path
@@ -15,6 +16,35 @@ from app.models.file import File
 from app.models.data_profile import DataProfile
 from app.services.chunking import greedy_chunk
 from app.services import embedding as embed_svc
+
+_LIMITERS: dict[str, asyncio.Semaphore] = {}
+
+
+def _limiter_limit(kind: str) -> int:
+    return {
+        "preprocessing": settings.max_preprocessing_tasks,
+        "embedding": settings.max_embedding_tasks,
+        "ocr": settings.max_ocr_tasks,
+        "graph": settings.max_graph_tasks,
+    }.get(kind, 1)
+
+
+def _get_limiter(kind: str) -> asyncio.Semaphore:
+    limiter = _LIMITERS.get(kind)
+    if limiter is None:
+        limiter = asyncio.Semaphore(max(1, _limiter_limit(kind)))
+        _LIMITERS[kind] = limiter
+    return limiter
+
+
+async def run_limited(kind: str, awaitable):
+    """限制进程内重任务并发，避免上传/嵌入/OCR 抢占 API 进程资源。"""
+    async with _get_limiter(kind):
+        return await awaitable
+
+
+async def preprocess_file_limited(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[str, Any]:
+    return await run_limited("preprocessing", preprocess_file(file_id, data_space_id))
 
 
 async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[str, Any]:
@@ -35,9 +65,11 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
             if ext in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
                 profile_data = _profile_tabular(file_path, ext)
                 profile_type = "tabular"
-                import asyncio
                 asyncio.create_task(
-                    _embed_tabular_background(profile_data, str(file_id), str(data_space_id), file.filename)
+                    run_limited(
+                        "embedding",
+                        _embed_tabular_background(profile_data, str(file_id), str(data_space_id), file.filename),
+                    )
                 )
             elif ext in ("sqlite", "db", "sqlite3"):
                 profile_data = _profile_sqlite(file_path)
@@ -45,23 +77,39 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
             elif ext in ("txt", "md", "py", "sql", "html", "xml", "yaml", "yml", "log", "r", "ipynb"):
                 profile_data = _profile_text_fast(file_path)
                 profile_type = "text"
-                import asyncio
-                asyncio.create_task(_embed_text_background(file_path, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(
+                    run_limited(
+                        "embedding",
+                        _embed_text_background(file_path, str(file_id), str(data_space_id), file.filename),
+                    )
+                )
             elif ext in ("pdf", "docx"):
                 profile_data = _profile_document_fast(file_path, ext)
                 profile_type = "document"
-                import asyncio
-                asyncio.create_task(_document_ocr_pipeline(file_path, ext, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(
+                    run_limited(
+                        "ocr",
+                        _document_ocr_pipeline(file_path, ext, str(file_id), str(data_space_id), file.filename),
+                    )
+                )
             elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
                 profile_data = _profile_image(file_path)
                 profile_type = "image"
-                import asyncio
-                asyncio.create_task(_image_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(
+                    run_limited(
+                        "ocr",
+                        _image_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename),
+                    )
+                )
             elif ext in ("mp4", "mov", "avi", "mkv", "webm"):
                 profile_data = _profile_video(file_path)
                 profile_type = "video"
-                import asyncio
-                asyncio.create_task(_video_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename))
+                asyncio.create_task(
+                    run_limited(
+                        "ocr",
+                        _video_ocr_pipeline(file_path, str(file_id), str(data_space_id), file.filename),
+                    )
+                )
             else:
                 profile_data = {"info": f"文件类型: {ext}", "file_size": file.file_size}
                 profile_type = "other"

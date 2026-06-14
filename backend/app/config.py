@@ -10,6 +10,11 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+    redis_max_connections: int = 50
+
+    # 数据库连接池（按 worker 计算；4 workers * (10 + 5) = 60，低于默认 PostgreSQL 100）
+    db_pool_size: int = 10
+    db_max_overflow: int = 5
 
     # JWT
     secret_key: str = "please-change-this-in-production"
@@ -82,6 +87,14 @@ class Settings(BaseSettings):
     max_spaces_per_user: int = 20
     max_conversations_per_user: int = 200
     max_files_per_space: int = 50
+
+    # 并发保护
+    max_concurrent_streams_per_user: int = 3
+    max_concurrent_streams_global: int = 24
+    max_preprocessing_tasks: int = 2
+    max_embedding_tasks: int = 2
+    max_ocr_tasks: int = 2
+    max_graph_tasks: int = 2
 
     # 服务
     backend_host: str = "0.0.0.0"

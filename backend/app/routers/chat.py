@@ -19,12 +19,87 @@ from app.schemas.chat import (
     MessageResponse, ConversationDetailResponse,
 )
 from app.agent.loop import AgentLoop
+from app.config import settings
 
 router = APIRouter()
 
-MAX_CONCURRENT_STREAMS_PER_USER = 3
 _active_streams: dict[str, int] = defaultdict(int)
+_active_streams_global = 0
 _abort_signals: dict[str, bool] = {}
+
+
+_ACQUIRE_LUA = """
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local limit = tonumber(ARGV[1])
+if current >= limit then
+    return -1
+end
+current = redis.call('INCR', KEYS[1])
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+return current
+"""
+
+_RELEASE_LUA = """
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+if current <= 1 then
+    redis.call('DEL', KEYS[1])
+    return 0
+end
+return redis.call('DECR', KEYS[1])
+"""
+
+
+async def _redis_acquire(key: str, limit: int, ttl: int = 900) -> bool:
+    from app.core.redis_client import get_redis
+
+    redis = await get_redis()
+    result = await redis.eval(_ACQUIRE_LUA, 1, key, limit, ttl)
+    return int(result) >= 0
+
+
+async def _redis_release(key: str) -> None:
+    from app.core.redis_client import get_redis
+
+    redis = await get_redis()
+    await redis.eval(_RELEASE_LUA, 1, key)
+
+
+async def _acquire_stream_slot(user_key: str) -> tuple[bool, str]:
+    """跨 worker 的流式对话并发闸门；Redis 不可用时退回进程内限制。"""
+    global _active_streams_global
+
+    global_key = "streams:global"
+    user_stream_key = f"streams:user:{user_key}"
+    try:
+        if not await _redis_acquire(global_key, settings.max_concurrent_streams_global):
+            return False, "当前平台对话并发已满，请稍后再试"
+        if not await _redis_acquire(user_stream_key, settings.max_concurrent_streams_per_user):
+            await _redis_release(global_key)
+            return False, "同时进行的对话太多，请等待当前对话完成后再试"
+        return True, "redis"
+    except Exception:
+        if _active_streams_global >= settings.max_concurrent_streams_global:
+            return False, "当前平台对话并发已满，请稍后再试"
+        if _active_streams[user_key] >= settings.max_concurrent_streams_per_user:
+            return False, "同时进行的对话太多，请等待当前对话完成后再试"
+        _active_streams_global += 1
+        _active_streams[user_key] += 1
+        return True, "local"
+
+
+async def _release_stream_slot(user_key: str, mode: str) -> None:
+    global _active_streams_global
+
+    if mode == "redis":
+        try:
+            await _redis_release("streams:global")
+            await _redis_release(f"streams:user:{user_key}")
+            return
+        except Exception:
+            pass
+
+    _active_streams_global = max(0, _active_streams_global - 1)
+    _active_streams[user_key] = max(0, _active_streams[user_key] - 1)
 
 
 @router.post("/conversations", response_model=ConversationResponse, status_code=201)
@@ -173,55 +248,60 @@ async def send_message(
     """发送消息并获取 Agent 流式回复（SSE）"""
     # 限制每用户并发流数
     user_key = str(current_user.id)
-    if _active_streams[user_key] >= MAX_CONCURRENT_STREAMS_PER_USER:
-        raise HTTPException(status_code=429, detail="同时进行的对话太多，请等待当前对话完成后再试")
+    acquired, limiter_mode_or_message = await _acquire_stream_slot(user_key)
+    if not acquired:
+        raise HTTPException(status_code=429, detail=limiter_mode_or_message)
+    limiter_mode = limiter_mode_or_message
 
-    # 验证对话归属
-    result = await db.execute(
-        select(Conversation).where(
-            Conversation.id == conv_id, Conversation.user_id == current_user.id
+    try:
+        # 验证对话归属
+        result = await db.execute(
+            select(Conversation).where(
+                Conversation.id == conv_id, Conversation.user_id == current_user.id
+            )
         )
-    )
-    conv = result.scalar_one_or_none()
-    if not conv:
-        raise HTTPException(status_code=404, detail="对话不存在")
+        conv = result.scalar_one_or_none()
+        if not conv:
+            raise HTTPException(status_code=404, detail="对话不存在")
 
-    # 检查是否是对话的第一条消息
-    from sqlalchemy import func as sql_func
-    msg_count_result = await db.execute(
-        select(sql_func.count()).select_from(Message).where(Message.conversation_id == conv_id)
-    )
-    is_first_message = (msg_count_result.scalar() or 0) == 0
+        # 检查是否是对话的第一条消息
+        from sqlalchemy import func as sql_func
+        msg_count_result = await db.execute(
+            select(sql_func.count()).select_from(Message).where(Message.conversation_id == conv_id)
+        )
+        is_first_message = (msg_count_result.scalar() or 0) == 0
 
-    # 保存用户消息
-    user_message = Message(
-        conversation_id=conv_id,
-        role="user",
-        content=data.content,
-    )
-    db.add(user_message)
-    await db.flush()
+        # 保存用户消息
+        user_message = Message(
+            conversation_id=conv_id,
+            role="user",
+            content=data.content,
+        )
+        db.add(user_message)
+        await db.flush()
 
-    # 如果对话没有标题，用算法从用户消息提取标题
-    needs_title = not conv.title
-    if needs_title:
-        conv.title = _extract_title(data.content)
+        # 如果对话没有标题，用算法从用户消息提取标题
+        needs_title = not conv.title
+        if needs_title:
+            conv.title = _extract_title(data.content)
 
-    # 如果前端传了 model_id，更新对话使用的模型
-    if data.model_id and data.model_id != conv.model_id:
-        conv.model_id = data.model_id
+        # 如果前端传了 model_id，更新对话使用的模型
+        if data.model_id and data.model_id != conv.model_id:
+            conv.model_id = data.model_id
 
-    await db.commit()
+        await db.commit()
 
-    # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）
-    conv_data_space_id = conv.data_space_id
-    conv_model_id = conv.model_id
-    message_content = data.content
+        # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）
+        conv_data_space_id = conv.data_space_id
+        conv_model_id = conv.model_id
+        message_content = data.content
+    except Exception:
+        await _release_stream_slot(user_key, limiter_mode)
+        raise
 
     # 流式返回 Agent 回复
     async def event_stream() -> AsyncGenerator[str, None]:
         from app.core.database import get_session_factory
-        _active_streams[user_key] += 1
         abort_key = f"{current_user.id}:{conv_id}"
         _abort_signals[abort_key] = False
         agent = AgentLoop(abort_check=lambda: _abort_signals.get(abort_key, False))
@@ -311,7 +391,7 @@ async def send_message(
 
             yield "data: [DONE]\n\n"
         finally:
-            _active_streams[user_key] = max(0, _active_streams[user_key] - 1)
+            await _release_stream_slot(user_key, limiter_mode)
             _abort_signals.pop(abort_key, None)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -417,14 +417,14 @@ async def upload_files_to_space(
     # 后台异步预处理
     import asyncio
     import logging
-    from app.services.preprocessing import preprocess_file
+    from app.services.preprocessing import preprocess_file_limited, run_limited
 
     logger = logging.getLogger("data_spaces")
 
     async def _run_preprocessing():
         for f in uploaded:
             try:
-                await preprocess_file(f.id, space_id)
+                await preprocess_file_limited(f.id, space_id)
             except Exception as e:
                 logger.error(f"预处理文件 {f.filename} 失败: {e}", exc_info=True)
 
@@ -454,7 +454,13 @@ async def upload_files_to_space(
                             else:
                                 continue
                             if len(text.strip()) >= 100:
-                                await gs.extract_triples_from_text(text[:5000], max_triples=settings.graph_max_triples_per_file)
+                                await run_limited(
+                                    "graph",
+                                    gs.extract_triples_from_text(
+                                        text[:5000],
+                                        max_triples=settings.graph_max_triples_per_file,
+                                    ),
+                                )
                         except Exception as e:
                             logger.warning(f"图谱抽取跳过 {f.filename}: {e}")
                 except Exception as e:

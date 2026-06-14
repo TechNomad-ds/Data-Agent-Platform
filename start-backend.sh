@@ -6,4 +6,6 @@ cd /root/datamind/Data-Agent-Platform/backend
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
-exec venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8002
+# 生产默认使用 gunicorn 多 worker；WORKERS 可在环境变量里覆盖。
+export WORKERS="${WORKERS:-4}"
+exec venv/bin/gunicorn app.main:app -c gunicorn.conf.py
