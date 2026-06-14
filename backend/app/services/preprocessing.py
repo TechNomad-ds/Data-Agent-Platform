@@ -129,6 +129,21 @@ async def recover_unprocessed_files() -> int:
     logger = logging.getLogger("preprocessing")
     from app.models.data_space import DataSpaceFile
 
+    # 多 worker 场景下（gunicorn preload + N workers）每个 worker 都会在启动时调用本函数。
+    # 用 Redis SET NX 抢一把全局锁，确保只有一个 worker 真正执行补跑，避免重复 preprocess
+    # 同一批文件造成的 CPU/embedding 浪费与竞态。拿不到锁的 worker 直接跳过。
+    # 锁带过期时间兜底，防止持锁 worker 崩溃后永久占用。
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        got_lock = await redis.set("lock:recover_unprocessed_files", "1", nx=True, ex=1800)
+        if not got_lock:
+            logger.info("启动自愈：已有其它 worker 在执行，本 worker 跳过")
+            return 0
+    except Exception as e:
+        # Redis 不可用时不阻塞启动；退化为可能多 worker 重复跑（功能仍正确，幂等）
+        logger.warning(f"启动自愈：获取分布式锁失败，继续执行（可能重复）: {e}")
+
     async with get_session_factory()() as db:
         # 所有 (file_id, data_space_id) 关联
         link_rows = await db.execute(

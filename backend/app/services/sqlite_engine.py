@@ -176,3 +176,59 @@ def invalidate_cache(data_space_id: str) -> None:
                 pass
 
 
+def sweep_orphan_temp_files(max_age_seconds: int = 3600) -> int:
+    """清理无主的 SQLite 临时文件。
+
+    进程崩溃 / worker 被 max_requests 回收 / agent 异常中断时，内存里的 _cache
+    会丢失，但 /tmp 里的 space_*.db 文件不会被清理，长期累积会撑满磁盘。
+    这里扫描临时目录下所有由本模块创建（前缀 space_、后缀 .db）且超过 max_age
+    的文件并删除——仍在缓存内、TTL 未过期的活跃文件会被跳过。
+
+    返回删除的文件数。
+    """
+    import tempfile
+
+    with _cache_lock:
+        active = {entry["path"] for entry in _cache.values()}
+
+    tmp_dir = Path(tempfile.gettempdir())
+    now = time.time()
+    removed = 0
+    try:
+        candidates = tmp_dir.glob("space_*.db")
+    except Exception:
+        return 0
+
+    for p in candidates:
+        sp = str(p)
+        if sp in active:
+            continue
+        try:
+            if now - p.stat().st_mtime < max_age_seconds:
+                continue
+            p.unlink(missing_ok=True)
+            removed += 1
+        except Exception:
+            continue
+    return removed
+
+
+async def periodic_cleanup_loop(interval_seconds: int = 600, max_age_seconds: int = 3600) -> None:
+    """后台周期性清理孤儿临时文件，由应用启动时拉起。"""
+    import asyncio
+    import logging
+    logger = logging.getLogger("sqlite_engine")
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            removed = await asyncio.get_running_loop().run_in_executor(
+                None, sweep_orphan_temp_files, max_age_seconds
+            )
+            if removed:
+                logger.info(f"周期清理：删除 {removed} 个孤儿 SQLite 临时文件")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"周期清理临时文件失败: {e}")
+
+

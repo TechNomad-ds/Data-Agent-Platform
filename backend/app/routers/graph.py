@@ -94,16 +94,24 @@ async def build_graph(
     """懒加载触发图谱构建 - 从该 space 的文本/文档文件中抽取三元组"""
     space_key = str(space_id)
 
+    # 校验数据空间归属，防止越权将他人文件抽取进自己的图谱
+    from app.models.data_space import DataSpace, DataSpaceFile
+    space_check = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    if not space_check.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
     if space_key in _building_spaces:
         return {"status": "building", "message": "图谱正在构建中，请稍候..."}
 
     # 查找该 space 下所有文本/文档类型的文件（通过关联表）
-    from app.models.data_space import DataSpaceFile
     result = await db.execute(
         select(File)
         .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
         .where(
             DataSpaceFile.data_space_id == space_id,
+            File.user_id == current_user.id,
             File.file_type.in_(["txt", "md", "pdf", "docx", "py", "sql", "html", "xml", "yaml", "yml"]),
         )
     )

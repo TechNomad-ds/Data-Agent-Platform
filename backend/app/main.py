@@ -52,6 +52,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"启动自愈任务失败: {e}")
 
+    # 周期清理无主的 SQLite 临时文件（崩溃/中断会遗留 /tmp/space_*.db，长期撑满磁盘）
+    try:
+        import asyncio
+        from app.services.sqlite_engine import periodic_cleanup_loop
+        asyncio.create_task(periodic_cleanup_loop())
+        logger.info("SQLite 临时文件周期清理已在后台启动")
+    except Exception as e:
+        logger.warning(f"启动 SQLite 临时文件清理失败: {e}")
+
     yield
 
     # 关闭 Redis 连接

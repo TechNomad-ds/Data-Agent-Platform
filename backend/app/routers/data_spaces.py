@@ -530,6 +530,13 @@ async def get_file_profile_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """获取单个文件的数据画像"""
+    # 先校验数据空间归属，防止越权读取他人文件画像（IDOR）
+    space_check = await db.execute(
+        select(DataSpace).where(DataSpace.id == space_id, DataSpace.user_id == current_user.id)
+    )
+    if not space_check.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
     from app.models.data_profile import DataProfile as DP
     result = await db.execute(
         select(DP).where(DP.file_id == file_id, DP.data_space_id == space_id)

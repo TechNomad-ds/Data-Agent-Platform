@@ -164,13 +164,6 @@ async def _get_fake_redis():
 
 # ── Fixtures ──────────────────────────────────────
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database():
     os.makedirs("/tmp/datamind_test_storage", exist_ok=True)
@@ -179,6 +172,17 @@ async def setup_database():
     yield
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # 必须 dispose：aiosqlite 的连接 worker 是非 daemon 线程，不释放会让
+    # 解释器在退出阶段卡在 threading._shutdown 上永久等待（表现为整个测试进程挂死）。
+    await _test_engine.dispose()
+    # app 自身的引擎也用 aiosqlite（如 /api/health 直接调 get_session_factory），
+    # 同样会遗留 worker 线程，一并释放。
+    try:
+        from app.core import database as _app_db
+        if _app_db._engine is not None:
+            await _app_db._engine.dispose()
+    except Exception:
+        pass
 
 
 @pytest_asyncio.fixture
