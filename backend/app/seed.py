@@ -61,11 +61,21 @@ async def seed_admin():
     ADMIN_EMAIL = settings.admin_email
     ADMIN_USERNAME = settings.admin_username
     ADMIN_PASSWORD = settings.admin_password
+    default_admin_passwords = {
+        "please-change-this-admin-password",
+        "changeme-admin-password",
+    }
 
     async with get_session_factory()() as db:
         result = await db.execute(select(User).where(User.username == ADMIN_USERNAME))
         if result.scalar_one_or_none():
             return
+
+        if ADMIN_PASSWORD in default_admin_passwords:
+            raise RuntimeError(
+                "拒绝使用默认 ADMIN_PASSWORD 创建管理员账号。"
+                "请在服务器 .env 中设置强密码后重新启动服务。"
+            )
 
         admin = User(
             email=ADMIN_EMAIL,

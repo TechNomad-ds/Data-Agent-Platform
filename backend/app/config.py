@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # JWT
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str = "please-change-this-in-production"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
@@ -20,10 +20,10 @@ class Settings(BaseSettings):
     # 切勿把真实密码写进代码或提交到版本库。
     admin_username: str = "admin"
     admin_email: str = "admin@datamind.local"
-    admin_password: str = "changeme-admin-password"
+    admin_password: str = "please-change-this-admin-password"
 
     def validate_secret_key(self) -> None:
-        if self.secret_key == "your-secret-key-change-in-production":
+        if self.secret_key == "please-change-this-in-production":
             import warnings
             warnings.warn(
                 "⚠️  SECRET_KEY 使用了默认值，请在 .env 中设置安全的随机密钥！"
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
             )
 
     def validate_admin_password(self) -> None:
-        if self.admin_password == "changeme-admin-password":
+        if self.admin_password == "please-change-this-admin-password":
             import warnings
             warnings.warn(
                 "⚠️  ADMIN_PASSWORD 使用了默认值，请在 .env 中设置强密码！"
