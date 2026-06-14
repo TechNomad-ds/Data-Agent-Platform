@@ -3,6 +3,7 @@ import uuid
 import json
 import ast
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "search_data_space",
-                "description": "在当前数据空间中搜索与查询相关的内容片段（支持向量语义搜索）",
+                "description": "在当前数据空间中搜索与查询相关的文本内容片段（支持向量语义搜索）。适合文档、报告、说明文字、代码注释等非结构化内容；不要用它替代表格聚合计算。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -38,7 +39,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "read_file",
-                "description": "读取数据空间中指定文件的内容。对于大文件可以指定起始行和行数",
+                "description": "读取数据空间中指定文件的原始内容或表格分页预览。适合查看文档全文、确认文件内容、读取非表格文件；表格统计分析优先用 pandas_query/sqlite_query。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -54,7 +55,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "inspect_data",
-                "description": "查看结构化数据文件(CSV/Excel/JSON)的 schema、列信息、样本数据和跨文件 join 建议",
+                "description": "查看结构化数据文件(CSV/Excel/JSON)的 schema、列信息、样本数据、execute_python 可用 DataFrame 变量名和跨文件 join 建议。字段或变量名不确定时先用它。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -68,12 +69,12 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "pandas_query",
-                "description": "对 CSV/Excel/JSON 文件执行 pandas 查询表达式。数据已加载为 df 变量",
+                "description": "对单个 CSV/Excel/JSON 文件执行 pandas 查询。该文件已加载为 df 变量。适合单表探索、清洗、分组、趋势、统计。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 expression 里完成，并赋值给 result 或 print 输出。",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "filename": {"type": "string", "description": "数据文件名"},
-                        "expression": {"type": "string", "description": "pandas 表达式，例如 df.describe()、df.groupby('col').sum()"},
+                        "expression": {"type": "string", "description": "pandas 表达式或多行代码，例如 df.describe()，或先创建日期/时长派生列再 groupby，最后把结果赋给 result 或让最后一行成为表达式"},
                     },
                     "required": ["filename", "expression"],
                 },
@@ -83,7 +84,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "sqlite_query",
-                "description": "对数据空间中的所有表格数据执行 SQL 查询。表名为文件名（去扩展名，小写，下划线替换空格）。只支持 SELECT 查询",
+                "description": "对数据空间中的所有表格数据执行 SQL 查询。适合多表 JOIN、过滤、计数、GROUP BY、排序。表名为文件名（去扩展名，小写，下划线替换空格）。只支持 SELECT/WITH 查询。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -97,7 +98,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "execute_python",
-                "description": "执行 Python 代码进行数据分析。数据空间中的文件已预加载为 DataFrame 变量（如 df_patient）。可用库：pandas(pd)、numpy(np)、json、math、statistics",
+                "description": "执行 Python 代码进行复杂数据分析。适合多文件联合计算、复杂派生指标、循环、统计摘要。数据空间中的 CSV/Excel/JSON 已预加载为 DataFrame 变量，具体变量名见 schema 或 inspect_data 输出。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 code 里完成，并赋值给 result 或 print 输出。可用库：pandas(pd)、numpy(np)、json、math、statistics",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -285,6 +286,47 @@ async def _get_profile_ocr_text(filename: str, user_id: uuid.UUID, data_space_id
 def _load_df(file_path: Path, ext: str) -> pd.DataFrame:
     from app.services.file_loader import load_dataframe
     return load_dataframe(file_path, ext)
+
+
+DATAFRAME_FILE_KINDS = {
+    "csv": "csv",
+    "xlsx": "excel",
+    "xls": "excel",
+    "json": "json",
+}
+
+
+def _safe_dataframe_var_base(filename: str) -> str:
+    stem = filename.rsplit(".", 1)[0].lower()
+    base = re.sub(r"\W+", "_", stem, flags=re.ASCII).strip("_")
+    if not base:
+        base = "data"
+    if base[0].isdigit():
+        base = "file_" + base
+    return base
+
+
+def _build_dataframe_preload(files: list) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+    """生成 execute_python 预加载变量，避免同名/复杂文件名导致覆盖或不可读。"""
+    preload: dict[str, tuple[str, str]] = {}
+    file_id_to_var: dict[str, str] = {}
+    used: dict[str, int] = {}
+
+    sorted_files = sorted(files, key=lambda f: (f.filename.lower(), str(getattr(f, "id", ""))))
+    for f in sorted_files:
+        full_path = Path(settings.storage_root) / f.storage_path
+        ext = f.filename.rsplit(".", 1)[-1].lower()
+        kind = DATAFRAME_FILE_KINDS.get(ext)
+        if not kind:
+            continue
+        base = _safe_dataframe_var_base(f.filename)
+        used[base] = used.get(base, 0) + 1
+        suffix = "" if used[base] == 1 else f"_{used[base]}"
+        var = f"df_{base}{suffix}"
+        preload[var] = (kind, str(full_path))
+        file_id_to_var[str(getattr(f, "id", f.filename))] = var
+
+    return preload, file_id_to_var
 
 
 def _resolve_tool_name(name: str, valid_names) -> str | None:
@@ -531,8 +573,16 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
     if not data_space_id:
         return "未选择数据空间"
 
+    files = await _get_space_files(user_id, data_space_id)
+    _preload, df_var_by_file_id = _build_dataframe_preload(files)
+
     if filename:
-        file_path = await _get_file_path(filename, user_id, data_space_id)
+        matches = [f for f in files if f.filename == filename]
+        file_obj = matches[0] if matches else None
+        if file_obj:
+            file_path = Path(settings.storage_root) / file_obj.storage_path
+        else:
+            file_path = await _get_file_path(filename, user_id, data_space_id)
         if not file_path or not file_path.exists():
             return f"文件 '{filename}' 不存在"
         ext = filename.rsplit(".", 1)[-1].lower()
@@ -541,6 +591,12 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
         try:
             df = _load_df(file_path, ext)
             info = [f"文件: {filename}", f"行数: {len(df)}", f"列数: {len(df.columns)}", "\n列信息:"]
+            if file_obj and str(file_obj.id) in df_var_by_file_id:
+                info.insert(
+                    1,
+                    f"execute_python 专用变量: {df_var_by_file_id[str(file_obj.id)]}"
+                    "（仅 execute_python 使用；pandas_query 中该文件固定叫 df）",
+                )
             for col in df.columns:
                 non_null = int(df[col].notna().sum())
                 unique = int(df[col].nunique())
@@ -551,7 +607,6 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
         except Exception as e:
             return f"解析失败: {str(e)}"
 
-    files = await _get_space_files(user_id, data_space_id)
     tabular = [f for f in files if f.file_type in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat")]
     if not tabular:
         return "数据空间中没有表格文件"
@@ -564,7 +619,11 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
             continue
         try:
             df = _load_df(fp, f.file_type)
-            output.append(f"## {f.filename} ({len(df)} 行, {len(df.columns)} 列)\n列: " + ", ".join(f"{c}({df[c].dtype})" for c in df.columns))
+            var_hint = df_var_by_file_id.get(str(f.id))
+            header = f"## {f.filename} ({len(df)} 行, {len(df.columns)} 列)"
+            if var_hint:
+                header += f"\nexecute_python 专用变量: {var_hint}（仅 execute_python 使用；pandas_query 中单文件固定叫 df）"
+            output.append(header + "\n列: " + ", ".join(f"{c}({df[c].dtype})" for c in df.columns))
             for col in df.columns:
                 if col not in all_columns:
                     all_columns[col] = {}
@@ -643,6 +702,124 @@ def _is_id_like(name: str) -> bool:
     return n.endswith("_id") or n.endswith("_key") or n == "id" or (n.endswith("id") and len(n) > 2 and n[-3].isalpha())
 
 
+STATELESS_TOOL_HINT = (
+    "提示：pandas_query / execute_python 每次调用都是全新的无状态沙箱；"
+    "下一次调用不会保留本次创建的变量、筛选后的 DataFrame 或新增列。"
+    "请在同一个代码块里完成读取、日期转换、派生列、聚合计算，并把最终结果赋给 result 或 print 输出。"
+)
+
+
+def _append_analysis_error_hint(error: str, available_vars: list[str] | None = None) -> str:
+    hints = [error, STATELESS_TOOL_HINT]
+    if available_vars:
+        hints.append("当前可用的预加载 DataFrame 变量：" + ", ".join(sorted(available_vars)))
+    if "KeyError" in error:
+        hints.append(
+            "KeyError 通常表示列名不存在，或派生列是在上一次工具调用里创建后丢失。"
+            "请先用 inspect_data/read_file 确认真实列名；如果 month、week、duration 等是派生列，"
+            "必须在同一次代码块内从原始列重新创建，例如："
+            "df['month'] = pd.to_datetime(df['opened_at'], errors='coerce').dt.to_period('M').astype(str)。"
+        )
+    if "NameError" in error:
+        hints.append(
+            "NameError 通常表示 DataFrame 变量名写错或使用了上一轮工具调用中的临时变量。"
+            "请查看 schema 或先调用 inspect_data，使用其中标注的 execute_python 变量名；"
+            "不要假设文件 incident_records.csv 一定对应某个未确认的变量名。"
+        )
+    return "\n".join(hints)
+
+
+def _has_explicit_result_assignment(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = []
+            if isinstance(node, ast.Assign):
+                targets = list(node.targets)
+            else:
+                targets = [node.target]
+            if any(isinstance(target, ast.Name) and target.id == "result" for target in targets):
+                return True
+    return False
+
+
+def _capture_trailing_expression(code: str) -> str:
+    """把最后一行裸表达式转成 result = <expr>，模拟 notebook 的可见输出。"""
+    try:
+        tree = ast.parse(code, mode="exec")
+    except SyntaxError:
+        return code
+    if not tree.body or _has_explicit_result_assignment(tree):
+        return code
+    last = tree.body[-1]
+    if not isinstance(last, ast.Expr):
+        return code
+    tree.body[-1] = ast.copy_location(ast.Assign(
+        targets=[ast.Name(id="result", ctx=ast.Store())],
+        value=last.value,
+    ), last)
+    ast.fix_missing_locations(tree)
+    try:
+        return ast.unparse(tree)
+    except Exception:
+        return code
+
+
+def _normalize_pandas_query_df_name(code: str) -> str:
+    """pandas_query 单文件环境只有 df；把模型误用的 df_xxx 自动映射回 df。"""
+    try:
+        tree = ast.parse(code, mode="exec")
+    except SyntaxError:
+        return code
+
+    class _DfAliasRewriter(ast.NodeTransformer):
+        def visit_Name(self, node: ast.Name):
+            if node.id.startswith("df_") or node.id == "ldf":
+                return ast.copy_location(ast.Name(id="df", ctx=node.ctx), node)
+            return node
+
+    tree = _DfAliasRewriter().visit(tree)
+    ast.fix_missing_locations(tree)
+    try:
+        return ast.unparse(tree)
+    except Exception:
+        return code
+
+
+PANDAS_QUERY_DERIVED_PREAMBLE = r"""
+# Auto-derived convenience columns for repeated daily analysis.
+# pandas_query is stateless, so recreate common date/time fields on every call.
+try:
+    _date_cols = [
+        c for c in df.columns
+        if any(k in str(c).lower() for k in ("date", "time", "_at", "_on", "opened", "closed", "created", "updated"))
+    ]
+    for _c in _date_cols:
+        _dt = pd.to_datetime(df[_c], errors="coerce")
+        if _dt.notna().any():
+            df[f"{_c}_dt"] = _dt
+    _base_date_col = None
+    for _candidate in ("opened_at", "created_at", "date", "time", "sys_created_on", "sys_updated_on"):
+        if f"{_candidate}_dt" in df.columns:
+            _base_date_col = f"{_candidate}_dt"
+            break
+        if _candidate in df.columns:
+            _base_date_col = _candidate
+            break
+    if _base_date_col is not None:
+        _base_dt = pd.to_datetime(df[_base_date_col], errors="coerce")
+        if "month" not in df.columns:
+            df["month"] = _base_dt.dt.to_period("M").astype(str)
+        if "week" not in df.columns:
+            df["week"] = _base_dt.dt.isocalendar().week.astype("Int64")
+        if "day_of_week" not in df.columns:
+            df["day_of_week"] = _base_dt.dt.day_name()
+    if "duration_hours" not in df.columns and "opened_at_dt" in df.columns and "closed_at_dt" in df.columns:
+        df["duration_hours"] = (df["closed_at_dt"] - df["opened_at_dt"]).dt.total_seconds() / 3600
+except Exception:
+    pass
+"""
+
+
 async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     filename = args.get("filename", "")
     expression = args.get("expression", "")
@@ -658,19 +835,21 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
     # 把表达式包装成给 result 赋值，交给隔离沙箱执行（df 已在子进程内预加载）
     from app.agent.sandbox import run_in_sandbox
-    # 单表达式优先；若本身是多行语句则原样执行（用户需自行赋值给 result）
+    # 单表达式优先；多行代码则自动捕获最后一行裸表达式，减少静默执行。
     code = expression
     try:
         ast.parse(expression, mode="eval")
         code = f"result = ({expression})"
     except SyntaxError:
-        pass
+        code = _capture_trailing_expression(expression)
+    code = _normalize_pandas_query_df_name(code)
+    code = PANDAS_QUERY_DERIVED_PREAMBLE + "\n" + code
 
     preload = {"df": (kind, str(file_path))}
     r = run_in_sandbox(code, preload=preload,
                        cpu_seconds=10, wall_timeout=30)
     if not r.get("ok"):
-        return r.get("error", "查询执行失败")
+        return "查询执行错误: " + _append_analysis_error_hint(r.get("error", "查询执行失败"), ["df"])
     if r.get("result") is not None:
         out = r["result"]
         # DataFrame.to_string 可能很长。放宽到 6 万字符，让"列出全部"类结果完整返回；
@@ -680,7 +859,11 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
         return out
     if r.get("stdout"):
         return r["stdout"][:60000]
-    return "执行完成（无返回值，可将结果赋给 result 变量）"
+    return (
+        "查询执行错误: 本次 pandas_query 没有产生可见输出。"
+        "请在同一个 expression 里把最终表格/指标赋给 result，或让最后一行成为要返回的表达式。\n"
+        + STATELESS_TOOL_HINT
+    )
 
 
 async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
@@ -717,27 +900,28 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
 
 async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    code = args.get("code", "")
+    code = _capture_trailing_expression(args.get("code", ""))
 
     # 收集数据空间文件，按文件名生成 df_xxx 变量供子进程预加载
     preload = {}
     if data_space_id:
         files = await _get_space_files(user_id, data_space_id)
-        for f in files:
-            full_path = Path(settings.storage_root) / f.storage_path
-            ext = f.filename.rsplit(".", 1)[-1].lower()
-            kind = {"csv": "csv", "xlsx": "excel", "xls": "excel", "json": "json"}.get(ext)
-            if not kind:
-                continue
-            var = f.filename.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
-            preload[f"df_{var}"] = (kind, str(full_path))
+        preload, _filename_to_var = _build_dataframe_preload(files)
+    if not preload:
+        return (
+            "代码执行错误: 当前数据空间没有可预加载为 DataFrame 的 CSV/Excel/JSON 文件。"
+            "如需分析其它格式，请先用 read_file 查看内容，或使用 sqlite_query/专用工具。"
+        )
 
     # 交给加固沙箱：静态检查 + 隔离子进程 + 资源限额 + 文件路径守卫
     from app.agent.sandbox import run_in_sandbox
     r = run_in_sandbox(code, preload=preload, cpu_seconds=10, wall_timeout=30)
 
     if not r.get("ok"):
-        return f"代码执行错误: {r.get('error', '未知错误')}"
+        return "代码执行错误: " + _append_analysis_error_hint(
+            r.get("error", "未知错误"),
+            list(preload.keys()),
+        )
 
     parts = []
     stdout_text = r.get("stdout") or ""
@@ -751,7 +935,11 @@ async def _tool_execute_python(args: dict, user_id: uuid.UUID, data_space_id: uu
     if stderr_text:
         parts.append(f"警告:\n{stderr_text[:2000]}")
     if not parts:
-        parts.append("代码执行成功（无输出，可将结果赋给 result 变量以便查看）")
+        parts.append(
+            "代码执行错误: 本次 execute_python 没有产生可见输出。"
+            "请把最终表格/指标赋给 result，或用 print 输出关键结果。\n"
+            + STATELESS_TOOL_HINT
+        )
     return "\n".join(parts)[:120000]
 
 

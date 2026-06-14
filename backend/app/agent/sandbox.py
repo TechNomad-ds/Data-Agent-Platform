@@ -265,7 +265,9 @@ def _child_entry(code, preload, cpu_seconds, mem_bytes, fsize_bytes, conn):
         if "result" in g:
             try:
                 val = g["result"]
-                if isinstance(val, (pd.DataFrame, pd.Series)):
+                if val is None:
+                    result_repr = None
+                elif isinstance(val, (pd.DataFrame, pd.Series)):
                     result_repr = val.to_string()
                 else:
                     result_repr = str(val)

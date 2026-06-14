@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import time
 import threading
+import re
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -112,14 +113,17 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
 
 def execute_query(db_path: str, sql: str, max_rows: int = 10000) -> Dict[str, Any]:
     """执行只读 SQL 查询"""
-    sql_upper = sql.strip().upper()
-    if any(kw in sql_upper for kw in ("INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE")):
+    sql_clean = sql.strip()
+    sql_upper = sql_clean.upper()
+    if not (sql_upper.startswith("SELECT") or sql_upper.startswith("WITH")):
+        return {"error": "只允许 SELECT/WITH 查询"}
+    if re.search(r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|TRUNCATE)\b", sql_upper):
         return {"error": "只允许 SELECT/WITH 查询"}
 
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
-        cursor = conn.execute(sql)
+        cursor = conn.execute(sql_clean)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         rows = cursor.fetchmany(max_rows)
         data = [dict(row) for row in rows]
@@ -230,5 +234,4 @@ async def periodic_cleanup_loop(interval_seconds: int = 600, max_age_seconds: in
             break
         except Exception as e:
             logger.warning(f"周期清理临时文件失败: {e}")
-
 

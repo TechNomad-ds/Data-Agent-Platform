@@ -15,7 +15,7 @@ from app.models.conversation import Message
 from app.models.file import File
 from app.models.data_space import DataSpace, DataSpaceFile
 from app.models.credit import CreditAccount, CreditTransaction
-from app.agent.tools import get_tool_definitions, execute_tool
+from app.agent.tools import get_tool_definitions, execute_tool, _resolve_tool_name
 from app.core.security import decrypt_api_key
 
 
@@ -75,6 +75,9 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 
 ## 工具选择策略
 
+先判断是否需要工具：如果用户是在问通用概念、方法、建议、产品使用、闲聊或不依赖数据空间的问题，直接回答，不要为了显得“在分析”而调用工具。
+
+需要基于用户数据作答时再使用工具：
 1. 数据结构已在上方预注入，无需再调用 inspect_data（除非需要更详细信息）
 2. 表格数据优先用 pandas_query（支持多行代码）或 sqlite_query 直接操作，不依赖索引
 3. pandas_query 适合单表分析，支持多行代码（赋值给 result 变量返回结果）
@@ -87,6 +90,39 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 10. graph_search 搜索知识图谱中的实体和关系
 11. graph_traverse 从实体出发发现多跳关系路径
 12. graph_extract_from_text 从文本中抽取三元组构建知识图谱
+
+## 对话模式路由
+
+每次回答先在内部判断属于哪种模式，并采用对应策略：
+
+1. **日常问答 / 概念解释 / 方法建议**
+- 不依赖用户数据时，直接用通俗语言回答。
+- 不要强制调用工具，不要输出 answer 块，不要假装已经查看数据。
+- 可以给步骤、示例、注意事项，但保持简洁。
+
+2. **专业分析 / 业务洞察**
+- 用户问趋势、规律、异常、原因、表现、风险、建议、诊断、对比时，基于数据做结构化分析。
+- 需要工具计算关键指标；回答要有结论和证据，不只罗列工具结果。
+- 可以主动补充合理的业务解释，但必须标明数据依据和假设。
+
+3. **精确取数 / 明细查询 / 导出**
+- 用户要列表、记录、计数、最值、排名、筛选结果时，必须查全查准。
+- 这类任务才强制输出 ```answer 块。
+
+4. **平台操作 / 故障排查**
+- 用户问如何上传、配置、部署、报错原因、权限、模型设置等，优先给可执行步骤。
+- 如果问题来自当前平台运行状态，可以结合工具或上下文定位；不要套用数据分析格式。
+
+## 日常数据分析工作流
+
+当用户提出开放式分析问题（如趋势、规律、异常、原因、表现、建议）时，按这个顺序工作：
+1. 先识别最相关的数据文件、时间列、分类列、数值指标和状态字段；不要急着只看 head()。
+2. 先做数据质量检查：行数、缺失、重复、时间范围、关键字段取值分布、明显异常值。
+3. 再做核心分析：总体概览、时间趋势、分类对比、Top/Bottom、异常点、效率/转化/占比等派生指标。
+4. 需要派生字段时，在同一次代码调用内完成日期转换、时长计算、分组聚合和结果输出。
+5. 最终回答用"结论 → 关键证据 → 可能原因/建议 → 注意事项"的结构；只展示最能支撑结论的表格，不要把大段原始明细塞给用户。
+6. 有时间趋势、类别对比、构成占比时，优先生成图表；图表服务于结论，不替代文字解释。
+7. 如果字段含义不确定，先用数据中的列名、样例值和 knowledge.md 推断；仍不确定时在结论里标明假设，不要编造业务含义。
 
 ## 第一步：判断任务意图（决定输出形态，非常重要）
 
@@ -103,7 +139,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 - 先给结论，再用关键数字、表格、图表支撑，适度解读。
 - 这类才适合摘要式表达和主动配图。
 
-拿不准时，倾向于 A：先给全量结果，再补一段简短解读。漏数据比多给解读严重得多。
+拿不准时，先判断用户是否在索要明确结果集。如果是查数/列表，倾向于 A；如果是"趋势/规律/洞察/原因/建议"，倾向于 B，不要强行输出明细型 answer 块。
 
 ## 输出格式要求
 
@@ -112,6 +148,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 3. **图表按需生成**：当数据有趋势、分布、对比关系且属于分析类任务时，用 generate_chart 可视化；取数类任务不要用图表替代完整数据
 4. **引用数据来源**：说明"根据 xxx.csv 的数据"或"从表 xxx 中查询到"
 5. **语言通俗**：避免技术术语，用业务语言解释
+6. **控制篇幅**：开放式分析最多给 5-7 条最重要洞察，每条包含关键数字和一句解释。不要写重复句、套话或很长的段落。
 
 ## 取数准确性要求（直接决定答案对错）
 
@@ -151,13 +188,13 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 
 ## 必须坚持到底（直接决定答案对错）
 
-- **绝不轻易放弃**：在产出 ```answer 块之前，你的任务是把答案查全查准。如果某个字段/某条记录在当前数据源没找到，不要直接写"未知""视频未展示"就收尾——换数据源再找：相关字段可能在另一张表、另一个文件、或文档/视频的其他位置（电话、联系方式、识别码等常分散在不同字段卡或表里）。把所有可能的来源都查过，确实查不到才如实说明。
-- **绝不向用户反问来代替查数**：本任务要的是数据结果，不是对话。不要问"你想看哪个省份/年份/维度吗？"这类问题；自己依据问题口径把结果算出来直接给。问题里的口径（字段、阈值、分组维度）以题面和视频/文档为准，不确定时按最直接的字面理解执行，不要停下来等用户澄清。
+- **绝不轻易放弃**：对于取数/确定结果类任务，在产出 ```answer 块之前，你的任务是把答案查全查准。如果某个字段/某条记录在当前数据源没找到，不要直接写"未知""视频未展示"就收尾——换数据源再找：相关字段可能在另一张表、另一个文件、或文档/视频的其他位置（电话、联系方式、识别码等常分散在不同字段卡或表里）。把所有可能的来源都查过，确实查不到才如实说明。
+- **绝不向用户反问来代替查数**：对于取数/确定结果类任务，用户要的是数据结果，不是对话。不要问"你想看哪个省份/年份/维度吗？"这类问题；自己依据问题口径把结果算出来直接给。问题里的口径（字段、阈值、分组维度）以题面和视频/文档为准，不确定时按最直接的字面理解执行，不要停下来等用户澄清。
 - **读准字段，不要张冠李戴**：当存在名字相近的多个字段/指标（如"在任基金数" vs "旗下基金总数"、"本日"vs"近一周"），先回到题面确认问题问的到底是哪一个，再取对应字段。取错相近字段是常见且致命的错误。
 - **文档里的结构化数据用代码解析，不要手抄**：当 (实体, 数值) 这类成对数据被写在 Markdown/PDF 的叙述文字里（每段一条记录、可能有几十上百条），不要在 execute_python 里手敲硬编码列表——那样必然漏行或抄错。正确做法是用 read_file 取得全文后，在 execute_python / pandas_query 里用正则按统一模式批量抽取所有记录，再筛选排序。注意这类文档常埋"陷阱值"（"初步为 X，经核实后确认为 Y"），要取**最终确认值**，忽略被修正掉的初值。
 - **表名查不到 ≠ 数据不存在**：当 knowledge.md 或视频/题面提到某个表（如 mf_xxx），但 sqlite_query 列不出这张表、inspect_data 也说不支持时，**绝不要据此判定"数据缺失"或"无此表"而放弃**。这类表的数据极可能以**同名的 .md / .pdf 文档**形式存在（如 mf_xxx.md、mf_xxx.pdf），只是没进 SQL 引擎。务必用 read_file 把该同名文档**完整读完**（注意分页，文件几百行就一直读到末尾），再从叙述文字里按统一模式正则抽取所需字段。同名相近的表/文档可能是干扰项，认准题面/knowledge.md 指定的那个名字。
 - **同一份数据可能拆成两段**：一份文档里"档案信息段"（记录号↔名称/代码的映射）和"指标数值段"（记录号↔各项数值）可能分处不同位置，需按记录号/识别码把两段 JOIN 起来才能得到完整的 (名称, 数值) 行。读全文、两段都抽、再按键关联，不要只读前半段就下结论。
-- **答案要落进 ```answer 块**：分析做到一半不要停。无论中间过程多长，最后一定要回到题面要求，输出与正文一致的 ```answer 块；没有这个块等于没回答。
+- **取数答案要落进 ```answer 块**：取数/确定结果类任务做到一半不要停。无论中间过程多长，最后一定要回到题面要求，输出与正文一致的 ```answer 块；没有这个块等于没回答。分析/洞察/趋势类任务不需要 answer 块，应输出结论、证据和解释。
 
 ## 没有数据空间时
 
@@ -175,13 +212,22 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 3. read_file 失败 → 尝试 inspect_data 查看数据画像，或用 search_data_space 检索内容（切勿在 execute_python 里用 open 读文件，沙箱禁止）
 4. search_data_space 失败 → 尝试 read_file 逐文件查找
 5. 如果所有方法都失败，诚实告知用户并建议替代方案
+- 不要把内部调试原因（如"变量作用域问题"、"我重新整体计算"）当作正文输出给用户；直接修正工具调用并给出最终分析。
+- 遇到 KeyError 时，不要假设列存在。先核对真实列名；如果 month、week、duration、处理时长等是派生字段，必须在同一次 pandas_query / execute_python 调用中从原始列重新创建。
 
 ## 代码执行约束（execute_python）
 
 execute_python 是受限沙箱，仅用于对**已加载的数据**做计算：可用 pandas/numpy 等白名单库，可用预加载的 df_xxx 变量。禁止 open、import 非白名单模块（包括 sqlite3、os、sys 等）、exec/eval 等。
 - 需要查数据库时不要在 execute_python 里 import sqlite3，直接用 sqlite_query 工具；需要文件内容时先用 read_file 获取。
 - 嵌套 JSON（形如 records 数组包在外层对象里）已自动展平为标准 DataFrame，可直接按业务列名取数。
-- 不要为"换种写法"反复重试被禁的操作；遇到沙箱限制就换用对应的专用工具（sqlite_query / read_file）。"""
+- 不要为"换种写法"反复重试被禁的操作；遇到沙箱限制就换用对应的专用工具（sqlite_query / read_file）。
+- pandas_query 和 execute_python 的每一次调用都是**全新的无状态沙箱**：上一轮创建的变量、筛选后的 DataFrame、新增列不会保留到下一轮。
+- pandas_query 只操作一个指定文件，代码中该文件**固定叫 df**；不要在 pandas_query 里使用 df_xxx 变量。
+- execute_python 可同时预加载多个文件，才使用 schema/inspect_data 中标注的 df_xxx 变量名。
+- 多步分析必须写成一个完整代码块：从预加载的原始 DataFrame 开始，完成类型转换、派生列、过滤、聚合、排序，最后赋值给 result 或 print 输出。
+- 不要运行只赋值但没有 result/print 的静默代码。需要看中间结果时，把中间摘要也放进 result 或 print。
+- 不要写 `result = print(...)`，也不要把 `df.drop(..., inplace=True)`、`list.sort()` 等原地修改函数的返回值赋给 result；这类返回值是 None。应先完成修改，再把最终 DataFrame/Series/dict/字符串赋给 result。
+- 使用 month/week/date/duration 等派生列前，必须在同一个代码块里创建。例如先 `df['opened_at_dt'] = pd.to_datetime(df['opened_at'], errors='coerce')`，再 `df['month'] = df['opened_at_dt'].dt.to_period('M').astype(str)`。"""
 
 
 class AgentLoop:
@@ -293,7 +339,7 @@ class AgentLoop:
 
         try:
             from app.models.data_profile import DataProfile
-            from app.agent.tools import _get_space_files, _load_df
+            from app.agent.tools import _get_space_files, _load_df, _build_dataframe_preload
             import pandas as pd
             import asyncio
 
@@ -301,6 +347,7 @@ class AgentLoop:
             all_files = await _get_space_files(user_id, data_space_id)
             if not all_files:
                 return ""
+            _preload, df_var_by_file_id = _build_dataframe_preload(all_files)
 
             # 获取已完成的 profiles
             async with get_session_factory()() as db:
@@ -344,7 +391,9 @@ class AgentLoop:
                     col_count = data.get("column_count", "?")
                     columns = data.get("columns", [])
 
-                    lines.append(f"### {f.filename}  rows={row_count}  cols={col_count}")
+                    df_var = df_var_by_file_id.get(str(f.id))
+                    py_hint = f"  python变量={df_var}" if df_var else ""
+                    lines.append(f"### {f.filename}  rows={row_count}  cols={col_count}{py_hint}")
                     for c in columns[:MAX_SCHEMA_COLS]:
                         name = c.get("name", "?")
                         dtype = c.get("dtype", "?")
@@ -437,7 +486,9 @@ class AgentLoop:
                         try:
                             loop = asyncio.get_event_loop()
                             df = await loop.run_in_executor(None, _load_df, fp, f.file_type)
-                            lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}")
+                            df_var = df_var_by_file_id.get(str(f.id))
+                            py_hint = f"  python变量={df_var}" if df_var else ""
+                            lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}{py_hint}")
                             for col in list(df.columns)[:MAX_SCHEMA_COLS]:
                                 unique = int(df[col].nunique())
                                 dtype = str(df[col].dtype)
@@ -682,6 +733,49 @@ class AgentLoop:
             "multiplier": 1.0,
         }
 
+    @staticmethod
+    def _requires_answer_block(user_message: str) -> bool:
+        """判断用户是否在索要确定结果集。
+
+        日常分析类问题（趋势、规律、洞察、原因、建议等）不应被 harness
+        强制补 ```answer 块；否则模型会把自然分析拉回竞赛式查数格式。
+        """
+        q = (user_message or "").strip().lower()
+        analysis_markers = (
+            "趋势", "规律", "洞察", "分析", "解读", "为什么", "原因", "建议",
+            "怎么样", "如何", "表现", "异常", "风险", "机会", "总结", "概览",
+            "trend", "pattern", "insight", "analyze", "analysis", "why",
+            "recommend", "summary", "overview",
+        )
+        if any(marker in q for marker in analysis_markers):
+            return False
+
+        result_markers = (
+            "列出", "导出", "明细", "记录", "清单", "名单", "有哪些", "哪些",
+            "多少", "几个", "第几", "最高", "最低", "最大", "最小", "排名",
+            "top", "bottom", "count", "list", "show", "export", "records",
+            "rows", "which", "how many", "maximum", "minimum",
+        )
+        return any(marker in q for marker in result_markers)
+
+    @staticmethod
+    def _looks_like_incomplete_process(text: str) -> bool:
+        """识别"我接下来要做..."但实际没有继续执行/总结的半截回答。"""
+        t = (text or "").strip()
+        if not t:
+            return False
+        tail = t[-120:]
+        incomplete_markers = (
+            "接下来", "下一步", "继续", "现在来", "现在做", "再来", "然后",
+            "我将", "我会", "让我", "来看", "开始分析", "进行分析",
+            "next", "now let's", "let me", "i will", "i'll", "continue",
+        )
+        terminal_markers = (
+            "结论", "总结", "建议", "因此", "总体来看", "值得关注",
+            "注意事项", "最终", "综上", "可以看出",
+        )
+        return any(m in tail.lower() for m in incomplete_markers) and not any(m in t for m in terminal_markers)
+
     async def run(
         self,
         conversation_id: uuid.UUID,
@@ -751,11 +845,13 @@ class AgentLoop:
         total_usage = {"input_tokens": 0, "output_tokens": 0}
         tool_calls_log = []
         consecutive_errors = 0
+        requires_answer_block = self._requires_answer_block(user_message)
+        continuation_repairs = 0
 
         yield {"type": "thinking", "content": "正在分析问题..."}
 
         # 撞步数上限前，预留一步强制收尾：注入一条指令让 Agent 用已有信息
-        # 立即产出 ```answer 块，而不是悄无声息地耗尽步数、留下半截分析。
+        # 立即产出最终答案，而不是悄无声息地耗尽步数、留下半截分析。
         # 在倒数第二步触发，给模型一整轮来组织最终答案。
         finalize_step = max(0, self.max_iterations - 1)
         finalize_injected = False
@@ -770,12 +866,21 @@ class AgentLoop:
             # 接近上限时强制收尾：禁用工具 + 注入收尾指令，逼模型给最终答案。
             force_finalize = iteration >= finalize_step
             if force_finalize and not finalize_injected:
+                final_instruction = (
+                    "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
+                    "请立即基于你已经获取到的信息，直接给出最终答案。如果某些信息仍不完整，"
+                    "就用现有最可靠的数据作答，并明确说明依据和限制，不要再说\"还需要进一步查询\"或留下空答案。"
+                )
+                if requires_answer_block:
+                    final_instruction = (
+                        "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
+                        "请立即基于你已经获取到的信息，直接给出最终答案，并务必在末尾输出与题面要求一致的 ```answer 块"
+                        "（列名+全部数据行，CSV 格式）。如果某些信息仍不完整，就用现有最可靠的数据作答，不要再说"
+                        "\"还需要进一步查询\"或留下空答案。"
+                    )
                 messages.append({
                     "role": "user",
-                    "content": "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
-                               "请立即基于你已经获取到的信息，直接给出最终答案，并务必在末尾输出与题面要求一致的 ```answer 块"
-                               "（列名+全部数据行，CSV 格式）。如果某些信息仍不完整，就用现有最可靠的数据作答，不要再说"
-                               "\"还需要进一步查询\"或留下空答案。",
+                    "content": final_instruction,
                 })
                 finalize_injected = True
 
@@ -805,7 +910,8 @@ class AgentLoop:
                             elif event.type == "content_block_delta":
                                 if event.delta.type == "text_delta":
                                     full_text += event.delta.text
-                                    yield {"type": "text", "delta": event.delta.text}
+                                    if event.delta.text:
+                                        yield {"type": "text", "delta": event.delta.text}
                                 elif event.delta.type == "input_json_delta":
                                     if tool_uses:
                                         tool_uses[-1]["input_json"] += event.delta.partial_json
@@ -862,12 +968,31 @@ class AgentLoop:
                 # 没有工具调用 → Agent 认为自己完成了
                 if not tool_uses:
                     accumulated_text += full_text
+                    if (
+                        tool_calls_log
+                        and continuation_repairs < 2
+                        and not force_finalize
+                        and iteration < finalize_step
+                        and self._looks_like_incomplete_process(full_text)
+                    ):
+                        messages.append({
+                            "role": "assistant",
+                            "content": full_text or "（已完成部分分析）",
+                        })
+                        messages.append({
+                            "role": "user",
+                            "content": "（系统提示）你刚才停在了过程说明，还没有完成用户要的分析。"
+                                       "请不要只说“接下来/下一步/继续”。要么继续调用工具完成剩余计算，"
+                                       "要么基于已有工具结果直接给出完整最终答案：结论、关键证据、规律/异常、建议或注意事项。",
+                        })
+                        continuation_repairs += 1
+                        continue
                     # 早退补救：数据查询任务理应以 ```answer 块收尾。若 Agent 不再调
                     # 工具却没产出 answer 块（典型："这不是我要的数据/需要进一步确认"
                     # 之类的放弃式结尾），补一轮逼它用现有信息给出最终答案块。只补一次，
                     # 且必须还有迭代余量；force_finalize 轮（已被要求收尾）不再重复。
                     has_answer_block = "```answer" in accumulated_text
-                    if (not has_answer_block and not finalize_injected
+                    if (requires_answer_block and not has_answer_block and not finalize_injected
                             and iteration < finalize_step):
                         messages.append({
                             "role": "assistant",
@@ -932,6 +1057,11 @@ class AgentLoop:
                 # 执行工具并收集结果
                 tool_results = []
                 for tu in tool_uses:
+                    valid_tool_names = [t["function"]["name"] for t in get_tool_definitions()]
+                    corrected_name = _resolve_tool_name(tu["name"], valid_tool_names)
+                    if corrected_name:
+                        tu["name"] = corrected_name
+
                     try:
                         tool_args = json.loads(tu["input_json"]) if tu["input_json"] else {}
                     except json.JSONDecodeError:
@@ -966,7 +1096,12 @@ class AgentLoop:
                     )
 
                     result_str = str(tool_result)
-                    is_error = result_str.startswith("工具执行错误") or result_str.startswith("SQL 错误")
+                    is_error = result_str.startswith((
+                        "工具执行错误",
+                        "SQL 错误",
+                        "代码执行错误",
+                        "查询执行错误",
+                    ))
 
                     if is_error:
                         consecutive_errors += 1
