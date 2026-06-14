@@ -56,9 +56,16 @@ async def update_user_status(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
+    if user.id == admin.id and data.is_active is False:
+        raise HTTPException(status_code=400, detail="不能禁用当前管理员账号")
+
     if data.is_active is not None:
         user.is_active = data.is_active
     if data.role is not None:
+        if data.role not in {"user", "admin"}:
+            raise HTTPException(status_code=400, detail="无效的用户角色")
+        if user.id == admin.id and data.role != "admin":
+            raise HTTPException(status_code=400, detail="不能移除当前管理员账号的管理员权限")
         user.role = data.role
 
     return {"message": "用户状态已更新"}

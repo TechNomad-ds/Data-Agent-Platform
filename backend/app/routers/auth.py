@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
@@ -25,22 +25,24 @@ async def _check_daily_credit_reset(user_id, db: AsyncSession):
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     """用户注册"""
+    email = data.email.lower()
+    username = data.username.strip()
+
     # 检查邮箱是否已存在
-    result = await db.execute(select(User).where(User.email == data.email))
+    result = await db.execute(select(User).where(func.lower(User.email) == email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该邮箱已被注册")
 
     # 检查用户名是否已存在
-    result = await db.execute(select(User).where(User.username == data.username))
+    result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该用户名已被使用")
 
-    # 创建用户 — 所有用户默认参与研究，忽略请求体中的取值
     user = User(
-        email=data.email,
-        username=data.username,
+        email=email,
+        username=username,
         password_hash=hash_password(data.password),
-        research_consent=True,
+        research_consent=data.research_consent,
     )
     db.add(user)
     await db.flush()
@@ -63,12 +65,15 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     """用户登录"""
+    login_id = data.email.strip()
+    login_key = login_id.lower()
+
     # 检查账号是否被锁定（5次失败锁15分钟）
     from app.core.redis_client import get_redis
     try:
         redis = await get_redis()
-        lock_key = f"login_lock:{data.email}"
-        fail_key = f"login_fail:{data.email}"
+        lock_key = f"login_lock:{login_key}"
+        fail_key = f"login_fail:{login_key}"
         if await redis.get(lock_key):
             raise HTTPException(status_code=429, detail="登录失败次数过多，请 15 分钟后再试")
     except HTTPException:
@@ -79,7 +84,9 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     # 支持邮箱或用户名登录
     from sqlalchemy import or_
     result = await db.execute(
-        select(User).where(or_(User.email == data.email, User.username == data.email))
+        select(User).where(
+            or_(func.lower(User.email) == login_key, func.lower(User.username) == login_key)
+        )
     )
     user = result.scalar_one_or_none()
 
@@ -93,7 +100,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
                 if fail_count >= 5:
                     await redis.set(lock_key, "1", ex=900)
                     import logging
-                    logging.getLogger("security").warning(f"账号 {data.email} 因连续 {fail_count} 次登录失败被锁定 15 分钟")
+                    logging.getLogger("security").warning(f"账号 {login_id} 因连续 {fail_count} 次登录失败被锁定 15 分钟")
             except Exception:
                 pass
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
@@ -175,6 +182,7 @@ async def update_profile(
             raise HTTPException(status_code=400, detail="该用户名已被使用")
         current_user.username = data.username
 
-    # research_consent 不再允许用户修改：所有用户恒为参与研究
+    if data.research_consent is not None:
+        current_user.research_consent = data.research_consent
 
     return current_user

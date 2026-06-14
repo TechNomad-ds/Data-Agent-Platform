@@ -97,7 +97,7 @@ export default function Register() {
                 name="password"
                 rules={[
                   { required: true, message: '请输入密码' },
-                  { min: 6, message: '密码至少 6 个字符' },
+                  { min: 8, message: '密码至少 8 个字符' },
                 ]}
               >
                 <Input.Password prefix={<LockOutlined style={{ color: colors.textMuted }} />} placeholder="密码" autoComplete="new-password" />
@@ -127,6 +127,11 @@ export default function Register() {
                   <a onClick={(e) => { e.preventDefault(); setLegalOpen(true) }} style={{ color: colors.primary }}>
                     用户协议与隐私政策
                   </a>
+                </Checkbox>
+              </Form.Item>
+              <Form.Item name="research_consent" valuePropName="checked" style={{ marginTop: -8 }}>
+                <Checkbox>
+                  同意将匿名化后的交互数据用于产品改进与学术研究
                 </Checkbox>
               </Form.Item>
               <Form.Item style={{ marginBottom: 16 }}>
@@ -186,7 +191,7 @@ function LegalContent() {
       <Title level={4}>六、额度</Title>
       <Paragraph>平台为每位用户提供每日免费分析额度，也支持配置自有 API Key 使用，后者不消耗平台额度，费用由对应服务商收取。</Paragraph>
       <Title level={4}>七、学术研究</Title>
-      <Paragraph>为持续改进平台服务与推动数据分析领域的发展，您的交互数据在经过严格匿名化处理后，可能被用于学术研究。研究数据不包含任何可识别个人身份的信息。</Paragraph>
+      <Paragraph>只有在您主动勾选授权后，您的交互数据才会在匿名化处理后用于产品改进与学术研究。您可以在个人资料中调整该授权。</Paragraph>
       <Title level={4}>八、数据删除与账户注销</Title>
       <Paragraph>您可随时删除数据空间、文件或对话记录，删除操作不可撤销。账户注销后，所有关联数据将被永久清除。</Paragraph>
       <Title level={4}>九、协议修订</Title>

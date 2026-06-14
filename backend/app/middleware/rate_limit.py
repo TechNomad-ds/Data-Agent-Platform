@@ -19,9 +19,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         }
         # 未认证接口用 IP 限流（防暴力破解和批量注册）
         self.ip_limits = {
-            "/api/auth/login": (30, 60),      # 每分钟30次
-            "/api/auth/register": (5, 300),    # 每5分钟5次
-            "/api/auth/refresh": (20, 60),     # 每分钟20次
+            "/api/auth/login": (10, 60),       # 每分钟10次
+            "/api/auth/register": (3, 300),    # 每5分钟3次
+            "/api/auth/refresh": (10, 60),     # 每分钟10次
         }
 
     async def dispatch(self, request: Request, call_next):

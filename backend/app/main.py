@@ -22,6 +22,14 @@ async def lifespan(app: FastAPI):
         from app.core.redis_client import get_redis
         from app.routers.admin import RUNTIME_CONFIG_KEYS
         redis = await get_redis()
+        global_api_base = await redis.get("global:api_base")
+        global_api_key = await redis.get("global:api_key")
+        if global_api_base:
+            settings.openai_api_base = global_api_base
+            logger.info("从 Redis 恢复全局 API 地址")
+        if global_api_key:
+            settings.openai_api_key = global_api_key
+            logger.info("从 Redis 恢复全局 API Key")
         for key, meta in RUNTIME_CONFIG_KEYS.items():
             cached = await redis.get(f"config:{key}")
             if cached is not None:

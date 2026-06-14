@@ -18,8 +18,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="user")  # user | admin
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # 所有用户默认参与研究（数据匿名化后用于学术研究），不再提供关闭选项
-    research_consent: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    research_consent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

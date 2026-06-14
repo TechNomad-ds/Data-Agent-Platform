@@ -5,6 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
+import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -29,6 +30,9 @@ ALLOWED_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB (databases can be large)
+MAX_FILES_PER_UPLOAD = 20
+MAX_ZIP_FILES = 1000
+MAX_ZIP_TOTAL_SIZE = 500 * 1024 * 1024
 
 
 def get_file_type(filename: str) -> str:
@@ -60,6 +64,9 @@ async def upload_files(
     db: AsyncSession = Depends(get_db),
 ):
     """上传文件（支持多文件批量上传）"""
+    if len(files) > MAX_FILES_PER_UPLOAD:
+        raise HTTPException(status_code=400, detail=f"单次最多上传 {MAX_FILES_PER_UPLOAD} 个文件")
+
     uploaded = []
     user_storage = get_user_storage_path(current_user.id)
 
@@ -69,27 +76,49 @@ async def upload_files(
         if file_type not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail=f"不支持的文件类型: {file_type}")
 
-        # 读取文件内容
-        content = await upload_file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(200MB)")
+        temp_path = user_storage / f"_upload_tmp_{uuid.uuid4()}"
+        file_size = 0
+        try:
+            async with aiofiles.open(temp_path, "wb") as tmp:
+                while chunk := await upload_file.read(1024 * 1024):
+                    file_size += len(chunk)
+                    if file_size > MAX_FILE_SIZE:
+                        raise HTTPException(status_code=400, detail=f"文件 {upload_file.filename} 超过大小限制(200MB)")
+                    await tmp.write(chunk)
+        except HTTPException:
+            temp_path.unlink(missing_ok=True)
+            raise
 
         # zip 文件：解压后逐个入库
         if file_type == "zip":
             tmp_dir = user_storage / f"_zip_tmp_{uuid.uuid4()}"
             tmp_dir.mkdir(parents=True, exist_ok=True)
             try:
-                zf = zipfile.ZipFile(io.BytesIO(content), "r")
-                # 安全检查：防止路径穿越
+                zf = zipfile.ZipFile(str(temp_path), "r")
+                total_uncompressed = 0
+                valid_count = 0
                 for info in zf.infolist():
                     if info.filename.startswith('/') or '..' in info.filename:
                         shutil.rmtree(tmp_dir, ignore_errors=True)
                         raise HTTPException(status_code=400, detail=f"zip 文件包含不安全的路径: {info.filename}")
+                    if info.is_dir() or _is_junk_path(info.filename):
+                        continue
+                    if get_file_type(info.filename) not in ALLOWED_EXTENSIONS:
+                        continue
+                    valid_count += 1
+                    total_uncompressed += info.file_size
+                if valid_count > MAX_ZIP_FILES:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    raise HTTPException(status_code=400, detail=f"zip 文件包含过多有效文件({valid_count}个，上限{MAX_ZIP_FILES}个)")
+                if total_uncompressed > MAX_ZIP_TOTAL_SIZE:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    raise HTTPException(status_code=400, detail="zip 解压后总大小超过限制(500MB)")
                 zf.extractall(tmp_dir)
                 member_names = zf.namelist()
                 zf.close()
             except zipfile.BadZipFile:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
+                temp_path.unlink(missing_ok=True)
                 raise HTTPException(status_code=400, detail=f"无效的 zip 文件: {upload_file.filename}")
 
             for member in member_names:
@@ -103,12 +132,12 @@ async def upload_files(
                 if not src.is_file():
                     continue
 
-                member_content = src.read_bytes()
                 member_name = Path(member).name
                 member_id = uuid.uuid4()
                 member_dir = user_storage / str(member_id)
                 member_dir.mkdir(parents=True, exist_ok=True)
                 member_path = member_dir / member_name
+                member_size = src.stat().st_size
                 shutil.move(str(src), str(member_path))
 
                 relative_path = str(member_path.relative_to(Path(settings.storage_root)))
@@ -118,7 +147,7 @@ async def upload_files(
                     filename=member_name,
                     original_filename=member_name,
                     file_type=member_type,
-                    file_size=len(member_content),
+                    file_size=member_size,
                     storage_path=relative_path,
                     metadata_={"source_zip": upload_file.filename},
                 )
@@ -126,6 +155,7 @@ async def upload_files(
                 uploaded.append(record)
 
             shutil.rmtree(tmp_dir, ignore_errors=True)
+            temp_path.unlink(missing_ok=True)
             continue
 
         # 普通文件：直接存储
@@ -134,8 +164,7 @@ async def upload_files(
         file_dir.mkdir(parents=True, exist_ok=True)
         file_path = file_dir / upload_file.filename
 
-        with open(file_path, "wb") as f:
-            f.write(content)
+        shutil.move(str(temp_path), str(file_path))
 
         relative_path = str(file_path.relative_to(Path(settings.storage_root)))
         file_record = File(
@@ -144,7 +173,7 @@ async def upload_files(
             filename=upload_file.filename,
             original_filename=upload_file.filename,
             file_type=file_type,
-            file_size=len(content),
+            file_size=file_size,
             storage_path=relative_path,
             mime_type=upload_file.content_type,
         )
