@@ -22,6 +22,8 @@
 
 <p align="center">
   <a href="#项目简介">项目简介</a> ·
+  <a href="#项目状态">状态</a> ·
+  <a href="#截图">截图</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#生产部署">生产部署</a> ·
@@ -34,6 +36,8 @@
 ## 目录
 
 - [项目简介](#项目简介)
+- [项目状态](#项目状态)
+- [截图](#截图)
 - [适用角色](#适用角色)
 - [核心能力](#核心能力)
 - [环境要求](#环境要求)
@@ -48,8 +52,11 @@
 - [支持的数据格式](#支持的数据格式)
 - [API 参考](#api-参考)
 - [项目结构](#项目结构)
+- [隐私与安全模型](#隐私与安全模型)
+- [已知限制](#已知限制)
 - [安全清单](#安全清单)
 - [故障排查](#故障排查)
+- [许可证](#许可证)
 - [贡献规范](#贡献规范)
 
 ---
@@ -65,6 +72,21 @@ DataMind Platform 是一个让业务人员通过自然语言直接完成数据�
 3. 实时获得图表、结论和可导出的报告
 
 平台背后不是简单问答机器人，而是可执行多步推理的 Agent：会自动检查数据、生成并校验查询、调用工具、产出可视化，并在必要时自我修正。
+
+## 项目状态
+
+DataMind Platform 正在持续开发中，适合本地评估、内部试点和自托管实验。生产环境使用前，请完整检查安全清单，替换所有基础设施凭据，并结合你的部署方式验证数据访问边界。
+
+当前仓库尚未包含 Docker Compose 配置，也尚未添加正式开源许可证文件。公开发布前请补充 `LICENSE` 文件。
+
+## 截图
+
+公开发布前建议补充产品截图或短 GIF。推荐展示：
+
+- 数据空间上传与文件画像
+- 对话式分析与工具调用过程
+- 对话中的自动图表
+- 管理后台的模型与额度配置
 
 ## 适用角色
 
@@ -130,14 +152,17 @@ DataMind Platform 是一个让业务人员通过自然语言直接完成数据�
 ### 方式一：一键部署（推荐）
 
 ```bash
-git clone git@github.com:TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
+git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
 cd DataMind-Platform
 cp .env.example .env
-# 编辑 .env，填写 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
+# 运行前先编辑 .env：
+# - 将 ADMIN_PASSWORD 改成强密码
+# - 将 SECRET_KEY 改成随机密钥
+# - 填写 ANTHROPIC_API_KEY 或 OPENAI_API_KEY
 bash deploy.sh
 ```
 
-`deploy.sh` 会检测系统与依赖、安装 Python/前端依赖、执行数据库迁移并构建前端。
+`deploy.sh` 会检测系统与依赖、安装 Python/前端依赖、执行数据库迁移并构建前端。脚本不会自动创建 PostgreSQL 或 Redis 实例；如果你没有使用本地默认账号，请先在 `.env` 中配置 `DATABASE_URL` 和 `REDIS_URL`。
 
 ### 方式二：手动部署（macOS 示例）
 
@@ -147,9 +172,10 @@ brew services start postgresql@16
 brew services start redis
 createdb data_agent
 
-git clone git@github.com:TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
+git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
 cd DataMind-Platform
 cp .env.example .env
+# 编辑 .env，修改 ADMIN_PASSWORD、SECRET_KEY 和 LLM API 配置
 
 cd backend
 uv venv venv --python $(which python3.11)
@@ -182,9 +208,18 @@ npm config set registry https://registry.npmmirror.com
 将 `.env.example` 复制为 `.env`：
 
 ```bash
+SECRET_KEY=change-me-to-a-random-secret
+ADMIN_PASSWORD=change-me-before-first-start
+
+# Anthropic
 LLM_BACKEND=anthropic
 ANTHROPIC_API_KEY=sk-ant-xxx
-# 或 OpenAI 兼容
+```
+
+或使用 OpenAI 兼容服务：
+
+```bash
+LLM_BACKEND=openai
 OPENAI_API_BASE=https://api.deepseek.com/v1
 OPENAI_API_KEY=sk-xxx
 OPENAI_MODEL=deepseek-chat
@@ -204,6 +239,8 @@ OPENAI_MODEL=deepseek-chat
 | `BACKEND_PORT` | 后端服务端口 |
 | `FRONTEND_URL` | 前端域名（CORS） |
 
+服务启动后，管理员也可以在后台调整运行时配置、模型配置、API Key 和额度参数。
+
 ---
 
 ## 生产部署
@@ -218,9 +255,10 @@ venv/bin/gunicorn app.main:app -c gunicorn.conf.py
 ```
 
 `gunicorn.conf.py` 已包含：
-- Worker 自动 sizing（`CPU * 2 + 1`，上限 8）
+- Worker 数量由 `WORKERS` 控制，默认 `min(cpu_count, 4)`
 - `timeout=300`（长对话场景）
-- `preload_app=True` 与 `max_requests=1000`（稳定性保护）
+- 默认 `preload_app=false`，避免 Chroma、embedding、Redis 等状态在 fork 后被共享
+- `max_requests=1000` 与 jitter，用于 worker 周期性回收
 
 ### 前端
 
@@ -251,6 +289,10 @@ WantedBy=multi-user.target
 ### 备份
 
 可使用 `backup.sh` 进行数据库与存储目录备份自动化。
+
+### Docker
+
+当前尚未提供 Docker Compose。若面向开源用户发布，建议补充一个最小 `docker-compose.yml`，包含 PostgreSQL、Redis、后端和前端，降低首次试用成本。
 
 ---
 
@@ -333,6 +375,8 @@ Browser (React + Ant Design + ECharts)
 
 Swagger：`http://localhost:8002/docs`
 
+下方只列出常用接口。完整接口以 FastAPI 自动生成的 OpenAPI 文档为准。
+
 常用接口：
 
 | 方法 | 路径 | 用途 |
@@ -385,6 +429,29 @@ DataMind-Platform/
 
 ---
 
+## 隐私与安全模型
+
+DataMind 面向自托管部署。上传文件、数据画像、对话历史、额度账户和模型配置会存储在你自己的 PostgreSQL、文件目录、Redis 与 Chroma 目录中。
+
+关键数据流说明：
+
+- LLM 提示词可能包含用户问题、相关 schema/画像上下文、检索到的文档片段和工具执行结果。
+- 不要使用具备写权限的生产数据库账号接入外部数据源，外部数据源应使用只读账号。
+- Python 与数据工具在后端主机执行。允许不可信用户使用前，请检查沙箱、资源限制和部署隔离策略。
+- 管理员可以配置全局模型 API Key 和额度策略，请使用强密码并限制管理后台访问范围。
+
+---
+
+## 已知限制
+
+- 暂未提供 Docker Compose。
+- 暂未包含正式 `LICENSE` 文件。
+- 代码中存在 graph router，但当前未挂载到 FastAPI app。
+- 额度计算目前较粗粒度，不等同于真实模型供应商 token 成本。
+- 大文件、OCR 密集文档和高并发长对话需要额外调优 worker、数据库连接池和 Redis 连接数。
+
+---
+
 ## 安全清单
 
 - 首次上线后立即修改管理员默认密码
@@ -392,6 +459,7 @@ DataMind-Platform/
 - 严禁提交 `.env` 与敏感凭据
 - 数据库和 Redis 使用独立账号并限制网络访问
 - 外部数据源保持只读连接
+- 上传敏感数据前，请先评估 LLM 提示词与数据流
 
 ---
 
@@ -405,6 +473,12 @@ DataMind-Platform/
 | 模型列表为空或无法对话 | 运行 `python manage.py seed` 并核对 API Key |
 | 依赖安装慢 | 使用上文镜像配置 |
 | 长对话中断 | 使用生产 Gunicorn 配置并保留 `timeout=300` |
+
+---
+
+## 许可证
+
+当前仓库尚未包含许可证文件。公开开源发布前，请选择并添加 MIT、Apache-2.0 或 AGPL-3.0 等许可证。
 
 ---
 

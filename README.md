@@ -22,6 +22,8 @@
 
 <p align="center">
   <a href="#overview">Overview</a> ·
+  <a href="#project-status">Status</a> ·
+  <a href="#screenshots">Screenshots</a> ·
   <a href="#core-capabilities">Capabilities</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#production-deployment">Deployment</a> ·
@@ -34,6 +36,8 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Project Status](#project-status)
+- [Screenshots](#screenshots)
 - [Who It Helps](#who-it-helps)
 - [Core Capabilities](#core-capabilities)
 - [Requirements](#requirements)
@@ -48,8 +52,11 @@
 - [Supported Data Formats](#supported-data-formats)
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
+- [Privacy and Security Model](#privacy-and-security-model)
+- [Known Limitations](#known-limitations)
 - [Security Checklist](#security-checklist)
 - [Troubleshooting](#troubleshooting)
+- [License](#license)
 - [Contributing](#contributing)
 
 ---
@@ -65,6 +72,21 @@ Instead of waiting for SQL/Python support for every ad-hoc request, teams can:
 3. Get charts, explanations, and exportable reports in minutes
 
 Behind the UI is a multi-step agent workflow that can inspect datasets, generate and validate queries, execute tools, visualize findings, and refine answers automatically.
+
+## Project Status
+
+DataMind Platform is under active development. It is suitable for local evaluation, internal pilots, and self-hosted experimentation. For production use, review the security checklist, configure your own infrastructure credentials, and test the data access boundaries against your deployment model.
+
+The repository currently does not include a Docker Compose setup or a formal open-source license file. Add a `LICENSE` file before publishing the project publicly.
+
+## Screenshots
+
+Add screenshots or a short demo GIF before public release. Recommended captures:
+
+- Data space upload and file profiling
+- Conversational analysis with tool execution
+- Generated chart in chat
+- Admin model and quota settings
 
 ## Who It Helps
 
@@ -130,14 +152,17 @@ Behind the UI is a multi-step agent workflow that can inspect datasets, generate
 ### Option 1: One-command setup (recommended)
 
 ```bash
-git clone git@github.com:TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
+git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
 cd DataMind-Platform
 cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY or OPENAI_API_KEY
+# edit .env before running:
+# - set ADMIN_PASSWORD to a strong password
+# - set SECRET_KEY to a random production value
+# - set ANTHROPIC_API_KEY or OPENAI_API_KEY
 bash deploy.sh
 ```
 
-`deploy.sh` checks OS and dependencies, installs Python/frontend packages, runs migrations, and builds frontend assets.
+`deploy.sh` checks OS and dependencies, installs Python/frontend packages, runs migrations, and builds frontend assets. It does not provision PostgreSQL or Redis for you; configure `DATABASE_URL` and `REDIS_URL` in `.env` first if they are not running locally with the default credentials.
 
 ### Option 2: Manual setup (macOS example)
 
@@ -147,9 +172,10 @@ brew services start postgresql@16
 brew services start redis
 createdb data_agent
 
-git clone git@github.com:TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
+git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
 cd DataMind-Platform
 cp .env.example .env
+# edit .env and change ADMIN_PASSWORD, SECRET_KEY, and your LLM API settings
 
 cd backend
 uv venv venv --python $(which python3.11)
@@ -183,9 +209,18 @@ Copy `.env.example` to `.env` in project root.
 Minimal required setup:
 
 ```bash
+SECRET_KEY=change-me-to-a-random-secret
+ADMIN_PASSWORD=change-me-before-first-start
+
+# Anthropic
 LLM_BACKEND=anthropic
 ANTHROPIC_API_KEY=sk-ant-xxx
-# or OpenAI-compatible provider
+```
+
+Or use an OpenAI-compatible provider:
+
+```bash
+LLM_BACKEND=openai
 OPENAI_API_BASE=https://api.deepseek.com/v1
 OPENAI_API_KEY=sk-xxx
 OPENAI_MODEL=deepseek-chat
@@ -205,6 +240,8 @@ Common settings:
 | `BACKEND_PORT` | API service port |
 | `FRONTEND_URL` | CORS origin |
 
+Admin users can also adjust runtime settings, model configuration, API keys, and quota values from the admin console after the service is running.
+
 ---
 
 ## Production Deployment
@@ -219,9 +256,10 @@ venv/bin/gunicorn app.main:app -c gunicorn.conf.py
 ```
 
 `gunicorn.conf.py` already includes:
-- worker sizing (`CPU * 2 + 1`, capped at 8)
+- worker sizing from `WORKERS`, defaulting to `min(cpu_count, 4)`
 - `timeout=300` for long-running agent interactions
-- `preload_app=True`, `max_requests=1000` for stability
+- `preload_app=false` by default to avoid sharing Chroma/embedding/Redis state across forked workers
+- `max_requests=1000` with jitter for worker recycling
 
 ### Frontend
 
@@ -252,6 +290,10 @@ WantedBy=multi-user.target
 ### Backups
 
 Use `backup.sh` for database/storage backup automation.
+
+### Docker
+
+Docker Compose is not included yet. For open-source distribution, adding a minimal `docker-compose.yml` for PostgreSQL, Redis, backend, and frontend would make first-time evaluation much easier.
 
 ---
 
@@ -334,6 +376,8 @@ DataMind exposes 14 agent tools:
 
 Swagger: `http://localhost:8002/docs`
 
+The list below highlights common endpoints. The source of truth is the generated OpenAPI schema exposed by FastAPI.
+
 Key endpoints:
 
 | Method | Path | Purpose |
@@ -386,6 +430,29 @@ DataMind-Platform/
 
 ---
 
+## Privacy and Security Model
+
+DataMind is designed for self-hosting. Uploaded files, profiles, conversation history, credit accounts, and model configuration are stored in your own PostgreSQL, file storage, Redis, and Chroma directories.
+
+Important data-flow notes:
+
+- LLM prompts may include user questions, relevant schema/profile context, retrieved document chunks, and tool outputs.
+- Do not connect production databases with write-capable credentials. External data source integrations should use read-only accounts.
+- Python and data tools execute on the backend host. Review sandboxing, resource limits, and deployment isolation before allowing untrusted users.
+- Admin users can configure global model API keys and quotas. Protect admin accounts with strong passwords and trusted network access.
+
+---
+
+## Known Limitations
+
+- No Docker Compose setup is provided yet.
+- No formal `LICENSE` file is included yet.
+- Graph API routes exist in the codebase but are not mounted in the FastAPI app.
+- Credit calculation is currently coarse-grained and may not reflect exact provider token cost.
+- Large files, OCR-heavy documents, and concurrent long-running chats require careful worker, database pool, and Redis connection tuning.
+
+---
+
 ## Security Checklist
 
 - Change default admin password immediately
@@ -393,6 +460,7 @@ DataMind-Platform/
 - Never commit `.env` or credentials
 - Use dedicated DB/Redis users with network restrictions
 - Keep external data source access read-only
+- Review LLM prompt/data flow before uploading sensitive data
 
 ---
 
@@ -406,6 +474,12 @@ DataMind-Platform/
 | No models available in admin/chat | Run `python manage.py seed` and verify API key |
 | Slow package install | Use mirror settings shown above |
 | Long chat interrupted | Use production gunicorn config with `timeout=300` |
+
+---
+
+## License
+
+No license file is currently included. Choose and add a license such as MIT, Apache-2.0, or AGPL-3.0 before publishing the repository as open source.
 
 ---
 
