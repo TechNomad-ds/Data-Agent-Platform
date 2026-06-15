@@ -1,4 +1,4 @@
-<h1 align="center">DataMind Platform</h1>
+<h1 align="center">DataMind Analyst</h1>
 
 <p align="center">
   <b>AI-powered data interaction platform for business teams</b><br/>
@@ -63,7 +63,7 @@
 
 ## Overview
 
-DataMind Platform is an AI-native analytics workspace that lets non-technical users analyze data through natural language conversations.
+DataMind Analyst is an AI-native analytics workspace that lets non-technical users analyze data through natural language conversations.
 
 Instead of waiting for SQL/Python support for every ad-hoc request, teams can:
 
@@ -75,7 +75,7 @@ Behind the UI is a multi-step agent workflow that can inspect datasets, generate
 
 ## Project Status
 
-DataMind Platform is under active development. It is suitable for local evaluation, internal pilots, and self-hosted experimentation. For production use, review the security checklist, configure your own infrastructure credentials, and test the data access boundaries against your deployment model.
+DataMind Analyst is under active development. It is suitable for local evaluation, internal pilots, and self-hosted experimentation. For production use, review the security checklist, configure your own infrastructure credentials, and test the data access boundaries against your deployment model.
 
 The repository currently does not include a Docker Compose setup or a formal open-source license file. Add a `LICENSE` file before publishing the project publicly.
 
@@ -152,8 +152,8 @@ Add screenshots or a short demo GIF before public release. Recommended captures:
 ### Option 1: One-command setup (recommended)
 
 ```bash
-git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
-cd DataMind-Platform
+git clone https://github.com/TechNomad-ds/DataMind-Analyst.git DataMind-Analyst
+cd DataMind-Analyst
 cp .env.example .env
 # edit .env before running:
 # - set ADMIN_PASSWORD to a strong password
@@ -172,8 +172,8 @@ brew services start postgresql@16
 brew services start redis
 createdb data_agent
 
-git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
-cd DataMind-Platform
+git clone https://github.com/TechNomad-ds/DataMind-Analyst.git DataMind-Analyst
+cd DataMind-Analyst
 cp .env.example .env
 # edit .env and change ADMIN_PASSWORD, SECRET_KEY, and your LLM API settings
 
@@ -274,14 +274,14 @@ Serve `frontend/dist/` with Nginx. See `frontend/nginx.conf`.
 
 ```ini
 [Unit]
-Description=DataMind Platform Backend
+Description=DataMind Analyst Backend
 After=network.target postgresql.service redis.service
 
 [Service]
-WorkingDirectory=/opt/DataMind-Platform/backend
-ExecStart=/opt/DataMind-Platform/backend/venv/bin/gunicorn app.main:app -c gunicorn.conf.py
+WorkingDirectory=/opt/DataMind-Analyst/backend
+ExecStart=/opt/DataMind-Analyst/backend/venv/bin/gunicorn app.main:app -c gunicorn.conf.py
 Restart=always
-EnvironmentFile=/opt/DataMind-Platform/.env
+EnvironmentFile=/opt/DataMind-Analyst/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -398,7 +398,7 @@ Key endpoints:
 ## Project Structure
 
 ```text
-DataMind-Platform/
+DataMind-Analyst/
 ├── backend/
 │   ├── app/
 │   │   ├── agent/

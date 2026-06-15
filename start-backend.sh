@@ -1,6 +1,7 @@
 #!/bin/bash
-# DataMind 后端启动脚本（带 .env 加载与 ModelScope 镜像缓存）
-cd /root/datamind/Data-Agent-Platform/backend
+# DataMind Analyst 后端启动脚本（带 .env 加载与 ModelScope 镜像缓存）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/backend"
 
 # 离线模式：模型已缓存到 ~/.cache/chroma，禁止联网下载兜底
 export HF_HUB_OFFLINE=1

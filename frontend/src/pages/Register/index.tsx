@@ -171,7 +171,7 @@ function LegalContent() {
     <div style={{ fontSize: 13.5, lineHeight: 1.8, color: colors.textSecondary }}>
       <Title level={4}>一、服务说明</Title>
       <Paragraph>
-        DataMind Platform（以下简称"本平台"）是一个基于人工智能的数据分析平台，提供数据上传、智能对话分析、可视化图表生成等服务。注册或使用本平台即表示您同意接受本协议的全部条款。
+        DataMind Analyst（以下简称"本平台"）是一个基于人工智能的数据分析平台，提供数据上传、智能对话分析、可视化图表生成等服务。注册或使用本平台即表示您同意接受本协议的全部条款。
       </Paragraph>
       <Title level={4}>二、账户与安全</Title>
       <Paragraph>

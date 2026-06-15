@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DataMind Platform CLI 管理工具
+"""DataMind Analyst CLI 管理工具
 
 用法:
     python manage.py create-admin          创建管理员账号
@@ -123,7 +123,7 @@ async def show_stats():
         msgs = (await db.execute(select(func.count()).select_from(Message))).scalar()
         models = (await db.execute(select(func.count()).select_from(LLMModel).where(LLMModel.is_active == True))).scalar()
 
-    print("=== DataMind Platform 统计 ===\n")
+    print("=== DataMind Analyst 统计 ===\n")
     print(f"  用户: {users} (管理员: {admins})")
     print(f"  数据空间: {spaces}")
     print(f"  文件: {files}")

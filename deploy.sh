@@ -1,10 +1,10 @@
 #!/bin/bash
-# DataMind Platform 一键部署脚本
+# DataMind Analyst 一键部署脚本
 # 用法: bash deploy.sh
 set -e
 
 echo "========================================="
-echo "  DataMind Platform 部署脚本"
+echo "  DataMind Analyst 部署脚本"
 echo "========================================="
 echo ""
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# DataMind Platform 备份/恢复脚本
+# DataMind Analyst 备份/恢复脚本
 # 用法:
 #   备份: bash backup.sh backup
 #   恢复: bash backup.sh restore <备份文件.tar.gz>

@@ -1,4 +1,4 @@
-<h1 align="center">DataMind Platform</h1>
+<h1 align="center">DataMind Analyst</h1>
 
 <p align="center">
   <b>面向业务团队的 AI 数据交互平台</b><br/>
@@ -63,7 +63,7 @@
 
 ## 项目简介
 
-DataMind Platform 是一个让业务人员通过自然语言直接完成数据分析的 AI 平台。
+DataMind Analyst 是一个让业务人员通过自然语言直接完成数据分析的 AI 平台。
 
 过去，很多企业的分析需求都要依赖 SQL/Python 人员排队处理。DataMind 把这个流程压缩成一次对话：
 
@@ -75,7 +75,7 @@ DataMind Platform 是一个让业务人员通过自然语言直接完成数据�
 
 ## 项目状态
 
-DataMind Platform 正在持续开发中，适合本地评估、内部试点和自托管实验。生产环境使用前，请完整检查安全清单，替换所有基础设施凭据，并结合你的部署方式验证数据访问边界。
+DataMind Analyst 正在持续开发中，适合本地评估、内部试点和自托管实验。生产环境使用前，请完整检查安全清单，替换所有基础设施凭据，并结合你的部署方式验证数据访问边界。
 
 当前仓库尚未包含 Docker Compose 配置，也尚未添加正式开源许可证文件。公开发布前请补充 `LICENSE` 文件。
 
@@ -152,8 +152,8 @@ DataMind Platform 正在持续开发中，适合本地评估、内部试点和�
 ### 方式一：一键部署（推荐）
 
 ```bash
-git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
-cd DataMind-Platform
+git clone https://github.com/TechNomad-ds/DataMind-Analyst.git DataMind-Analyst
+cd DataMind-Analyst
 cp .env.example .env
 # 运行前先编辑 .env：
 # - 将 ADMIN_PASSWORD 改成强密码
@@ -172,8 +172,8 @@ brew services start postgresql@16
 brew services start redis
 createdb data_agent
 
-git clone https://github.com/TechNomad-ds/Data-Agent-Platform.git DataMind-Platform
-cd DataMind-Platform
+git clone https://github.com/TechNomad-ds/DataMind-Analyst.git DataMind-Analyst
+cd DataMind-Analyst
 cp .env.example .env
 # 编辑 .env，修改 ADMIN_PASSWORD、SECRET_KEY 和 LLM API 配置
 
@@ -273,14 +273,14 @@ npm run build
 
 ```ini
 [Unit]
-Description=DataMind Platform Backend
+Description=DataMind Analyst Backend
 After=network.target postgresql.service redis.service
 
 [Service]
-WorkingDirectory=/opt/DataMind-Platform/backend
-ExecStart=/opt/DataMind-Platform/backend/venv/bin/gunicorn app.main:app -c gunicorn.conf.py
+WorkingDirectory=/opt/DataMind-Analyst/backend
+ExecStart=/opt/DataMind-Analyst/backend/venv/bin/gunicorn app.main:app -c gunicorn.conf.py
 Restart=always
-EnvironmentFile=/opt/DataMind-Platform/.env
+EnvironmentFile=/opt/DataMind-Analyst/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -397,7 +397,7 @@ Swagger：`http://localhost:8002/docs`
 ## 项目结构
 
 ```text
-DataMind-Platform/
+DataMind-Analyst/
 ├── backend/
 │   ├── app/
 │   │   ├── agent/

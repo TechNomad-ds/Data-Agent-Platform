@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="DataMind Platform",
+    title="DataMind Analyst",
     description="多租户数据智能交互平台",
     version="0.1.0",
     lifespan=lifespan,

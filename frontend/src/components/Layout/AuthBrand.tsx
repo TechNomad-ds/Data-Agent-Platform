@@ -124,7 +124,7 @@ export default function AuthBrand() {
       {/* Footer */}
       <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', zIndex: 1 }}>
         <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>
-          © {new Date().getFullYear()} DataMind Platform
+          © {new Date().getFullYear()} DataMind Analyst
         </Text>
       </div>
     </div>
