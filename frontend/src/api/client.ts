@@ -27,11 +27,19 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = []
 }
 
+const isAuthEndpoint = (url?: string) => {
+  if (!url) return false
+  const path = url.replace(/^\/?api/, '')
+  return ['/auth/login', '/auth/register', '/auth/refresh'].includes(path)
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthRequest = isAuthEndpoint(originalRequest?.url)
+
+    if (error.response?.status === 401 && originalRequest && !isAuthRequest && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve: (token) => {
