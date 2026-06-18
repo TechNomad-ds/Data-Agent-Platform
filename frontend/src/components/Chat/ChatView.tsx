@@ -7,8 +7,6 @@ import {
   DatabaseOutlined,
   ArrowDownOutlined,
 } from '@ant-design/icons'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
 import { settingsApi, ModelOption } from '@/api/settings'
@@ -16,6 +14,7 @@ import { useChatStore } from '@/stores/chatStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import MessageContent from '@/components/Chat/MessageContent'
+import MarkdownRenderer from '@/components/Chat/MarkdownRenderer'
 import ThinkingBlock from '@/components/Chat/ThinkingBlock'
 import ExportButton from '@/components/Chat/ExportButton'
 import api from '@/api/client'
@@ -87,7 +86,9 @@ export default function ChatView({
     setMessages,
     segments,
     isStreaming,
+    streamingConversationId,
     setIsStreaming,
+    setStreamingConversationId,
     appendStreamDelta,
     appendThinkingDelta,
     addToolEvent,
@@ -112,6 +113,7 @@ export default function ChatView({
   const sseBufferRef = useRef('')
   const savedMsgIdRef = useRef<string | null>(null)
   const creditsUsedRef = useRef<number | null>(null)
+  const activeStreamConvIdRef = useRef<string | null>(null)
   // 刚在本地创建的对话 id：conversationId 变化时不要再拉取服务端快照，
   // 否则会与发送请求竞态、把本地乐观插入的用户消息覆盖掉
   const justCreatedConvRef = useRef<string | null>(null)
@@ -247,9 +249,11 @@ export default function ChatView({
             message.error(event.message || 'Agent 执行出错')
             break
           case 'conversation_deleted':
-            setMessages([])
-            setCurrentConversation(null)
-            onConversationDeleted?.()
+            if (activeStreamConvIdRef.current === useChatStore.getState().currentConversation?.id) {
+              setMessages([])
+              setCurrentConversation(null)
+              onConversationDeleted?.()
+            }
             break
         }
       } catch {}
@@ -318,6 +322,8 @@ export default function ChatView({
     setInputValue('')
     resetStream()
     setIsStreaming(true)
+    setStreamingConversationId(convId)
+    activeStreamConvIdRef.current = convId
     savedMsgIdRef.current = null
     creditsUsedRef.current = null
     const controller = new AbortController()
@@ -367,21 +373,25 @@ export default function ChatView({
         .join('')
       // 即便没有 text 段（只有工具调用），也要把 tool_calls 留下，避免内容丢失
       if (finalContent || state.segments.length > 0) {
-        const assistantMsg: Message = {
-          id: savedMsgIdRef.current || (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: finalContent,
-          tool_calls: state.segments,
-          token_usage: null,
-          credits_used: creditsUsedRef.current,
-          created_at: new Date().toISOString(),
+        if (useChatStore.getState().currentConversation?.id === convId) {
+          const assistantMsg: Message = {
+            id: savedMsgIdRef.current || (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: finalContent,
+            tool_calls: state.segments,
+            token_usage: null,
+            credits_used: creditsUsedRef.current,
+            created_at: new Date().toISOString(),
+          }
+          setMessages([...useChatStore.getState().messages, assistantMsg])
         }
-        setMessages([...useChatStore.getState().messages, assistantMsg])
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') message.error('发送失败')
     } finally {
       setIsStreaming(false)
+      setStreamingConversationId(null)
+      activeStreamConvIdRef.current = null
       setAbortController(null)
       resetStream()
     }
@@ -407,7 +417,8 @@ export default function ChatView({
     []
   )
 
-  const showEmpty = messages.length === 0 && !isStreaming
+  const showStreaming = isStreaming && streamingConversationId === conversationId
+  const showEmpty = messages.length === 0 && !showStreaming
   const inputDisabled = isStreaming
 
   return (
@@ -598,7 +609,7 @@ export default function ChatView({
                   />
                 </div>
               ))}
-              {isStreaming && (
+              {showStreaming && (
                 <div
                   style={{
                     marginBottom: 24,
@@ -658,9 +669,7 @@ export default function ChatView({
                           className="markdown-body"
                           style={{ marginBottom: 8 }}
                         >
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {seg.content || ''}
-                          </ReactMarkdown>
+                          <MarkdownRenderer content={seg.content || ''} />
                           {/* 流式中显示输入光标 */}
                           {i === segments.length - 1 && (
                             <span className="typing-dot" />

@@ -34,6 +34,10 @@ async def create_data_space(
     db: AsyncSession = Depends(get_db),
 ):
     """创建数据空间"""
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="数据空间名称不能为空")
+
     # 检查数量上限（管理员不限）
     if current_user.role != "admin":
         count_result = await db.execute(
@@ -44,12 +48,12 @@ async def create_data_space(
 
     # 检查同名
     result = await db.execute(
-        select(DataSpace).where(DataSpace.user_id == current_user.id, DataSpace.name == data.name)
+        select(DataSpace).where(DataSpace.user_id == current_user.id, DataSpace.name == name)
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="已存在同名数据空间")
 
-    space = DataSpace(user_id=current_user.id, name=data.name, description=data.description)
+    space = DataSpace(user_id=current_user.id, name=name, description=data.description)
     db.add(space)
     await db.flush()
 
@@ -143,7 +147,19 @@ async def update_data_space(
         raise HTTPException(status_code=404, detail="数据空间不存在")
 
     if data.name is not None:
-        space.name = data.name
+        name = data.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="数据空间名称不能为空")
+        duplicate_result = await db.execute(
+            select(DataSpace).where(
+                DataSpace.user_id == current_user.id,
+                DataSpace.name == name,
+                DataSpace.id != space_id,
+            )
+        )
+        if duplicate_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="已存在同名数据空间")
+        space.name = name
     if data.description is not None:
         space.description = data.description
 
@@ -417,11 +433,16 @@ async def upload_files_to_space(
     # 后台异步预处理
     import asyncio
     import logging
-    from app.services.preprocessing import preprocess_file_limited, run_limited
 
     logger = logging.getLogger("data_spaces")
 
     async def _run_preprocessing():
+        try:
+            from app.services.preprocessing import preprocess_file_limited, run_limited
+        except Exception as e:
+            logger.error(f"预处理依赖加载失败，已跳过后台处理: {e}", exc_info=True)
+            return
+
         for f in uploaded:
             try:
                 await preprocess_file_limited(f.id, space_id)

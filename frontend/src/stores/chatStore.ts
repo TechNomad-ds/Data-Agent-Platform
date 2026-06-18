@@ -14,6 +14,7 @@ interface ChatState {
   segments: StreamSegment[]
   thinkingText: string
   isStreaming: boolean
+  streamingConversationId: string | null
   abortController: AbortController | null
   setConversations: (conversations: Conversation[]) => void
   setCurrentConversation: (conv: Conversation | null) => void
@@ -23,6 +24,7 @@ interface ChatState {
   addToolEvent: (event: SSEEvent) => void
   setThinkingText: (text: string) => void
   setIsStreaming: (v: boolean) => void
+  setStreamingConversationId: (id: string | null) => void
   setAbortController: (controller: AbortController | null) => void
   resetStream: () => void
   stopStreaming: () => void
@@ -35,6 +37,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   segments: [],
   thinkingText: '',
   isStreaming: false,
+  streamingConversationId: null,
   abortController: null,
 
   setConversations: (conversations) => set({ conversations }),
@@ -80,9 +83,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setThinkingText: (text) => set({ thinkingText: text }),
   setIsStreaming: (v) => set({ isStreaming: v }),
+  setStreamingConversationId: (id) => set({ streamingConversationId: id }),
   setAbortController: (controller) => set({ abortController: controller }),
 
-  resetStream: () => set({ segments: [], thinkingText: '', isStreaming: false }),
+  resetStream: () => set({ segments: [], thinkingText: '', isStreaming: false, streamingConversationId: null }),
 
   stopStreaming: () => {
     const { abortController, segments, messages } = get()
@@ -101,6 +105,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set({ messages: [...messages, assistantMsg] })
     }
-    set({ isStreaming: false, abortController: null, segments: [], thinkingText: '' })
+    set({ isStreaming: false, streamingConversationId: null, abortController: null, segments: [], thinkingText: '' })
   },
 }))

@@ -17,6 +17,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "/api/data-spaces/": 30,
             "/api/files": 10,
         }
+        # 上传是少量长请求；同一批多文件上传不应与普通点击操作共用严格 POST 限流。
+        self.upload_limits = {
+            "/api/data-spaces/": (12, 60),
+            "/api/files/upload": (12, 60),
+        }
         # 未认证接口用 IP 限流（防暴力破解和批量注册）
         self.ip_limits = {
             "/api/auth/login": (10, 60),       # 每分钟10次
@@ -65,21 +70,34 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             user_key = token[-16:]
 
         limit = self.default_limit
+        window = self.window
+        matched_upload_limit = False
+        for prefix, (upload_limit, upload_window) in self.upload_limits.items():
+            if request.method == "POST" and path.startswith(prefix) and path.endswith("/upload"):
+                limit = upload_limit
+                window = upload_window
+                matched_upload_limit = True
+                break
+        else:
+            if request.method == "POST" and path == "/api/files/upload":
+                limit, window = self.upload_limits["/api/files/upload"]
+                matched_upload_limit = True
+
         for prefix, path_limit in self.path_limits.items():
-            if path.startswith(prefix) and request.method == "POST":
+            if path.startswith(prefix) and request.method == "POST" and not matched_upload_limit:
                 limit = path_limit
                 break
 
         blocked = await self._check_rate(
             f"rate:{user_key}:{path.split('/')[2] if len(path.split('/')) > 2 else 'default'}",
             limit,
-            self.window,
+            window,
         )
         if blocked:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "请求过于频繁，请稍后再试"},
-                headers={"Retry-After": str(self.window)},
+                headers={"Retry-After": str(window)},
             )
 
         return await call_next(request)

@@ -4,6 +4,7 @@ import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { lightThemeConfig } from './theme/themeConfig'
 import App from './App'
+import 'katex/dist/katex.min.css'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

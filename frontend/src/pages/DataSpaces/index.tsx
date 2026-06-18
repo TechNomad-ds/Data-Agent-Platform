@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, Row, Col, Button, Modal, Form, Input, Tag, Space, Typography, Empty, Popconfirm, message } from 'antd'
-import { PlusOutlined, DatabaseOutlined, DeleteOutlined, FileOutlined } from '@ant-design/icons'
+import { PlusOutlined, DatabaseOutlined, DeleteOutlined, FileOutlined, EditOutlined } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
 import SpaceDetail from './SpaceDetail'
 
@@ -9,6 +9,7 @@ const { Title, Text } = Typography
 export default function DataSpaces() {
   const [spaces, setSpaces] = useState<DataSpace[]>([])
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingSpace, setEditingSpace] = useState<DataSpace | null>(null)
   const [selectedSpace, setSelectedSpace] = useState<DataSpace | null>(null)
   const [form] = Form.useForm()
 
@@ -35,6 +36,36 @@ export default function DataSpaces() {
     }
   }
 
+  const openCreateModal = () => {
+    setEditingSpace(null)
+    form.resetFields()
+    setModalOpen(true)
+  }
+
+  const openEditModal = (space: DataSpace) => {
+    setEditingSpace(space)
+    form.setFieldsValue({ name: space.name, description: space.description || '' })
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async (values: { name: string; description?: string }) => {
+    if (!editingSpace) {
+      await handleCreate(values)
+      return
+    }
+
+    try {
+      await dataSpacesApi.update(editingSpace.id, values)
+      message.success('数据空间已更新')
+      setModalOpen(false)
+      setEditingSpace(null)
+      form.resetFields()
+      loadSpaces()
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '更新失败')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       await dataSpacesApi.delete(id)
@@ -56,7 +87,7 @@ export default function DataSpaces() {
           <Title level={4} style={{ marginBottom: 4 }}>数据空间</Title>
           <Text type="secondary">将文件组织到数据空间中，Agent 将基于选定的数据空间进行分析</Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
           创建数据空间
         </Button>
       </div>
@@ -67,7 +98,7 @@ export default function DataSpaces() {
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="还没有数据空间"
           >
-            <Button type="primary" onClick={() => setModalOpen(true)}>
+            <Button type="primary" onClick={openCreateModal}>
               创建第一个数据空间
             </Button>
           </Empty>
@@ -80,6 +111,7 @@ export default function DataSpaces() {
                 hoverable
                 onClick={() => setSelectedSpace(space)}
                 actions={[
+                  <EditOutlined key="edit" onClick={(e) => { e.stopPropagation(); openEditModal(space) }} />,
                   <Popconfirm title="确定删除？" onConfirm={(e) => { e?.stopPropagation(); handleDelete(space.id) }}>
                     <DeleteOutlined key="delete" onClick={(e) => e.stopPropagation()} />
                   </Popconfirm>,
@@ -102,12 +134,12 @@ export default function DataSpaces() {
       )}
 
       <Modal
-        title="创建数据空间"
+        title={editingSpace ? '编辑数据空间' : '创建数据空间'}
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => { setModalOpen(false); setEditingSpace(null); form.resetFields() }}
         onOk={() => form.submit()}
       >
-        <Form form={form} layout="vertical" onFinish={handleCreate}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="例如：销售数据分析" />
           </Form.Item>

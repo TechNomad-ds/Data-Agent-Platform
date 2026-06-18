@@ -181,6 +181,16 @@ body {
   margin: 16px 0;
 }
 
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.markdown-body .katex {
+  font-size: 1.03em;
+}
+
 /* Conversation list — show delete on hover */
 .conv-row {
   position: relative;
