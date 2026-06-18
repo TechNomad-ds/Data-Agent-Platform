@@ -21,6 +21,25 @@ import httpx
 
 
 DEFAULT_PASSWORD = "PkuSmokeTest123456"
+DEFAULT_SMOKE_EMAIL = "pku_smoke_acceptance@example.com"
+DEFAULT_SMOKE_USERNAME = "pku_smoke_acceptance"
+
+
+def _python_runtime_info() -> dict[str, Any]:
+    version = ".".join(map(str, sys.version_info[:3]))
+    info: dict[str, Any] = {"python_version": version}
+    if sys.version_info[:2] not in ((3, 11), (3, 12)):
+        info["python_warning"] = (
+            "PKU deployment is validated for Python 3.11/3.12; "
+            "recreate backend/venv if this is a deployment run."
+        )
+    return info
+
+
+def _write_report(report_path: str, report: dict[str, Any]) -> None:
+    out = Path(report_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @dataclass
@@ -181,6 +200,13 @@ def _materials() -> dict[str, list[tuple[str, bytes, str]]]:
 
 
 def register_or_login(client: httpx.Client, email: str, username: str, password: str) -> dict[str, str]:
+    login = client.post("/api/auth/login", json={"email": email, "password": password})
+    if login.status_code == 200:
+        token = login.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+    if login.status_code == 429:
+        _require_status(login, 200, "login")
+
     reg = client.post(
         "/api/auth/register",
         json={"email": email, "username": username, "password": password},
@@ -192,6 +218,10 @@ def register_or_login(client: httpx.Client, email: str, username: str, password:
     _require_status(login, 200, "login")
     token = login.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+def space_name(base: str, run_label: str) -> str:
+    return f"{base}-{run_label}" if run_label else base
 
 
 def create_space(ctx: SmokeContext, name: str) -> str:
@@ -235,13 +265,31 @@ def preview_file(ctx: SmokeContext, space_id: str, file_id: str, filename: str) 
         raise RuntimeError(f"preview {filename} did not include expected slide text")
 
 
+def wait_processing_ready(ctx: SmokeContext, space_id: str, label: str, timeout_seconds: int = 30) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_seconds
+    last_status: dict[str, Any] = {}
+    while True:
+        status = ctx.client.get(f"/api/data-spaces/{space_id}/processing-status", headers=ctx.headers)
+        _require_status(status, 200, f"processing status {label}")
+        last_status = status.json()
+        if last_status.get("all_ready"):
+            return last_status
+        if last_status.get("error", 0) > 0:
+            raise RuntimeError(f"processing status {label} has errors: {last_status}")
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"processing status {label} did not become ready: {last_status}")
+        time.sleep(1)
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     report: dict[str, Any] = {
         "base_url": args.base_url,
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "run_label": args.run_label,
         "checks": [],
         "spaces": {},
     }
+    report.update(_python_runtime_info())
     client = httpx.Client(base_url=args.base_url.rstrip("/"), timeout=60)
     try:
         headers = register_or_login(client, args.email, args.username, args.password)
@@ -254,13 +302,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
         # Interleaved course creation/upload mirrors the manual acceptance flow.
         for course in ("计算机体系结构", "现代文学导论", "线性代数复习"):
-            sid = create_space(ctx, course)
+            sid = create_space(ctx, space_name(course, args.run_label))
             space_ids[course] = sid
             uploads[course] = upload_files(ctx, sid, materials[course][:2], f"{course} first batch")
             report["spaces"][course] = {"id": sid, "uploaded": [f["filename"] for f in uploads[course]]}
 
         # Rename data-space check.
-        renamed = "计算机体系结构-验收"
+        renamed = space_name("计算机体系结构-验收", args.run_label)
         rename_resp = client.put(
             f"/api/data-spaces/{space_ids['计算机体系结构']}",
             headers=headers,
@@ -299,9 +347,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
         # Processing status endpoint should be usable after uploads.
         for course, sid in space_ids.items():
-            status = client.get(f"/api/data-spaces/{sid}/processing-status", headers=headers)
-            _require_status(status, 200, f"processing status {course}")
-            report["spaces"][course]["processing_status"] = status.json()
+            report["spaces"][course]["processing_status"] = wait_processing_ready(ctx, sid, course)
         report["checks"].append("processing_status")
 
         # Conversation creation verifies space binding without consuming LLM credits.
@@ -333,10 +379,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run PKU deployment acceptance smoke checks.")
     parser.add_argument("--base-url", default=os.getenv("DATAMIND_BASE_URL", "http://127.0.0.1:8002"))
-    parser.add_argument("--email", default=os.getenv("DATAMIND_SMOKE_EMAIL", f"pku_smoke_{int(time.time())}@example.com"))
-    parser.add_argument("--username", default=os.getenv("DATAMIND_SMOKE_USERNAME", f"pku_smoke_{int(time.time())}"))
+    parser.add_argument("--email", default=os.getenv("DATAMIND_SMOKE_EMAIL", DEFAULT_SMOKE_EMAIL))
+    parser.add_argument("--username", default=os.getenv("DATAMIND_SMOKE_USERNAME", DEFAULT_SMOKE_USERNAME))
     parser.add_argument("--password", default=os.getenv("DATAMIND_SMOKE_PASSWORD", DEFAULT_PASSWORD))
     parser.add_argument("--model-id", default=os.getenv("DATAMIND_SMOKE_MODEL_ID", "smoke-test-model"))
+    parser.add_argument("--run-label", default=os.getenv("DATAMIND_SMOKE_RUN_LABEL", time.strftime("%Y%m%d%H%M%S")))
     parser.add_argument("--report", default=os.getenv("DATAMIND_SMOKE_REPORT", "eval/pku_acceptance_report.json"))
     args = parser.parse_args()
 
@@ -349,15 +396,15 @@ def main() -> int:
             "base_url": args.base_url,
             "ended_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
+        report.update(_python_runtime_info())
+        _write_report(args.report, report)
         print(json.dumps(report, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 
-    out = Path(args.report)
-    out.parent.mkdir(parents=True, exist_ok=True)
     report["ended_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_report(args.report, report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print(f"\nReport written to {out}")
+    print(f"\nReport written to {args.report}")
     return 0
 
 

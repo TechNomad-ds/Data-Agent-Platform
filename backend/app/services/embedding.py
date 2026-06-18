@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from chromadb.db.base import UniqueConstraintError
 
 from app.config import settings
 
@@ -26,10 +27,17 @@ def get_chroma_client() -> chromadb.ClientAPI:
 
 def get_collection(data_space_id: str) -> chromadb.Collection:
     client = get_chroma_client()
-    return client.get_or_create_collection(
-        name=f"space_{data_space_id.replace('-', '')}",
-        metadata={"hnsw:space": "cosine"},
-    )
+    name = f"space_{data_space_id.replace('-', '')}"
+    try:
+        return client.get_or_create_collection(
+            name=name,
+            metadata={"hnsw:space": "cosine"},
+        )
+    except UniqueConstraintError:
+        # Chroma 0.5 can race when multiple upload tasks create the same
+        # collection concurrently. If another worker won creation, fetch it.
+        logger.info("Chroma collection already created concurrently: %s", name)
+        return client.get_collection(name=name)
 
 
 def embed_chunks(

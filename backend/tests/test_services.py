@@ -1,5 +1,7 @@
 """核心服务单元测试 — file_loader、retrieval分词、sqlite_engine、标题提取"""
 import json
+import importlib.util
+import sys
 import tempfile
 from pathlib import Path
 
@@ -185,3 +187,155 @@ def test_system_prompt_contains_text_analysis_quality_guidance():
         "不要依赖上一轮工具里创建的临时变量",
     ):
         assert phrase in SYSTEM_PROMPT_TEMPLATE
+
+
+def _load_pku_llm_acceptance_module():
+    scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+    script_path = scripts_dir / "pku_llm_acceptance_check.py"
+    sys.path.insert(0, str(scripts_dir))
+    spec = importlib.util.spec_from_file_location("pku_llm_acceptance_check", script_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(scripts_dir))
+    return module
+
+
+def _load_pku_acceptance_smoke_module():
+    scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+    script_path = scripts_dir / "pku_acceptance_smoke.py"
+    sys.path.insert(0, str(scripts_dir))
+    spec = importlib.util.spec_from_file_location("pku_acceptance_smoke", script_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(scripts_dir))
+    return module
+
+
+def test_pku_llm_acceptance_writes_failure_report(tmp_path):
+    """真实 LLM 验收失败也要落盘，方便部署排查留证据。"""
+    module = _load_pku_llm_acceptance_module()
+
+    report_path = tmp_path / "nested" / "failure.json"
+    module._write_report(str(report_path), {
+        "ok": False,
+        "error": "connection refused",
+        "base_url": "http://127.0.0.1:9",
+    })
+
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    assert data["ok"] is False
+    assert data["error"] == "connection refused"
+    assert data["base_url"] == "http://127.0.0.1:9"
+
+
+def test_pku_llm_acceptance_main_writes_report_on_error(tmp_path, monkeypatch):
+    """脚本 main() 异常路径也必须写报告，而不是只打印 stderr。"""
+    module = _load_pku_llm_acceptance_module()
+    report_path = tmp_path / "llm_failure.json"
+
+    def fail_run(_args):
+        raise RuntimeError("model endpoint failed")
+
+    monkeypatch.setattr(module, "run", fail_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pku_llm_acceptance_check.py",
+            "--base-url",
+            "http://127.0.0.1:9",
+            "--report",
+            str(report_path),
+        ],
+    )
+
+    assert module.main() == 1
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    assert data["ok"] is False
+    assert data["error"] == "model endpoint failed"
+    assert data["base_url"] == "http://127.0.0.1:9"
+
+
+def test_pku_llm_acceptance_skips_blank_model_ids():
+    """模型列表可能含空配置，验收脚本必须选择可用模型。"""
+    module = _load_pku_llm_acceptance_module()
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return [
+                {"id": "", "model_name": "", "provider": "anthropic"},
+                {"id": "deepseek-v4-flash", "model_name": "deepseek-v4-pro", "provider": "openai"},
+            ]
+
+    class FakeClient:
+        def get(self, _path, headers=None):
+            return FakeResponse()
+
+    assert module._pick_model_id(FakeClient(), {"Authorization": "Bearer test"}, None) == "deepseek-v4-flash"
+
+
+def test_pku_smoke_main_writes_report_on_error(tmp_path, monkeypatch):
+    """基础 smoke 失败也要落盘，否则线上初测失败缺少可归档证据。"""
+    module = _load_pku_acceptance_smoke_module()
+    report_path = tmp_path / "smoke_failure.json"
+
+    def fail_run(_args):
+        raise RuntimeError("api unavailable")
+
+    monkeypatch.setattr(module, "run", fail_run)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "pku_acceptance_smoke.py",
+            "--base-url",
+            "http://127.0.0.1:9",
+            "--report",
+            str(report_path),
+        ],
+    )
+
+    assert module.main() == 1
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    assert data["ok"] is False
+    assert data["error"] == "api unavailable"
+    assert data["base_url"] == "http://127.0.0.1:9"
+    assert "python_version" in data
+
+
+def test_embedding_get_collection_handles_create_race(monkeypatch):
+    """并发上传同一空间时，Chroma collection 创建冲突应回退为读取已有 collection。"""
+    from chromadb.db.base import UniqueConstraintError
+    from app.services import embedding
+
+    class FakeClient:
+        def __init__(self):
+            self.created = []
+            self.fetched = []
+
+        def get_or_create_collection(self, name, metadata):
+            self.created.append((name, metadata))
+            raise UniqueConstraintError("collection already exists")
+
+        def get_collection(self, name):
+            self.fetched.append(name)
+            return {"name": name}
+
+    client = FakeClient()
+    monkeypatch.setattr(embedding, "get_chroma_client", lambda: client)
+
+    collection = embedding.get_collection("54adc376-45a3-4743-9cd0-35e00a456b47")
+
+    assert collection == {"name": "space_54adc37645a347439cd035e00a456b47"}
+    assert client.created == [
+        ("space_54adc37645a347439cd035e00a456b47", {"hnsw:space": "cosine"})
+    ]
+    assert client.fetched == ["space_54adc37645a347439cd035e00a456b47"]

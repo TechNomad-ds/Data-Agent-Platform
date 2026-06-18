@@ -20,8 +20,11 @@ import httpx
 
 from pku_acceptance_smoke import (
     DEFAULT_PASSWORD,
+    DEFAULT_SMOKE_EMAIL,
+    DEFAULT_SMOKE_USERNAME,
     SmokeContext,
     _materials,
+    _python_runtime_info,
     _require_status,
     create_space,
     register_or_login,
@@ -30,6 +33,8 @@ from pku_acceptance_smoke import (
 
 
 CheckFn = Callable[[str], tuple[bool, str]]
+DEFAULT_LLM_EMAIL = DEFAULT_SMOKE_EMAIL.replace("smoke", "llm")
+DEFAULT_LLM_USERNAME = DEFAULT_SMOKE_USERNAME.replace("smoke", "llm")
 
 
 def _contains_all(*phrases: str) -> CheckFn:
@@ -73,10 +78,14 @@ def _pick_model_id(client: httpx.Client, headers: dict[str, str], explicit: str 
             models = resp.json()
             break
         last_error = f"{path}: HTTP {resp.status_code}"
-    if not models:
+    valid_models = [
+        model for model in models
+        if str(model.get("id", "")).strip() and str(model.get("model_name", "")).strip()
+    ]
+    if not valid_models:
         detail = f" Last error: {last_error}." if last_error else ""
-        raise RuntimeError(f"No visible model found. Run backend/manage.py seed or pass --model-id.{detail}")
-    return models[0]["id"]
+        raise RuntimeError(f"No valid visible model found. Run backend/manage.py seed or pass --model-id.{detail}")
+    return valid_models[0]["id"]
 
 
 def _send_message(client: httpx.Client, headers: dict[str, str], conversation_id: str, model_id: str, content: str) -> dict[str, Any]:
@@ -163,6 +172,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "checks": [],
     }
+    report.update(_python_runtime_info())
     client = httpx.Client(base_url=args.base_url.rstrip("/"), timeout=60)
     try:
         headers = register_or_login(client, args.email, args.username, args.password)
@@ -232,8 +242,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run optional real-LLM PKU acceptance checks.")
     parser.add_argument("--base-url", default=os.getenv("DATAMIND_BASE_URL", "http://127.0.0.1:8002"))
-    parser.add_argument("--email", default=os.getenv("DATAMIND_LLM_EMAIL", f"pku_llm_{int(time.time())}@example.com"))
-    parser.add_argument("--username", default=os.getenv("DATAMIND_LLM_USERNAME", f"pku_llm_{int(time.time())}"))
+    parser.add_argument("--email", default=os.getenv("DATAMIND_LLM_EMAIL", DEFAULT_LLM_EMAIL))
+    parser.add_argument("--username", default=os.getenv("DATAMIND_LLM_USERNAME", DEFAULT_LLM_USERNAME))
     parser.add_argument("--password", default=os.getenv("DATAMIND_LLM_PASSWORD", DEFAULT_PASSWORD))
     parser.add_argument("--model-id", default=os.getenv("DATAMIND_LLM_MODEL_ID"))
     parser.add_argument("--run-label", default=os.getenv("DATAMIND_LLM_RUN_LABEL", time.strftime("%Y%m%d%H%M%S")))
@@ -249,16 +259,22 @@ def main() -> int:
             "base_url": args.base_url,
             "ended_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
+        report.update(_python_runtime_info())
+        _write_report(args.report, report)
         print(json.dumps(report, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 
-    out = Path(args.report)
-    out.parent.mkdir(parents=True, exist_ok=True)
     report["ended_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_report(args.report, report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print(f"\nReport written to {out}")
+    print(f"\nReport written to {args.report}")
     return 0 if report.get("ok") else 1
+
+
+def _write_report(report_path: str, report: dict[str, Any]) -> None:
+    out = Path(report_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
