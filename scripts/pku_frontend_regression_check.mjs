@@ -69,6 +69,7 @@ const pkuChecklist = read('DEPLOY_PKU.md')
 const reportTemplate = read('PKU_ACCEPTANCE_REPORT_TEMPLATE.md')
 const nginxConf = read('frontend/nginx.conf')
 const smokeScript = read('scripts/pku_acceptance_smoke.py')
+const llmScript = read('scripts/pku_llm_acceptance_check.py')
 assert(nginxConf.includes('proxy_pass http://127.0.0.1:8002;'), 'frontend/nginx.conf should proxy to local gunicorn by default')
 assert(!nginxConf.includes('proxy_pass http://backend:8002;'), 'frontend/nginx.conf should not default to Docker-only backend hostname')
 assert(nginxConf.includes('proxy_buffering off;'), 'frontend/nginx.conf must disable buffering for SSE')
@@ -83,6 +84,11 @@ for (const phrase of ['计算机体系结构', '线性代数复习', '现代文�
 for (const phrase of ['online_course_ops_multisheet.xlsx', '"type") != "workbook"', '课程目录', '报名记录', '学习日志']) {
   assert(smokeScript.includes(phrase), `PKU smoke script missing multi-sheet Excel coverage: ${phrase}`)
 }
+for (const phrase of ['multisheet_excel_join', 'sentiment_improvement_request', '希望增加更多实战', 'pku_llm_acceptance_report.json', '/api/models/available', 'DATAMIND_LLM_RUN_LABEL']) {
+  assert(llmScript.includes(phrase), `PKU LLM script missing behavior check: ${phrase}`)
+  assert(pkuChecklist.includes('pku_llm_acceptance_check.py'), 'PKU checklist missing LLM acceptance script')
+  assert(reportTemplate.includes('pku_llm_acceptance_check.py'), 'PKU report template missing LLM acceptance script')
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -96,6 +102,7 @@ console.log(JSON.stringify({
     'thinking_collapsed_by_default',
     'abort_targets_active_stream',
     'multisheet_excel_smoke_coverage',
+    'real_llm_acceptance_script',
     'pku_acceptance_template_coverage',
     'nginx_host_deployment_proxy',
   ],

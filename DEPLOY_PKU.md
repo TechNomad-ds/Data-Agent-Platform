@@ -87,6 +87,23 @@ backend/venv/bin/python scripts/pku_acceptance_smoke.py
 
 脚本成功后会输出并写入 `eval/pku_acceptance_report.json`。如果失败，先根据报错检查后端日志和 `.env` 配置。
 
+基础链路通过后，再运行真实 LLM 验收。该脚本会消耗模型额度/API 调用，用于验证多 sheet Excel 联合分析、公式回答、个性化学习解释和评论情感分类：
+
+```bash
+backend/venv/bin/python scripts/pku_llm_acceptance_check.py \
+  --base-url http://127.0.0.1:8002
+
+# 如需指定模型
+DATAMIND_LLM_MODEL_ID=<模型ID> \
+backend/venv/bin/python scripts/pku_llm_acceptance_check.py
+
+# 复用固定账号重复验收时，可指定批次名避免数据空间混淆
+DATAMIND_LLM_RUN_LABEL=round2 \
+backend/venv/bin/python scripts/pku_llm_acceptance_check.py
+```
+
+脚本成功后会输出并写入 `eval/pku_llm_acceptance_report.json`。该报告可作为人工截图验收前的机器检查证据。
+
 自动化脚本通过后，再做人工问答验收：
 
 ```bash

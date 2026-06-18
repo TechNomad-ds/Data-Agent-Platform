@@ -16,6 +16,7 @@
 |---|---|---|---|
 | 前端公式/流式隔离回归 | `node scripts/pku_frontend_regression_check.mjs` | 通过 / 失败 |  |
 | 基础 API smoke | `backend/venv/bin/python scripts/pku_acceptance_smoke.py --base-url <后端地址>` | 通过 / 失败 | 报告：`eval/pku_acceptance_report.json` |
+| 真实 LLM 行为验收 | `backend/venv/bin/python scripts/pku_llm_acceptance_check.py --base-url <后端地址>` | 通过 / 失败 | 报告：`eval/pku_llm_acceptance_report.json` |
 | 前端构建 | `cd frontend && npm run build` | 通过 / 失败 |  |
 
 ## 2. 测试数据空间
