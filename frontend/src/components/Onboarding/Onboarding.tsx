@@ -134,14 +134,14 @@ export default function Onboarding({ onComplete }: Props) {
               multiple
               showUploadList={false}
               beforeUpload={handleUpload}
-              accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
+              accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.pptx,.ppt,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
               style={{ marginBottom: 16, borderRadius: radius.lg, border: `1px dashed ${colors.border}` }}
             >
               <p style={{ fontSize: 28, color: colors.primary, marginBottom: 6 }}>
                 <CloudUploadOutlined />
               </p>
               <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>点击或拖拽文件到这里</p>
-              <p style={{ fontSize: 11, color: colors.textMuted, margin: '4px 0 0' }}>支持 CSV、Excel、PDF、Word、JSON 等格式</p>
+              <p style={{ fontSize: 11, color: colors.textMuted, margin: '4px 0 0' }}>支持 CSV、Excel、PDF、Word、PPT、JSON 等格式</p>
             </Upload.Dragger>
 
             {/* Uploaded file list */}

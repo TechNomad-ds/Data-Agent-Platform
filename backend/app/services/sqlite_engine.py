@@ -81,19 +81,17 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
         if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
             continue
 
-        base_name = f.filename.rsplit(".", 1)[0].replace(" ", "_").replace("-", "_").lower()
-        table_name = base_name
-        existing_tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-        if table_name in existing_tables:
-            table_name = f"{base_name}_{ext}"
-
         try:
-            from app.services.file_loader import load_dataframe
-            df = load_dataframe(file_path, ext)
-            if df.empty:
-                continue
-
-            df.to_sql(table_name, conn, if_exists="replace", index=False)
+            from app.services.file_loader import iter_named_dataframes
+            base_name = f.filename.rsplit(".", 1)[0]
+            for table_name, df in iter_named_dataframes(file_path, ext, base_name=base_name):
+                if df.empty:
+                    continue
+                existing_tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+                dest = table_name
+                if dest in existing_tables:
+                    dest = f"{table_name}_{ext}"
+                df.to_sql(dest, conn, if_exists="replace", index=False)
         except Exception:
             continue
 
@@ -234,4 +232,3 @@ async def periodic_cleanup_loop(interval_seconds: int = 600, max_age_seconds: in
             break
         except Exception as e:
             logger.warning(f"周期清理临时文件失败: {e}")
-

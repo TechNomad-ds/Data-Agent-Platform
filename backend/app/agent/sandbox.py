@@ -160,8 +160,9 @@ def _install_fs_guard(pd, np, preload):
     """
     import os as _os
     allowed = set()
-    for _k, (_kind, p) in (preload or {}).items():
+    for _k, item in (preload or {}).items():
         try:
+            p = item[1]
             allowed.add(_os.path.realpath(p))
         except Exception:
             pass
@@ -246,12 +247,14 @@ def _child_entry(code, preload, cpu_seconds, mem_bytes, fsize_bytes, conn):
         g = {"__builtins__": _build_safe_builtins(), "pd": pd, "np": np}
 
         # 预加载数据文件为 DataFrame（在子进程内，受限额约束）
-        for var_name, (kind, path) in (preload or {}).items():
+        for var_name, preload_item in (preload or {}).items():
             try:
+                kind, path = preload_item[0], preload_item[1]
                 if kind == "csv":
                     g[var_name] = pd.read_csv(path)
                 elif kind == "excel":
-                    g[var_name] = pd.read_excel(path)
+                    sheet_name = preload_item[2] if len(preload_item) > 2 else 0
+                    g[var_name] = pd.read_excel(path, sheet_name=sheet_name)
                 elif kind == "json":
                     g[var_name] = _load_json_df(pd, path)
             except Exception:

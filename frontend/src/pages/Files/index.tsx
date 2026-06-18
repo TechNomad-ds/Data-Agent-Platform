@@ -63,7 +63,7 @@ export default function Files() {
 
   const typeColors: Record<string, string> = {
     pdf: 'red', csv: 'green', xlsx: 'green', json: 'orange',
-    py: 'blue', md: 'purple', txt: 'default', docx: 'cyan',
+    py: 'blue', md: 'purple', txt: 'default', docx: 'cyan', pptx: 'volcano', ppt: 'volcano',
   }
 
   const columns = [

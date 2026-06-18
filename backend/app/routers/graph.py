@@ -112,7 +112,7 @@ async def build_graph(
         .where(
             DataSpaceFile.data_space_id == space_id,
             File.user_id == current_user.id,
-            File.file_type.in_(["txt", "md", "pdf", "docx", "py", "sql", "html", "xml", "yaml", "yml"]),
+            File.file_type.in_(["txt", "md", "pdf", "docx", "pptx", "py", "sql", "html", "xml", "yaml", "yml"]),
         )
     )
     files = result.scalars().all()
@@ -147,21 +147,10 @@ async def build_graph(
                 text = ""
                 if ext in ("txt", "md", "py", "sql", "html", "xml", "yaml", "yml"):
                     text = file_path.read_text(encoding="utf-8", errors="ignore")
-                elif ext == "pdf":
+                elif ext in ("pdf", "docx", "pptx"):
                     try:
-                        import fitz
-                        doc = fitz.open(str(file_path))
-                        for page in doc:
-                            text += page.get_text() + "\n"
-                        doc.close()
-                    except Exception:
-                        continue
-                elif ext == "docx":
-                    try:
-                        from docx import Document
-                        doc = Document(str(file_path))
-                        for para in doc.paragraphs:
-                            text += para.text + "\n"
+                        from app.services.document_text import extract_document_text
+                        text = extract_document_text(file_path, ext)
                     except Exception:
                         continue
 

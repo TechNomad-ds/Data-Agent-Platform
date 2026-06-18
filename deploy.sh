@@ -37,7 +37,34 @@ check_cmd() {
     fi
 }
 
-check_cmd python3 || { echo "  → 请安装 Python 3.11+"; exit 1; }
+select_python() {
+    if [ -n "$PYTHON_BIN" ] && command -v "$PYTHON_BIN" &>/dev/null; then
+        echo "$PYTHON_BIN"
+        return 0
+    fi
+    for candidate in python3.11 python3.12 python3; do
+        if command -v "$candidate" &>/dev/null; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+PYTHON_CMD="$(select_python)" || { echo "  ✗ 未找到 Python；请安装 Python 3.11 或 3.12"; exit 1; }
+PYTHON_VERSION_OK="$("$PYTHON_CMD" - <<'PY'
+import sys
+major, minor = sys.version_info[:2]
+print("ok" if major == 3 and minor in (11, 12) else "bad")
+PY
+)"
+if [ "$PYTHON_VERSION_OK" != "ok" ]; then
+    echo "  ✗ $PYTHON_CMD 版本为 $($PYTHON_CMD -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+    echo "  → 当前依赖锁定建议使用 Python 3.11 或 3.12；不要使用 3.13+"
+    echo "  → 可设置 PYTHON_BIN=/path/to/python3.11 后重试"
+    exit 1
+fi
+echo "  ✓ $PYTHON_CMD ($($PYTHON_CMD -c 'import sys; print(".".join(map(str, sys.version_info[:3])))'))"
 check_cmd node || { echo "  → 请安装 Node.js 18+"; exit 1; }
 check_cmd npm || { echo "  → 请安装 npm"; exit 1; }
 check_cmd psql || echo "  ⚠ PostgreSQL 客户端未安装（如果数据库在远程可忽略）"
@@ -67,8 +94,20 @@ echo "[3/6] 安装后端依赖..."
 
 cd backend
 if [ ! -d venv ]; then
-    python3 -m venv venv
+    "$PYTHON_CMD" -m venv venv
     echo "  ✓ 虚拟环境已创建"
+fi
+
+VENV_VERSION_OK="$(venv/bin/python - <<'PY'
+import sys
+major, minor = sys.version_info[:2]
+print("ok" if major == 3 and minor in (11, 12) else "bad")
+PY
+)"
+if [ "$VENV_VERSION_OK" != "ok" ]; then
+    echo "  ✗ backend/venv 使用 Python $(venv/bin/python -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+    echo "  → 请删除 backend/venv 后重跑，或设置 PYTHON_BIN=/path/to/python3.11"
+    exit 1
 fi
 
 venv/bin/python -m pip install --upgrade pip -q 2>/dev/null

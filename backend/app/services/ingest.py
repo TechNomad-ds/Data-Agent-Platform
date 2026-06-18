@@ -61,11 +61,10 @@ class IngestService:
                 doc.close()
             except Exception:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
-        elif ext == "docx":
+        elif ext in ("docx", "pptx"):
             try:
-                from docx import Document
-                doc = Document(str(file_path))
-                content = "\n".join(p.text for p in doc.paragraphs)
+                from app.services.document_text import extract_document_text
+                content = extract_document_text(file_path, ext)
             except Exception:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
         else:
@@ -117,4 +116,3 @@ class IngestService:
             "row_count": row_count,
             "column_count": len(df.columns),
         }
-

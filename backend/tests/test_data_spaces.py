@@ -1,7 +1,10 @@
 """数据空间测试 — CRUD、文件上传、关联管理"""
 import io
 import pytest
-from tests.conftest import get_auth_headers
+import pandas as pd
+from sqlalchemy import select
+from tests.conftest import get_auth_headers, _test_session_factory
+from app.models.user import User
 
 
 @pytest.mark.asyncio
@@ -86,6 +89,93 @@ async def test_upload_csv_to_space(client):
     assert len(data) == 1
     assert data[0]["filename"] == "test.csv"
     assert data[0]["file_type"] == "csv"
+
+
+@pytest.mark.asyncio
+async def test_upload_pptx_to_space(client):
+    pptx = pytest.importorskip("pptx")
+    headers, _ = await get_auth_headers(client)
+    create_res = await client.post("/api/data-spaces", headers=headers, json={"name": "slides_space"})
+    space_id = create_res.json()["id"]
+
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "计算机体系结构"
+    slide.placeholders[1].text = "流水线、缓存局部性、指令级并行"
+    buf = io.BytesIO()
+    prs.save(buf)
+    buf.seek(0)
+
+    files = {
+        "files": (
+            "architecture.pptx",
+            buf,
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+    }
+    res = await client.post(f"/api/data-spaces/{space_id}/upload", headers=headers, files=files)
+    assert res.status_code == 201
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["filename"] == "architecture.pptx"
+    assert data[0]["file_type"] == "pptx"
+
+
+@pytest.mark.asyncio
+async def test_upload_multisheet_excel_expands_to_sql_tables(client, db_session, monkeypatch):
+    """报告中的核心回归：一个 xlsx 的多个 sheet 必须都进入 SQL 层。"""
+    pytest.importorskip("openpyxl")
+    headers, email = await get_auth_headers(client)
+    user = (await db_session.execute(select(User).where(User.email == email))).scalar_one()
+    create_res = await client.post("/api/data-spaces", headers=headers, json={"name": "multisheet_sql_space"})
+    space_id = create_res.json()["id"]
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as writer:
+        pd.DataFrame({"course_id": ["C001"], "course_name": ["线性代数"]}).to_excel(
+            writer, sheet_name="课程目录", index=False
+        )
+        pd.DataFrame({"student_id": ["S001"], "course_id": ["C001"]}).to_excel(
+            writer, sheet_name="报名记录", index=False
+        )
+        pd.DataFrame({"student_id": ["S001"], "minutes": [80]}).to_excel(
+            writer, sheet_name="学习日志", index=False
+        )
+    buf.seek(0)
+
+    files = {
+        "files": (
+            "online_course_ops_multisheet.xlsx",
+            buf,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
+    res = await client.post(f"/api/data-spaces/{space_id}/upload", headers=headers, files=files)
+    assert res.status_code == 201
+
+    import app.services.sqlite_engine as sqlite_engine
+
+    monkeypatch.setattr(sqlite_engine, "get_session_factory", lambda: _test_session_factory)
+    sqlite_engine.invalidate_cache(space_id)
+    db_path = await sqlite_engine.load_space_to_sqlite(space_id, user.id)
+    tables = sqlite_engine.list_tables(db_path)
+    table_names = {t["name"] for t in tables}
+    assert {
+        "online_course_ops_multisheet__课程目录",
+        "online_course_ops_multisheet__报名记录",
+        "online_course_ops_multisheet__学习日志",
+    }.issubset(table_names)
+
+    joined = sqlite_engine.execute_query(
+        db_path,
+        'SELECT c.course_name, e.student_id, l.minutes '
+        'FROM "online_course_ops_multisheet__课程目录" c '
+        'JOIN "online_course_ops_multisheet__报名记录" e ON e.course_id = c.course_id '
+        'JOIN "online_course_ops_multisheet__学习日志" l ON l.student_id = e.student_id',
+    )
+    assert joined["row_count"] == 1
+    assert joined["rows"][0]["course_name"] == "线性代数"
+    assert joined["rows"][0]["minutes"] == 80
 
 
 @pytest.mark.asyncio

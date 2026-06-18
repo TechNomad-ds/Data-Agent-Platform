@@ -82,6 +82,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 2. 表格数据优先用 pandas_query（支持多行代码）或 sqlite_query 直接操作，不依赖索引
 3. pandas_query 适合单表分析，支持多行代码（赋值给 result 变量返回结果）
 4. sqlite_query 适合跨表 JOIN、GROUP BY 等 SQL 擅长的操作
+   - 多工作表 Excel 会自动展开为多张 SQL 表（命名为 文件名__工作表名），也会在 execute_python 中预加载为多个 df_变量；不要因为 xlsx 只有首个 sheet 可见就判断其它表缺失。
 5. read_file 可读取任何文件（CSV/Excel/PDF/Word/代码/数据库都支持）
 6. execute_python 适合需要复杂逻辑、循环、多步计算的场景
 7. generate_chart 生成可视化图表，善用它让数据直观呈现
@@ -113,6 +114,13 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 - 用户问如何上传、配置、部署、报错原因、权限、模型设置等，优先给可执行步骤。
 - 如果问题来自当前平台运行状态，可以结合工具或上下文定位；不要套用数据分析格式。
 
+5. **课程学习 / 复习辅导**
+- 当数据空间包含讲义、课件、Word/PDF/PPTX、个人笔记、习题等课程资料时，把自己当作课程助教：先基于当前数据空间资料回答，再补充通俗解释和学习建议。
+- 回答必须围绕当前数据空间，不要把其它课程空间的内容混入当前回答；若当前未选择数据空间，明确说明只能做通用解释。
+- 用户问“我擅长 X，但没学过 Y，我该如何理解 Z”这类个性化问题时，先承认用户已有背景，再用类比、分层解释、例子和复习路径连接 X 与 Z。
+- 用户问“复习/总结/考点/怎么学”时，优先输出：核心概念 → 易混点 → 例题/应用 → 复习建议。不要只复述资料原文。
+- 如果资料里有明确术语、定义、公式或作者观点，优先引用资料内容；无法在资料中找到时，说明“资料中未直接出现，我按通用知识解释”。
+
 ## 日常数据分析工作流
 
 当用户提出开放式分析问题（如趋势、规律、异常、原因、表现、建议）时，按这个顺序工作：
@@ -123,6 +131,22 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 5. 最终回答用"结论 → 关键证据 → 可能原因/建议 → 注意事项"的结构；只展示最能支撑结论的表格，不要把大段原始明细塞给用户。
 6. 有时间趋势、类别对比、构成占比时，优先生成图表；图表服务于结论，不替代文字解释。
 7. 如果字段含义不确定，先用数据中的列名、样例值和 knowledge.md 推断；仍不确定时在结论里标明假设，不要编造业务含义。
+
+## 文本 / 评论 / 情感分析要求
+
+当用户要求分析评论、问卷、满意度、反馈、主观文本或“情感分类”时：
+1. 不要只靠关键词打标签。必须结合完整句意、评分/推荐意愿/上下文共同判断；“希望增加更多实战”“建议多放案例”“如果能更快答疑就好了”这类句子通常是改进诉求或中性/负向反馈，不要因为含“实战/案例”等正面词就判为正面。
+2. 输出情感或主题分类时，给出分类口径：正面、负面、中性、改进诉求/建设性建议可以分开统计；不要把改进诉求硬塞进正面。
+3. 每个主题至少列 1-3 条代表性原文短句或样例 ID，并说明置信度或不确定性；如果只是规则/关键词近似分类，要明确这是启发式结果。
+4. 先做数据质量检查：评论是否为空、是否有重复、评分和文本是否冲突、样本量是否足够。发现评分与文字矛盾时单独标出，不要静默归类。
+5. 如果需要写代码分类，先构造清晰的规则函数并保留“改进诉求/不确定”类别；最终汇总前抽样检查各类样例，发现误判要修正规则再输出。
+
+## 代码可靠性要求
+
+使用 pandas_query / execute_python 前先从 schema 或 inspect_data 确认真实列名和可用 DataFrame 变量；不要凭中文问题猜列名。
+写代码时先处理列名、空值、类型转换和派生列，再做 groupby/join/排序；避免链式赋值，使用 `.copy()` 保存筛选后的 DataFrame。
+一次工具调用内完成完整计算和输出，不要依赖上一轮工具里创建的临时变量。
+如果第一版代码失败，立即根据错误修正并重跑；最终回答只呈现修正后的结果和必要的不确定性，不把调试过程当作正文。
 
 ## 第一步：判断任务意图（决定输出形态，非常重要）
 
@@ -149,6 +173,8 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 4. **引用数据来源**：说明"根据 xxx.csv 的数据"或"从表 xxx 中查询到"
 5. **语言通俗**：避免技术术语，用业务语言解释
 6. **控制篇幅**：开放式分析最多给 5-7 条最重要洞察，每条包含关键数字和一句解释。不要写重复句、套话或很长的段落。
+7. **公式输出规范**：数学公式一律用 LaTeX。行内公式用 `$...$`，独立公式用 `$$...$$`。不要把公式包在普通代码块里，不要用全角符号拼公式。
+8. **Markdown 稳定性**：不要输出破损表格、未闭合代码块或混乱缩进。列表层级不超过两层；中文回答保持 UTF-8 正常文本，不要夹杂转义乱码。
 
 ## 取数准确性要求（直接决定答案对错）
 
@@ -248,7 +274,7 @@ class AgentLoop:
         "py": "Python代码", "r": "R代码", "sql": "SQL脚本", "ipynb": "Jupyter笔记本",
         "txt": "文本文件", "md": "Markdown文档", "log": "日志文件",
         "html": "HTML文件", "xml": "XML文件", "yaml": "配置文件", "yml": "配置文件",
-        "pdf": "PDF文档", "docx": "Word文档",
+        "pdf": "PDF文档", "docx": "Word文档", "pptx": "PowerPoint课件", "ppt": "PowerPoint旧版课件",
         "png": "图片", "jpg": "图片", "jpeg": "图片", "gif": "图片", "bmp": "图片", "webp": "图片",
     }
 
@@ -387,45 +413,59 @@ class AgentLoop:
                 # 有 profile 且已就绪 → 用 profile 的丰富信息
                 if profile and profile.status == "ready" and profile.profile_type == "tabular":
                     data = profile.profile_data or {}
-                    row_count = data.get("row_count", "?")
-                    col_count = data.get("column_count", "?")
-                    columns = data.get("columns", [])
 
                     df_var = df_var_by_file_id.get(str(f.id))
                     py_hint = f"  python变量={df_var}" if df_var else ""
-                    lines.append(f"### {f.filename}  rows={row_count}  cols={col_count}{py_hint}")
-                    for c in columns[:MAX_SCHEMA_COLS]:
-                        name = c.get("name", "?")
-                        dtype = c.get("dtype", "?")
-                        unique = c.get("unique_count", "?")
-                        null_pct = c.get("null_pct", 0)
-                        samples = c.get("sample_values", [])[:3]
-                        samples_str = ", ".join(str(s)[:20] for s in samples)
-                        extra = ""
-                        if null_pct > 5:
-                            extra += f" null={null_pct}%"
-                        stats = c.get("stats")
-                        if stats and stats.get("mean") is not None:
-                            extra += f" mean={stats['mean']}"
-                        top = c.get("top_values")
-                        if top:
-                            extra += f" top=[{', '.join(f'{k}:{v}' for k,v in list(top.items())[:3])}]"
-                        lines.append(f"    - {name} ({dtype}) unique={unique} ex=[{samples_str}]{extra}")
-                        if name not in all_columns:
-                            all_columns[name] = {}
-                        all_columns[name][f.filename] = set(str(s) for s in samples)
+                    sheet_profiles = data.get("sheets") if data.get("workbook") else None
+                    if sheet_profiles:
+                        lines.append(f"### {f.filename}  Excel工作簿 sheets={data.get('sheet_count', len(sheet_profiles))}{py_hint}")
+                        profiles_to_render = sheet_profiles[:8]
+                    else:
+                        lines.append(f"### {f.filename}  rows={data.get('row_count', '?')}  cols={data.get('column_count', '?')}{py_hint}")
+                        profiles_to_render = [data]
 
-                    if len(columns) > MAX_SCHEMA_COLS:
-                        lines.append(f"    ...（还有 {len(columns) - MAX_SCHEMA_COLS} 列）")
+                    for sheet_data in profiles_to_render:
+                        columns = sheet_data.get("columns", [])
+                        sheet_name = sheet_data.get("sheet_name")
+                        indent = "    "
+                        source_label = f"{f.filename}[{sheet_name}]" if sheet_name else f.filename
+                        if sheet_name:
+                            lines.append(f"    - 工作表 {sheet_name}: rows={sheet_data.get('row_count', '?')} cols={sheet_data.get('column_count', '?')}")
+                            indent = "      "
+                        for c in columns[:MAX_SCHEMA_COLS]:
+                            name = c.get("name", "?")
+                            dtype = c.get("dtype", "?")
+                            unique = c.get("unique_count", "?")
+                            null_pct = c.get("null_pct", 0)
+                            samples = c.get("sample_values", [])[:3]
+                            samples_str = ", ".join(str(s)[:20] for s in samples)
+                            extra = ""
+                            if null_pct > 5:
+                                extra += f" null={null_pct}%"
+                            stats = c.get("stats")
+                            if stats and stats.get("mean") is not None:
+                                extra += f" mean={stats['mean']}"
+                            top = c.get("top_values")
+                            if top:
+                                extra += f" top=[{', '.join(f'{k}:{v}' for k,v in list(top.items())[:3])}]"
+                            lines.append(f"{indent}- {name} ({dtype}) unique={unique} ex=[{samples_str}]{extra}")
+                            if name not in all_columns:
+                                all_columns[name] = {}
+                            all_columns[name][source_label] = set(str(s) for s in samples)
 
-                    quality = data.get("quality", {})
-                    qp = []
-                    if quality.get("duplicate_pct", 0) > 1: qp.append(f"重复率{quality['duplicate_pct']}%")
-                    if quality.get("complete_pct", 100) < 95: qp.append(f"完整率{quality['complete_pct']}%")
-                    if quality.get("outlier_columns"): qp.append(f"{len(quality['outlier_columns'])}列有异常值")
-                    if quality.get("type_suggestions"): qp.append(f"{len(quality['type_suggestions'])}列可转类型")
-                    if qp:
-                        lines.append(f"    ⚠️ {', '.join(qp)}")
+                        if len(columns) > MAX_SCHEMA_COLS:
+                            lines.append(f"{indent}...（还有 {len(columns) - MAX_SCHEMA_COLS} 列）")
+
+                        quality = sheet_data.get("quality", {})
+                        qp = []
+                        if quality.get("duplicate_pct", 0) > 1: qp.append(f"重复率{quality['duplicate_pct']}%")
+                        if quality.get("complete_pct", 100) < 95: qp.append(f"完整率{quality['complete_pct']}%")
+                        if quality.get("outlier_columns"): qp.append(f"{len(quality['outlier_columns'])}列有异常值")
+                        if quality.get("type_suggestions"): qp.append(f"{len(quality['type_suggestions'])}列可转类型")
+                        if qp:
+                            lines.append(f"{indent}⚠️ {', '.join(qp)}")
+                    if sheet_profiles and len(sheet_profiles) > 8:
+                        lines.append(f"    ...（还有 {len(sheet_profiles) - 8} 个工作表）")
                     lines.append("")
 
                 elif profile and profile.status == "ready" and profile.profile_type in ("text", "document"):
@@ -516,6 +556,18 @@ class AgentLoop:
                                 lines.append(f"    内容预览: {raw}")
                         except Exception:
                             pass
+                    elif f.file_type in ("pdf", "docx", "pptx"):
+                        try:
+                            from app.services.document_text import extract_document_text
+                            fp = Path(settings.storage_root) / f.storage_path
+                            if fp.exists():
+                                raw = extract_document_text(fp, f.file_type)[:300]
+                                if raw:
+                                    lines.append(f"    内容预览: {raw}")
+                        except Exception:
+                            pass
+                    elif f.file_type == "ppt":
+                        lines.append("    旧版 .ppt 暂不支持抽取文本，请转换为 .pptx 后上传")
                     lines.append("")
 
             # JOIN 检测

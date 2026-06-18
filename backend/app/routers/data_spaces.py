@@ -451,7 +451,7 @@ async def upload_files_to_space(
 
         # 自动为文本/文档类文件构建知识图谱（无感化，不阻塞用户）
         if settings.graph_auto_extract:
-            text_files = [f for f in uploaded if f.file_type in ("txt", "md", "pdf", "docx")]
+            text_files = [f for f in uploaded if f.file_type in ("txt", "md", "pdf", "docx", "pptx")]
             if text_files:
                 try:
                     from app.services.graph import GraphService
@@ -463,15 +463,9 @@ async def upload_files_to_space(
                         try:
                             if f.file_type in ("txt", "md"):
                                 text = file_path.read_text(encoding="utf-8", errors="ignore")
-                            elif f.file_type == "pdf":
-                                import fitz
-                                doc = fitz.open(str(file_path))
-                                text = "\n".join(p.get_text() for p in doc)
-                                doc.close()
-                            elif f.file_type == "docx":
-                                from docx import Document as DocxDoc
-                                doc = DocxDoc(str(file_path))
-                                text = "\n".join(p.text for p in doc.paragraphs)
+                            elif f.file_type in ("pdf", "docx", "pptx"):
+                                from app.services.document_text import extract_document_text
+                                text = extract_document_text(file_path, f.file_type)
                             else:
                                 continue
                             if len(text.strip()) >= 100:
@@ -661,7 +655,29 @@ async def preview_file_data(
         encoding = _detect_encoding(file_path)
         df = pd.read_csv(file_path, sep="\t", encoding=encoding, nrows=page * page_size, on_bad_lines="skip")
     elif ext in ("xlsx", "xls"):
-        df = pd.read_excel(file_path, nrows=page * page_size)
+        from app.services.file_loader import load_excel_sheets
+        sheet_frames = load_excel_sheets(file_path, nrows=page * page_size)
+        sheets = []
+        start = (page - 1) * page_size
+        end = start + page_size
+        for sheet_name, sheet_df in sheet_frames.items():
+            page_df = sheet_df.iloc[start:end]
+            sheets.append({
+                "name": sheet_name,
+                "columns": [{"name": str(col), "dtype": str(sheet_df[col].dtype)} for col in sheet_df.columns],
+                "rows": page_df.fillna("").astype(str).values.tolist(),
+                "total_rows": len(sheet_df),
+            })
+        if not sheets:
+            return {"type": "unsupported", "message": "无法解析 Excel 工作簿"}
+        return {
+            "type": "workbook",
+            "sheets": sheets,
+            "sheet_count": len(sheets),
+            "page": page,
+            "page_size": page_size,
+            "filename": file.filename,
+        }
     elif ext == "parquet":
         df = pd.read_parquet(file_path).head(page * page_size)
     elif ext == "feather":
@@ -719,11 +735,10 @@ async def preview_file_data(
             }
         except ImportError:
             return {"type": "unsupported", "message": "需要安装 PyMuPDF 才能预览 PDF"}
-    elif ext == "docx":
+    elif ext in ("docx", "pptx"):
         try:
-            from docx import Document
-            doc = Document(str(file_path))
-            full_text = "\n".join(p.text for p in doc.paragraphs)
+            from app.services.document_text import extract_document_text
+            full_text = extract_document_text(file_path, ext)
             lines = full_text.split("\n")
             start = (page - 1) * page_size
             end = start + page_size
@@ -736,7 +751,9 @@ async def preview_file_data(
                 "filename": file.filename,
             }
         except ImportError:
-            return {"type": "unsupported", "message": "需要安装 python-docx 才能预览 Word"}
+            return {"type": "unsupported", "message": "需要安装文档解析依赖才能预览该文件"}
+    elif ext == "ppt":
+        return {"type": "unsupported", "message": "旧版 .ppt 暂不支持预览，请转换为 .pptx 后上传"}
     elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
         return {"type": "image", "filename": file.filename, "file_size_kb": round(file_path.stat().st_size / 1024, 1)}
     else:

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   Typography, Button, Upload, Table, Tag, message,
   Popconfirm, Spin, Progress, Input, Modal, Tooltip,
+  Tabs,
 } from 'antd'
 import {
   DeleteOutlined, FileTextOutlined,
@@ -35,6 +36,8 @@ const FILE_TYPE_CONFIG: Record<string, { color: string; icon: React.ReactNode }>
   jsonl: { color: '#f59e0b', icon: <CodeOutlined /> },
   pdf: { color: '#ef4444', icon: <FilePdfOutlined /> },
   docx: { color: '#3b82f6', icon: <FileTextOutlined /> },
+  pptx: { color: '#f97316', icon: <FileTextOutlined /> },
+  ppt: { color: '#f97316', icon: <FileTextOutlined /> },
   png: { color: '#8b5cf6', icon: <FileImageOutlined /> },
   jpg: { color: '#8b5cf6', icon: <FileImageOutlined /> },
   jpeg: { color: '#8b5cf6', icon: <FileImageOutlined /> },
@@ -556,7 +559,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           <div style={{ padding: '16px 16px 0' }}>
             <Upload.Dragger
               multiple showUploadList={false} beforeUpload={handleUpload}
-              accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
+              accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.pptx,.ppt,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
               style={{
                 border: `2px dashed ${colors.border}`,
                 borderRadius: 14,
@@ -721,6 +724,39 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                   scroll={{ x: (preview.columns?.length || 1) * 140 }}
                   pagination={{ pageSize: 50, size: 'small' }}
                   style={{ borderRadius: 10 }}
+                />
+              </div>
+            ) : preview?.type === 'workbook' ? (
+              <div>
+                <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 14, fontWeight: 600 }}>
+                    {files.find(f => f.file_id === selectedFileId)?.filename}
+                  </Text>
+                  <Tag>{preview.sheet_count} 个工作表</Tag>
+                </div>
+                <Tabs
+                  size="small"
+                  items={preview.sheets?.map((sheet: any) => ({
+                    key: sheet.name,
+                    label: `${sheet.name} (${sheet.total_rows} 行)`,
+                    children: (
+                      <Table
+                        dataSource={sheet.rows?.map((row: string[], i: number) => {
+                          const obj: Record<string, string> = { _key: `${sheet.name}-${i}` }
+                          sheet.columns?.forEach((col: any, j: number) => { obj[col.name] = row[j] })
+                          return obj
+                        })}
+                        columns={sheet.columns?.map((col: any) => ({
+                          title: <Tooltip title={`类型: ${col.dtype}`}><span style={{ fontSize: 12 }}>{col.name}</span></Tooltip>,
+                          dataIndex: col.name, key: col.name, width: 140, ellipsis: true,
+                          render: (v: string) => <span style={{ fontSize: 12 }}>{v}</span>,
+                        }))}
+                        rowKey="_key" size="small"
+                        scroll={{ x: (sheet.columns?.length || 1) * 140 }}
+                        pagination={{ pageSize: 50, size: 'small' }}
+                      />
+                    ),
+                  }))}
                 />
               </div>
             ) : preview?.type === 'text' ? (

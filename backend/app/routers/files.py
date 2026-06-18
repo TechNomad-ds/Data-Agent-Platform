@@ -21,7 +21,7 @@ router = APIRouter()
 
 # 支持的文件类型
 ALLOWED_EXTENSIONS = {
-    "txt", "md", "pdf", "docx", "csv", "xlsx", "xls", "json", "jsonl",
+    "txt", "md", "pdf", "docx", "pptx", "ppt", "csv", "xlsx", "xls", "json", "jsonl",
     "html", "xml", "sql", "py", "ipynb", "zip", "yaml", "yml",
     "log", "tsv", "parquet", "feather", "sqlite", "db", "sqlite3",
     "png", "jpg", "jpeg", "gif", "bmp", "webp",

@@ -83,15 +83,16 @@ async def preprocess_file(file_id: uuid.UUID, data_space_id: uuid.UUID) -> Dict[
                         _embed_text_background(file_path, str(file_id), str(data_space_id), file.filename),
                     )
                 )
-            elif ext in ("pdf", "docx"):
+            elif ext in ("pdf", "docx", "pptx", "ppt"):
                 profile_data = _profile_document_fast(file_path, ext)
                 profile_type = "document"
-                asyncio.create_task(
-                    run_limited(
-                        "ocr",
-                        _document_ocr_pipeline(file_path, ext, str(file_id), str(data_space_id), file.filename),
+                if ext != "ppt":
+                    asyncio.create_task(
+                        run_limited(
+                            "ocr",
+                            _document_ocr_pipeline(file_path, ext, str(file_id), str(data_space_id), file.filename),
+                        )
                     )
-                )
             elif ext in ("png", "jpg", "jpeg", "gif", "bmp", "webp"):
                 profile_data = _profile_image(file_path)
                 profile_type = "image"
@@ -225,10 +226,36 @@ async def recover_unprocessed_files() -> int:
 
 def _profile_tabular(file_path: Path, ext: str) -> Dict[str, Any]:
     """生成表格数据画像 - 支持多种格式"""
+    if ext in ("xlsx", "xls"):
+        from app.services.file_loader import load_excel_sheets
+        sheets = load_excel_sheets(file_path, nrows=10000)
+        sheet_profiles = []
+        for sheet_name, df in sheets.items():
+            if df.empty:
+                continue
+            sheet_profile = _profile_dataframe(df)
+            sheet_profile["sheet_name"] = sheet_name
+            sheet_profiles.append(sheet_profile)
+        if not sheet_profiles:
+            return {"error": f"无法加载 {ext} 格式文件"}
+
+        profile = dict(sheet_profiles[0])
+        profile.update({
+            "workbook": True,
+            "sheet_count": len(sheets),
+            "loaded_sheet_count": len(sheet_profiles),
+            "sheets": sheet_profiles,
+        })
+        return profile
+
     df = _load_tabular(file_path, ext)
     if df is None or df.empty:
         return {"error": f"无法加载 {ext} 格式文件"}
+    return _profile_dataframe(df)
 
+
+def _profile_dataframe(df: pd.DataFrame) -> Dict[str, Any]:
+    """生成单张 DataFrame 的画像。"""
     profile: Dict[str, Any] = {
         "row_count": int(len(df)),
         "column_count": int(len(df.columns)),
@@ -369,23 +396,33 @@ async def _embed_tabular_background(
     logger = logging.getLogger("preprocessing")
     try:
         chunks = []
-        columns = profile_data.get("columns", [])
-        row_count = profile_data.get("row_count", 0)
+        profiles = profile_data.get("sheets") or [profile_data]
+        summary_parts = []
+        if profile_data.get("workbook"):
+            summary_parts.append(f"Excel 文件 {filename}，共 {profile_data.get('sheet_count', len(profiles))} 个工作表。")
 
-        col_names = [c["name"] for c in columns]
-        summary = f"表格文件 {filename}，共 {row_count} 行，{len(columns)} 列。列包括: {', '.join(col_names)}。"
+        for sheet_profile in profiles:
+            columns = sheet_profile.get("columns", [])
+            row_count = sheet_profile.get("row_count", 0)
+            sheet_name = sheet_profile.get("sheet_name")
+            col_names = [c["name"] for c in columns]
+            prefix = f"工作表 {sheet_name}: " if sheet_name else ""
+            summary = f"{prefix}共 {row_count} 行，{len(columns)} 列。列包括: {', '.join(col_names)}。"
 
-        for c in columns:
-            desc = f"列 {c['name']} (类型: {c['dtype']})"
-            if c.get("stats"):
-                s = c["stats"]
-                desc += f"，均值 {s.get('mean', '?')}，范围 {s.get('min', '?')} ~ {s.get('max', '?')}"
-            if c.get("top_values"):
-                top = list(c["top_values"].keys())[:5]
-                desc += f"，常见值: {', '.join(top)}"
-            if c.get("sample_values"):
-                desc += f"，示例: {', '.join(c['sample_values'][:3])}"
-            summary += " " + desc + "。"
+            for c in columns:
+                desc = f"列 {c['name']} (类型: {c['dtype']})"
+                if c.get("stats"):
+                    s = c["stats"]
+                    desc += f"，均值 {s.get('mean', '?')}，范围 {s.get('min', '?')} ~ {s.get('max', '?')}"
+                if c.get("top_values"):
+                    top = list(c["top_values"].keys())[:5]
+                    desc += f"，常见值: {', '.join(top)}"
+                if c.get("sample_values"):
+                    desc += f"，示例: {', '.join(c['sample_values'][:3])}"
+                summary += " " + desc + "。"
+            summary_parts.append(summary)
+
+        summary = "\n".join(summary_parts)
 
         chunks.append({"text": summary, "start_char": 0, "end_char": len(summary)})
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
@@ -422,28 +459,17 @@ async def _embed_text_background(
 
 def _profile_document_fast(file_path: Path, ext: str) -> Dict[str, Any]:
     """快速生成文档画像（不做 embedding）"""
-    text = ""
-    page_count = 0
+    if ext == "ppt":
+        return {
+            "char_count": 0,
+            "page_count": 0,
+            "preview": "",
+            "warning": "旧版 .ppt 暂不支持抽取文本，请转换为 .pptx 后上传以获得检索和问答效果",
+        }
 
-    if ext == "pdf":
-        try:
-            import fitz
-            doc = fitz.open(str(file_path))
-            page_count = len(doc)
-            for page in doc:
-                text += page.get_text() + "\n"
-            doc.close()
-        except ImportError:
-            text = file_path.read_text(encoding="utf-8", errors="ignore")
-    elif ext == "docx":
-        try:
-            from docx import Document
-            doc = Document(str(file_path))
-            for para in doc.paragraphs:
-                text += para.text + "\n"
-            page_count = len(doc.paragraphs) // 30 + 1
-        except ImportError:
-            text = file_path.read_text(encoding="utf-8", errors="ignore")
+    from app.services.document_text import document_page_count, extract_document_text
+    text = extract_document_text(file_path, ext)
+    page_count = document_page_count(file_path, ext, text)
 
     return {
         "char_count": len(text),
@@ -466,23 +492,8 @@ async def _document_ocr_pipeline(
     # ---- 1. 本地抽取 + 嵌入 ----
     local_text = ""
     try:
-        if ext == "pdf":
-            try:
-                import fitz
-                doc = fitz.open(str(file_path))
-                for page in doc:
-                    local_text += page.get_text() + "\n"
-                doc.close()
-            except ImportError:
-                local_text = file_path.read_text(encoding="utf-8", errors="ignore")
-        elif ext == "docx":
-            try:
-                from docx import Document
-                doc = Document(str(file_path))
-                for para in doc.paragraphs:
-                    local_text += para.text + "\n"
-            except ImportError:
-                local_text = file_path.read_text(encoding="utf-8", errors="ignore")
+        from app.services.document_text import extract_document_text
+        local_text = extract_document_text(file_path, ext)
 
         chunks = greedy_chunk(local_text, max_size=1000, overlap=200)
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)

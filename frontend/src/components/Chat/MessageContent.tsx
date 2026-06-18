@@ -290,20 +290,12 @@ export default function MessageContent({ message, onRegenerate, onFeedback }: Me
                   <MarkdownRenderer content={seg.content || ''} />
                 </div>
               ) : seg.type === 'thinking' ? (
-                <div
-                  key={i}
-                  style={{
-                    marginBottom: 10,
-                    paddingLeft: 10,
-                    borderLeft: `2px solid ${colors.border}`,
-                    fontSize: 12.5,
-                    color: colors.textMuted,
-                    fontStyle: 'italic',
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {seg.content || ''}
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <ThinkingBlock
+                    thinkingText={seg.content || ''}
+                    toolEvents={[]}
+                    defaultExpanded={false}
+                  />
                 </div>
               ) : (
                 <div key={i} style={{ marginBottom: 10 }}>

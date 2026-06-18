@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11-3776ab" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688" alt="FastAPI" />
   <img src="https://img.shields.io/badge/React-18-61dafb" alt="React" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791" alt="PostgreSQL" />
@@ -102,7 +102,7 @@ DataMind Analyst 正在持续开发中，适合本地评估、内部试点和自
 ## 核心能力
 
 ### 数据接入与理解
-- 支持 20+ 数据格式：CSV、Excel、JSON、Parquet、SQLite、PDF、DOCX、Markdown、Stata/SPSS/SAS 等
+- 支持 20+ 数据格式：CSV、Excel（支持多 sheet 自动展开）、JSON、Parquet、SQLite、PDF、DOCX、PPTX、Markdown、Stata/SPSS/SAS 等
 - 支持 ZIP 批量上传、自动解压、编码识别
 - 支持只读外部数据源接入（MySQL / PostgreSQL）
 - 自动生成数据画像（字段、缺失、分布、异常）
@@ -139,7 +139,7 @@ DataMind Analyst 正在持续开发中，适合本地评估、内部试点和自
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
-| Python | 3.11+ | 后端运行时 |
+| Python | 3.11 / 3.12 | 后端运行时；当前依赖锁定不建议使用 3.13+ |
 | Node.js | 18+ | 前端构建 |
 | PostgreSQL | 16 | 元数据存储（本地或远程） |
 | Redis | 7 | 缓存与限流（本地或远程） |
@@ -247,6 +247,8 @@ OPENAI_MODEL=deepseek-chat
 
 推荐组合：`Gunicorn + UvicornWorker + Nginx`。
 
+北大平台上线前，请按 [DEPLOY_PKU.md](DEPLOY_PKU.md) 完成运行环境、Nginx、课程资料初测和截图验收检查。
+
 ### 后端
 
 ```bash
@@ -268,6 +270,8 @@ npm run build
 ```
 
 将 `frontend/dist/` 部署到 Nginx，参考 `frontend/nginx.conf`。
+
+`frontend/nginx.conf` 默认代理到本机后端 `127.0.0.1:8002`，适合 systemd/Gunicorn 与 Nginx 同机部署。上线时请把 `root` 改成实际静态文件目录，例如 `/var/www/datamind`。
 
 ### systemd 示例
 
@@ -361,9 +365,9 @@ Browser (React + Ant Design + ECharts)
 
 | 类别 | 格式 |
 |------|------|
-| 表格 | CSV, TSV, Excel, JSON, JSONL, Parquet, Feather |
+| 表格 | CSV, TSV, Excel（多 sheet 自动展开）, JSON, JSONL, Parquet, Feather |
 | 数据库 | SQLite, MySQL（远程）, PostgreSQL（远程） |
-| 文档 | PDF, DOCX, TXT, Markdown |
+| 文档 | PDF, DOCX, PPTX, TXT, Markdown |
 | 代码 | Python, SQL, R, HTML, XML, YAML |
 | 统计软件 | Stata, SPSS, SAS |
 | 图片 | PNG, JPG, GIF, BMP, WebP |
@@ -389,8 +393,6 @@ Swagger：`http://localhost:8002/docs`
 | GET | `/api/data-spaces/{id}/suggestions` | 智能建议 |
 | POST | `/api/chat/conversations/{id}/messages` | Agent 对话（SSE） |
 | POST | `/api/reports/generate` | 报告导出 |
-
-> 说明：`backend/app/routers/graph.py` 存在，但当前未在 `backend/app/main.py` 挂载。
 
 ---
 

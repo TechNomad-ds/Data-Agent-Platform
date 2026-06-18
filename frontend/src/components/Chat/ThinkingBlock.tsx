@@ -105,6 +105,8 @@ export default function ThinkingBlock({
     (e) => e.type === 'tool_result'
   ).length
   const allDone = toolUseCount > 0 && toolUseCount === toolResultCount
+  const hasTools = toolUseCount > 0
+  const statusLabel = hasTools ? (allDone ? '已完成' : '执行中') : '思考过程'
 
   // 从工具结果中提取图表规格，始终在折叠块外渲染（不受展开/收起影响）
   const charts: string[] = []
@@ -143,12 +145,12 @@ export default function ThinkingBlock({
         )}
         <ThunderboltOutlined
           style={{
-            color: allDone ? colors.success : colors.warning,
+            color: hasTools ? (allDone ? colors.success : colors.warning) : colors.textMuted,
             fontSize: 13,
           }}
         />
         <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 500 }}>
-          {allDone ? '已完成' : '执行中'}
+          {statusLabel}
         </Text>
         {toolUseCount > 0 && (
           <Text style={{ fontSize: 11, color: colors.textMuted }}>

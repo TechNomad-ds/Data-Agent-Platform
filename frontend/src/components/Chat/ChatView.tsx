@@ -676,20 +676,12 @@ export default function ChatView({
                           )}
                         </div>
                       ) : seg.type === 'thinking' ? (
-                        <div
-                          key={i}
-                          style={{
-                            marginBottom: 10,
-                            paddingLeft: 10,
-                            borderLeft: `2px solid ${colors.border}`,
-                            fontSize: 12.5,
-                            color: colors.textMuted,
-                            fontStyle: 'italic',
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: 1.6,
-                          }}
-                        >
-                          {seg.content || ''}
+                        <div key={i} style={{ marginBottom: 10 }}>
+                          <ThinkingBlock
+                            thinkingText={seg.content || ''}
+                            toolEvents={[]}
+                            defaultExpanded={false}
+                          />
                         </div>
                       ) : (
                         <div key={i} style={{ marginBottom: 10 }}>
@@ -785,15 +777,15 @@ export default function ChatView({
               lineHeight: 1.55,
             }}
           />
-          {isStreaming ? (
+          {showStreaming ? (
             <Tooltip title="停止生成">
               <Button
                 shape="circle"
                 icon={<StopOutlined />}
                 onClick={() => {
                   stopStreaming()
-                  if (conversationId) {
-                    api.post(`/chat/conversations/${conversationId}/abort`).catch(() => {})
+                  if (streamingConversationId) {
+                    api.post(`/chat/conversations/${streamingConversationId}/abort`).catch(() => {})
                   }
                 }}
                 style={{
@@ -806,16 +798,16 @@ export default function ChatView({
               />
             </Tooltip>
           ) : (
-            <Tooltip title={inputValue.trim() ? '发送' : '请输入内容'}>
+            <Tooltip title={isStreaming ? '其他对话正在生成，请稍后' : inputValue.trim() ? '发送' : '请输入内容'}>
               <Button
                 shape="circle"
                 icon={<SendOutlined />}
                 onClick={handleSend}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isStreaming}
                 style={{
                   width: 36,
                   height: 36,
-                  background: inputValue.trim()
+                  background: inputValue.trim() && !isStreaming
                     ? colors.textPrimary
                     : colors.borderStrong,
                   borderColor: 'transparent',

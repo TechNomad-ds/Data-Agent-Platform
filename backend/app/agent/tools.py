@@ -84,7 +84,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "sqlite_query",
-                "description": "对数据空间中的所有表格数据执行 SQL 查询。适合多表 JOIN、过滤、计数、GROUP BY、排序。表名为文件名（去扩展名，小写，下划线替换空格）。只支持 SELECT/WITH 查询。",
+                "description": "对数据空间中的所有表格数据执行 SQL 查询。适合多表 JOIN、过滤、计数、GROUP BY、排序。表名通常为文件名（去扩展名，小写，下划线替换空格）；多工作表 Excel 会展开为 文件名__工作表名。只支持 SELECT/WITH 查询。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -298,7 +298,7 @@ DATAFRAME_FILE_KINDS = {
 
 def _safe_dataframe_var_base(filename: str) -> str:
     stem = filename.rsplit(".", 1)[0].lower()
-    base = re.sub(r"\W+", "_", stem, flags=re.ASCII).strip("_")
+    base = re.sub(r"\W+", "_", stem).strip("_")
     if not base:
         base = "data"
     if base[0].isdigit():
@@ -306,9 +306,18 @@ def _safe_dataframe_var_base(filename: str) -> str:
     return base
 
 
-def _build_dataframe_preload(files: list) -> tuple[dict[str, tuple[str, str]], dict[str, str]]:
+def _safe_dataframe_var_part(value: str, fallback: str = "sheet") -> str:
+    part = re.sub(r"\W+", "_", value.lower()).strip("_")
+    if not part:
+        part = fallback
+    if part[0].isdigit():
+        part = f"{fallback}_{part}"
+    return part
+
+
+def _build_dataframe_preload(files: list) -> tuple[dict[str, tuple], dict[str, str]]:
     """生成 execute_python 预加载变量，避免同名/复杂文件名导致覆盖或不可读。"""
-    preload: dict[str, tuple[str, str]] = {}
+    preload: dict[str, tuple] = {}
     file_id_to_var: dict[str, str] = {}
     used: dict[str, int] = {}
 
@@ -320,11 +329,30 @@ def _build_dataframe_preload(files: list) -> tuple[dict[str, tuple[str, str]], d
         if not kind:
             continue
         base = _safe_dataframe_var_base(f.filename)
-        used[base] = used.get(base, 0) + 1
-        suffix = "" if used[base] == 1 else f"_{used[base]}"
-        var = f"df_{base}{suffix}"
-        preload[var] = (kind, str(full_path))
-        file_id_to_var[str(getattr(f, "id", f.filename))] = var
+        vars_for_file = []
+        if ext in ("xlsx", "xls"):
+            try:
+                from app.services.file_loader import load_excel_sheets
+                sheet_names = list(load_excel_sheets(full_path, nrows=1).keys())
+            except Exception:
+                sheet_names = []
+            for index, sheet_name in enumerate(sheet_names, start=1):
+                sheet_part = _safe_dataframe_var_part(sheet_name, f"sheet{index}")
+                candidate = f"{base}__{sheet_part}" if len(sheet_names) > 1 else base
+                used[candidate] = used.get(candidate, 0) + 1
+                suffix = "" if used[candidate] == 1 else f"_{used[candidate]}"
+                var = f"df_{candidate}{suffix}"
+                preload[var] = (kind, str(full_path), sheet_name)
+                vars_for_file.append(var)
+        else:
+            used[base] = used.get(base, 0) + 1
+            suffix = "" if used[base] == 1 else f"_{used[base]}"
+            var = f"df_{base}{suffix}"
+            preload[var] = (kind, str(full_path))
+            vars_for_file.append(var)
+
+        if vars_for_file:
+            file_id_to_var[str(getattr(f, "id", f.filename))] = ", ".join(vars_for_file)
 
     return preload, file_id_to_var
 
@@ -480,6 +508,23 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
     try:
         # 表格文件：用 pandas 加载后输出为可读文本
         if ext in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
+            if ext in ("xlsx", "xls"):
+                from app.services.file_loader import load_excel_sheets
+                sheets = load_excel_sheets(file_path)
+                if not sheets:
+                    return f"文件 '{filename}' 暂时无法以 Excel 工作簿方式读取"
+                parts = [f"文件: {filename} (Excel 工作簿, {len(sheets)} 个工作表)"]
+                for sheet_name, sheet_df in sheets.items():
+                    total_rows = len(sheet_df)
+                    end = min(start_line + max_lines, total_rows)
+                    page = sheet_df.iloc[start_line:end]
+                    parts.append(
+                        f"\n## 工作表: {sheet_name} ({total_rows} 行, {len(sheet_df.columns)} 列，显示第 {start_line+1}-{end} 行)\n"
+                        f"列: {', '.join(f'{c}({sheet_df[c].dtype})' for c in sheet_df.columns)}\n---\n"
+                        f"{page.to_string()}"
+                    )
+                return "\n".join(parts)
+
             df = _load_df(file_path, ext)
             if df.empty:
                 return f"文件 '{filename}' 暂时无法以表格方式读取，请尝试用 execute_python 工具直接处理此文件"
@@ -524,17 +569,20 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
             return f"'{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
 
 
-        # Word 文件
-        if ext == "docx":
+        # Word / PowerPoint 文件
+        if ext in ("docx", "pptx"):
             try:
-                from docx import Document
-                doc = Document(str(file_path))
-                content = "\n".join(p.text for p in doc.paragraphs)
+                from app.services.document_text import extract_document_text
+                content = extract_document_text(file_path, ext)
                 lines = content.split("\n")
                 selected = lines[start_line:start_line + max_lines]
-                return f"文件: {filename} (Word, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+                label = "PowerPoint" if ext == "pptx" else "Word"
+                return f"文件: {filename} ({label}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
             except ImportError:
                 pass
+
+        if ext == "ppt":
+            return f"文件 '{filename}' 是旧版 .ppt，暂不支持抽取文本。请转换为 .pptx 后上传。"
 
         # SQLite 数据库
         if ext in ("sqlite", "db", "sqlite3"):
@@ -589,6 +637,31 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
         if ext not in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
             return f"不支持 inspect_data 的文件类型: {ext}"
         try:
+            if ext in ("xlsx", "xls"):
+                from app.services.file_loader import load_excel_sheets
+                sheets = load_excel_sheets(file_path)
+                if not sheets:
+                    return f"解析失败: Excel 工作簿没有可读取的工作表"
+                info = [f"文件: {filename}", f"Excel 工作簿: {len(sheets)} 个工作表"]
+                var_hint = df_var_by_file_id.get(str(file_obj.id)) if file_obj else None
+                if var_hint:
+                    info.append(
+                        f"execute_python 专用变量: {var_hint}"
+                        "（每个工作表一个变量；pandas_query 中该文件默认只读第一个工作表）"
+                    )
+                for sheet_name, df in sheets.items():
+                    info.append(f"\n## 工作表: {sheet_name}")
+                    info.append(f"行数: {len(df)}")
+                    info.append(f"列数: {len(df.columns)}")
+                    info.append("列信息:")
+                    for col in df.columns:
+                        non_null = int(df[col].notna().sum())
+                        unique = int(df[col].nunique())
+                        sample = str(df[col].dropna().iloc[0])[:50] if non_null > 0 else "N/A"
+                        info.append(f"  - {col}: {df[col].dtype} ({non_null}/{len(df)} 非空, {unique} 唯一值, 示例: {sample})")
+                    info.append(f"\n前5行:\n{df.head(5).to_string()}")
+                return "\n".join(info)
+
             df = _load_df(file_path, ext)
             info = [f"文件: {filename}", f"行数: {len(df)}", f"列数: {len(df.columns)}", "\n列信息:"]
             if file_obj and str(file_obj.id) in df_var_by_file_id:
@@ -618,16 +691,35 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
         if not fp.exists():
             continue
         try:
-            df = _load_df(fp, f.file_type)
             var_hint = df_var_by_file_id.get(str(f.id))
-            header = f"## {f.filename} ({len(df)} 行, {len(df.columns)} 列)"
-            if var_hint:
-                header += f"\nexecute_python 专用变量: {var_hint}（仅 execute_python 使用；pandas_query 中单文件固定叫 df）"
-            output.append(header + "\n列: " + ", ".join(f"{c}({df[c].dtype})" for c in df.columns))
-            for col in df.columns:
-                if col not in all_columns:
-                    all_columns[col] = {}
-                all_columns[col][f.filename] = set(df[col].dropna().astype(str).head(500).tolist())
+            if f.file_type in ("xlsx", "xls"):
+                from app.services.file_loader import load_excel_sheets
+                sheets = load_excel_sheets(fp)
+                header = f"## {f.filename} (Excel 工作簿, {len(sheets)} 个工作表)"
+                if var_hint:
+                    header += f"\nexecute_python 专用变量: {var_hint}（每个工作表一个变量）"
+                output.append(header)
+                for sheet_name, df in sheets.items():
+                    output.append(
+                        f"### 工作表: {sheet_name} ({len(df)} 行, {len(df.columns)} 列)\n"
+                        + "列: "
+                        + ", ".join(f"{c}({df[c].dtype})" for c in df.columns)
+                    )
+                    source_name = f"{f.filename}[{sheet_name}]"
+                    for col in df.columns:
+                        if col not in all_columns:
+                            all_columns[col] = {}
+                        all_columns[col][source_name] = set(df[col].dropna().astype(str).head(500).tolist())
+            else:
+                df = _load_df(fp, f.file_type)
+                header = f"## {f.filename} ({len(df)} 行, {len(df.columns)} 列)"
+                if var_hint:
+                    header += f"\nexecute_python 专用变量: {var_hint}（仅 execute_python 使用；pandas_query 中单文件固定叫 df）"
+                output.append(header + "\n列: " + ", ".join(f"{c}({df[c].dtype})" for c in df.columns))
+                for col in df.columns:
+                    if col not in all_columns:
+                        all_columns[col] = {}
+                    all_columns[col][f.filename] = set(df[col].dropna().astype(str).head(500).tolist())
         except Exception:
             continue
 
@@ -832,6 +924,19 @@ async def _tool_pandas_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     kind = {"csv": "csv", "xlsx": "excel", "xls": "excel", "json": "json"}.get(ext)
     if not kind:
         return f"pandas_query 暂不支持 .{ext} 文件，请用 read_file 或 execute_python 工具"
+    if ext in ("xlsx", "xls"):
+        try:
+            from app.services.file_loader import load_excel_sheets
+            sheet_names = list(load_excel_sheets(file_path, nrows=1).keys())
+        except Exception:
+            sheet_names = []
+        if len(sheet_names) > 1:
+            return (
+                f"查询执行错误: '{filename}' 是多工作表 Excel（{', '.join(sheet_names)}）。"
+                "pandas_query 为避免静默只读第一个工作表，已停止执行。"
+                "请先用 inspect_data 查看每个工作表对应的 execute_python 变量，"
+                "或用 sqlite_query 查询自动展开后的 SQL 表。"
+            )
 
     # 把表达式包装成给 result 赋值，交给隔离沙箱执行（df 已在子进程内预加载）
     from app.agent.sandbox import run_in_sandbox

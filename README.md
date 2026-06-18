@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11-3776ab" alt="Python" />
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688" alt="FastAPI" />
   <img src="https://img.shields.io/badge/React-18-61dafb" alt="React" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791" alt="PostgreSQL" />
@@ -102,7 +102,7 @@ Add screenshots or a short demo GIF before public release. Recommended captures:
 ## Core Capabilities
 
 ### Data Ingestion and Understanding
-- Supports 20+ formats: CSV, Excel, JSON, Parquet, SQLite, PDF, DOCX, Markdown, Stata/SPSS/SAS, etc.
+- Supports 20+ formats: CSV, Excel (multi-sheet workbooks are expanded automatically), JSON, Parquet, SQLite, PDF, DOCX, PPTX, Markdown, Stata/SPSS/SAS, etc.
 - Supports ZIP batch upload with auto extraction and encoding detection
 - Supports read-only external data source integration (MySQL/PostgreSQL)
 - Automatically builds data profiles (schema, missing values, distribution, anomalies)
@@ -139,7 +139,7 @@ Add screenshots or a short demo GIF before public release. Recommended captures:
 
 | Component | Version | Notes |
 |----------|---------|------|
-| Python | 3.11+ | Backend runtime |
+| Python | 3.11 / 3.12 | Backend runtime; current pinned dependencies are not recommended on 3.13+ |
 | Node.js | 18+ | Frontend build/runtime |
 | PostgreSQL | 16 | Metadata storage (local or remote) |
 | Redis | 7 | Cache and rate limiting (local or remote) |
@@ -248,6 +248,8 @@ Admin users can also adjust runtime settings, model configuration, API keys, and
 
 Recommended stack: `Gunicorn + UvicornWorker + Nginx`.
 
+For the PKU deployment and course-material acceptance flow, follow [DEPLOY_PKU.md](DEPLOY_PKU.md).
+
 ### Backend
 
 ```bash
@@ -269,6 +271,8 @@ npm run build
 ```
 
 Serve `frontend/dist/` with Nginx. See `frontend/nginx.conf`.
+
+`frontend/nginx.conf` proxies to the local backend at `127.0.0.1:8002` by default, matching a host-based systemd/Gunicorn + Nginx deployment. Update `root` to your deployed static directory, for example `/var/www/datamind`.
 
 ### systemd example
 
@@ -362,9 +366,9 @@ DataMind exposes 14 agent tools:
 
 | Category | Formats |
 |---------|---------|
-| Tabular | CSV, TSV, Excel, JSON, JSONL, Parquet, Feather |
+| Tabular | CSV, TSV, Excel (multi-sheet workbooks auto-expand), JSON, JSONL, Parquet, Feather |
 | Databases | SQLite, MySQL (remote), PostgreSQL (remote) |
-| Documents | PDF, DOCX, TXT, Markdown |
+| Documents | PDF, DOCX, PPTX, TXT, Markdown |
 | Code | Python, SQL, R, HTML, XML, YAML |
 | Statistical | Stata, SPSS, SAS |
 | Images | PNG, JPG, GIF, BMP, WebP |
@@ -390,8 +394,6 @@ Key endpoints:
 | GET | `/api/data-spaces/{id}/suggestions` | Intelligent suggestions |
 | POST | `/api/chat/conversations/{id}/messages` | Agent chat (SSE) |
 | POST | `/api/reports/generate` | Export report |
-
-> Note: `backend/app/routers/graph.py` exists, but it is not currently mounted in `backend/app/main.py`.
 
 ---
 

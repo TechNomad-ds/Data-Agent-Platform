@@ -147,7 +147,7 @@ export default function GraphViewer({ spaceId }: Props) {
           {buildFailed ? '重新构建图谱' : '从文档构建图谱'}
         </Button>
         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
-          将从 .txt、.md、.pdf、.docx 等文件中自动提取实体关系
+          将从 .txt、.md、.pdf、.docx、.pptx 等文件中自动提取实体关系
         </div>
       </div>
     )
