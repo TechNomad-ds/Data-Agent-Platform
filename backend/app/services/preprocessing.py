@@ -15,9 +15,13 @@ from app.core.database import get_session_factory
 from app.models.file import File
 from app.models.data_profile import DataProfile
 from app.services.chunking import greedy_chunk
-from app.services import embedding as embed_svc
 
 _LIMITERS: dict[str, asyncio.Semaphore] = {}
+
+
+def _embedding_service():
+    from app.services import embedding as embed_svc
+    return embed_svc
 
 
 def _limiter_limit(kind: str) -> int:
@@ -425,6 +429,7 @@ async def _embed_tabular_background(
         summary = "\n".join(summary_parts)
 
         chunks.append({"text": summary, "start_char": 0, "end_char": len(summary)})
+        embed_svc = _embedding_service()
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
 
         try:
@@ -446,6 +451,7 @@ async def _embed_text_background(
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
         chunks = greedy_chunk(content, max_size=1000, overlap=200)
+        embed_svc = _embedding_service()
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         try:
             from app.services.retrieval import invalidate_cache
@@ -496,6 +502,7 @@ async def _document_ocr_pipeline(
         local_text = extract_document_text(file_path, ext)
 
         chunks = greedy_chunk(local_text, max_size=1000, overlap=200)
+        embed_svc = _embedding_service()
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         _invalidate_retrieval(data_space_id)
         logger.info(f"文档本地嵌入完成: {filename}, {len(chunks)} 个块")
@@ -514,6 +521,7 @@ async def _document_ocr_pipeline(
             return
 
         # 用 OCR 结果覆盖嵌入
+        embed_svc = _embedding_service()
         embed_svc.delete_file_embeddings(data_space_id, file_id)
         ocr_chunks = greedy_chunk(md, max_size=1000, overlap=200)
         await embed_svc.embed_chunks_async(data_space_id, ocr_chunks, file_id, filename)
@@ -543,6 +551,7 @@ async def _image_ocr_pipeline(
             return
 
         chunks = greedy_chunk(md, max_size=1000, overlap=200)
+        embed_svc = _embedding_service()
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         _invalidate_retrieval(data_space_id)
         await _update_profile_ocr(file_id, data_space_id, md)
@@ -608,6 +617,7 @@ async def _video_ocr_pipeline(
             return
 
         chunks = greedy_chunk(full_md, max_size=1000, overlap=200)
+        embed_svc = _embedding_service()
         await embed_svc.embed_chunks_async(data_space_id, chunks, file_id, filename)
         _invalidate_retrieval(data_space_id)
         await _update_profile_ocr(file_id, data_space_id, full_md)
