@@ -681,12 +681,17 @@ export default function ChatView({
                           )}
                         </div>
                       ) : seg.type === 'thinking' ? (
-                        <div key={i} style={{ marginBottom: 10 }}>
-                          <ThinkingBlock
-                            thinkingText={seg.content || ''}
-                            toolEvents={[]}
-                            defaultExpanded={false}
-                          />
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: colors.textMuted,
+                              fontStyle: 'italic',
+                              whiteSpace: 'pre-wrap',
+                            }}
+                          >
+                            {seg.content || ''}
+                          </Text>
                         </div>
                       ) : seg.type === 'plan' ? (
                         <div key={i} style={{ marginBottom: 10 }}>

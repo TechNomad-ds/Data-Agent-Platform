@@ -948,8 +948,6 @@ class AgentLoop:
         # 当前任务计划（由 update_plan 维护），供任务状态停止条件使用
         current_plan: list[dict] = []
 
-        yield {"type": "thinking", "content": "正在分析问题..."}
-
         # 停止条件基于「任务状态」而非步数（对齐 codex / claude code）：
         # 模型不再请求工具即视为一个 turn 完成。若此时计划仍有未完成步骤，
         # 注入一次简短提示让它继续；提示有上限，绝不靠步数硬刹车。

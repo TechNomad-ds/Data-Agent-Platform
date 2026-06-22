@@ -204,6 +204,10 @@ async def list_available_models(
         select(LLMModel).where(LLMModel.is_active == True, LLMModel.visible_to_users == True)
     )
     for m in result.scalars().all():
+        # 防御：跳过 id / display_name / model_name 为空（或全空白）的脏记录，
+        # 避免前端模型下拉框出现一个能选中却空白的项。
+        if not (m.id or "").strip() or not (m.display_name or "").strip() or not (m.model_name or "").strip():
+            continue
         models.append(ModelOption(
             id=m.id,
             display_name=m.display_name,
