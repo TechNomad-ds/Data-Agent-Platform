@@ -4,6 +4,7 @@
 import uuid
 import json
 import asyncio
+import logging
 from typing import AsyncGenerator, Any
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from app.models.data_space import DataSpace, DataSpaceFile
 from app.models.credit import CreditAccount, CreditTransaction
 from app.agent.tools import get_tool_definitions, execute_tool, _resolve_tool_name, tool_display_summary
 from app.core.security import decrypt_api_key
+
+logger = logging.getLogger("datamind.agent.loop")
 
 
 _client_cache: dict[str, Any] = {}
@@ -319,8 +322,8 @@ class AgentLoop:
             # 命中块越多越相关：每多一个块 +0.03，封顶 +0.15
             for fid, c in hit_counts.items():
                 scores[fid] = min(1.0, scores[fid] + min(0.15, (c - 1) * 0.03))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("relevance retrieval failed, falling back to filename match: %s", e)
 
         # 2) 文件名字面匹配（轻量、零依赖兜底，检索挂了也有效）
         try:
@@ -596,7 +599,8 @@ class AgentLoop:
                 lines.extend(joins)
 
             return "\n".join(lines)
-        except Exception:
+        except Exception as e:
+            logger.warning("schema context build failed, returning empty: %s", e)
             return ""
 
     def _detect_joins_for_schema(self, all_columns: dict[str, dict[str, set]]) -> list[str]:
@@ -876,8 +880,8 @@ class AgentLoop:
             if memories:
                 memory_lines = [f"- [{m['scope']}/{m['kind']}] {m['content']}" for m in memories]
                 memory_context = "## 相关记忆\n" + "\n".join(memory_lines)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("memory recall failed, continuing without memory: %s", e)
 
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
             data_space_info=data_space_info,
@@ -962,7 +966,12 @@ class AgentLoop:
             "graph_search", "graph_traverse",
         }
 
-        for iteration in range(self.max_iterations):
+        # 用显式计数的 while 循环：只有「真正向模型采样的轮次」才消耗配额。
+        # plan_nudge / self_check 这类注入轮通过 continue 回到顶部，但不计入 iteration，
+        # 保证多步任务始终有完整 max_iterations 步用于实际工具调用。
+        iteration = 0
+        while iteration < self.max_iterations:
+            iteration += 1
             if self._abort_check():
                 # 中断不是「作废」：把已产出的 canonical 正常收尾持久化，
                 # 下一轮用户追加消息时即可在完整上下文上继续（可续中断）。
@@ -1127,6 +1136,7 @@ class AgentLoop:
                         messages.append({"role": "user", "content": nudge})
                         turn_canonical.append({"role": "user", "content": nudge})
                         plan_nudges += 1
+                        iteration -= 1  # 注入轮不消耗工具调用配额
                         continue
 
                     # 取数结果自检（对齐 codex completion audit）：本轮用过数据工具、
@@ -1149,6 +1159,7 @@ class AgentLoop:
                         messages.append({"role": "user", "content": audit})
                         turn_canonical.append({"role": "user", "content": audit})
                         self_check_done = True
+                        iteration -= 1  # 自检注入轮不消耗工具调用配额
                         continue
 
                     credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0

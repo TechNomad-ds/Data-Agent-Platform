@@ -181,8 +181,18 @@ def test_redact_common_secrets():
     assert ctx.redact_secrets("key sk-abcdefghij1234567890") == "key [已隐藏]"
     assert ctx.redact_secrets("AKIA1234567890ABCDEF") == "[已隐藏]"
     assert "[已隐藏]" in ctx.redact_secrets("Authorization: Bearer abc123def456ghi789")
-    assert ctx.redact_secrets('api_key="supersecretvalue"') == "api_key=[已隐藏]"
-    assert "[已隐藏]" in ctx.redact_secrets("password: hunter2xyz")
+    # 键值对：真凭据（长+含字母数字）才遮蔽（避免 Stripe sk_live_ 示例触发 secret scan）
+    assert ctx.redact_secrets("api_key=sk-test-FakeRedactDemoKey01") == "api_key=[已隐藏]"
+    assert "[已隐藏]" in ctx.redact_secrets("client_secret: AbC123dEf456GhI789jKl0")
+
+
+def test_redact_does_not_touch_normal_business_columns():
+    # 名为 password/token 的正常业务列、短值或中文值不应被误伤
+    assert ctx.redact_secrets("password: 123") == "password: 123"
+    assert ctx.redact_secrets("token: 启用") == "token: 启用"
+    assert ctx.redact_secrets("某用户 password 字段是 hello") == "某用户 password 字段是 hello"
+    # 太短的值不算凭据
+    assert ctx.redact_secrets("access_token: abc") == "access_token: abc"
 
 
 def test_redact_keeps_clean_text_intact():
@@ -243,3 +253,30 @@ def test_validate_sequence_summary_prefix_ok():
     ]
     ok, _ = ctx.validate_sequence(msgs)
     assert ok
+
+
+# ---- canonical 体积保护 -------------------------------------------------
+
+def test_cap_canonical_noop_when_small():
+    msgs = [_user("hi"), _assistant("答案")]
+    assert ctx.cap_canonical(msgs, 10000) == msgs
+
+
+def test_cap_canonical_keeps_tail_and_marks_dropped():
+    big = [_assistant("A" * 100, tool_calls=[{"id": f"t{i}"}]) for i in range(20)]
+    big.append(_assistant("最终答案"))
+    out = ctx.cap_canonical(big, 300)
+    assert len(out) < len(big)
+    assert out[0]["role"] == "summary" and "省略" in out[0]["content"]
+    assert out[-1]["content"] == "最终答案"  # 末尾最终答案被保住
+
+
+def test_cap_canonical_counts_tool_results_chars():
+    msgs = [
+        _assistant("", tool_calls=[{"id": "t1"}]),
+        _tool_results([{"id": "t1", "name": "x", "content": "Z" * 5000, "is_error": False}]),
+        _assistant("done"),
+    ]
+    out = ctx.cap_canonical(msgs, 1000)
+    # 大 tool_results 应被丢弃，末尾 assistant 保留
+    assert out[-1]["content"] == "done"

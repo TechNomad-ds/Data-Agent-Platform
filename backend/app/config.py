@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # 模型认为完成、且本轮用过数据工具时，注入一次有界的核对提示
     enable_answer_self_check: bool = True
 
+    # 单回合 canonical 持久化的总字符上限（防长任务把单个 JSONB 行撑大、
+    # 拖慢下一轮全量历史加载）。超限丢弃更早的工具记录，保住最终答案。
+    canonical_max_total_chars: int = 60000
+
     # OpenAI 兼容接口（备选，当 llm_backend=openai 时使用）
     llm_backend: str = "anthropic"  # anthropic | openai
     openai_api_base: str = ""  # 如 https://api.deepseek.com/v1

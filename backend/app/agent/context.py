@@ -19,7 +19,10 @@ from __future__ import annotations
 
 import json
 import re
+import logging
 from typing import Any, Callable, Awaitable
+
+logger = logging.getLogger("datamind.agent.context")
 
 _CJK = re.compile(r"[㐀-鿿豈-﫿぀-ヿ]")
 
@@ -76,7 +79,44 @@ def truncate_tool_content(content: str, max_chars: int) -> str:
     )
 
 
-# 密钥脱敏：工具结果可能含用户数据/代码里的真实凭据。写入持久化历史或发往前端
+def cap_canonical(canonical: list[dict], max_total_chars: int) -> list[dict]:
+    """限制单回合 canonical 的总体积，避免长任务（几十次工具调用）把单个 JSONB
+    行撑大、拖慢下一轮的全量历史加载。
+
+    策略：从最新往回保留，累计字符超上限就丢弃更早的条目，但优先保住末尾的
+    assistant 文本（最终答案）。保留时不破坏 assistant/tool_results 配对结构——
+    本函数只整条丢弃，不切断单条内部。
+    """
+    if not canonical:
+        return canonical
+
+    def _entry_chars(e: dict) -> int:
+        role = e.get("role")
+        if role == "tool_results":
+            return sum(len(str(r.get("content", ""))) for r in e.get("results", []))
+        return len(str(e.get("content", "")))
+
+    total = sum(_entry_chars(e) for e in canonical)
+    if total <= max_total_chars:
+        return canonical
+
+    # 从尾部向前保留，直到逼近上限
+    kept_rev: list[dict] = []
+    acc = 0
+    for e in reversed(canonical):
+        c = _entry_chars(e)
+        if acc + c > max_total_chars and kept_rev:
+            break
+        kept_rev.append(e)
+        acc += c
+    kept = list(reversed(kept_rev))
+    dropped = len(canonical) - len(kept)
+    if dropped > 0:
+        kept.insert(0, {
+            "role": "summary",
+            "content": f"（本回合较早的 {dropped} 条工具记录因体积过大已省略，仅保留最近部分）",
+        })
+    return kept
 # 展示前过一遍，避免凭据被原文存进对话库或回显。注意：只在 persist/display 边界
 # 调用，绝不改模型当轮实际看到的完整结果（否则会缺数据）。
 _REDACT = "[已隐藏]"
@@ -98,8 +138,10 @@ _SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
     # Authorization: Bearer xxx
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9_\-\.=]{12,}"),
-    # 形如 api_key="...", password: '...', token=xxx 的键值对（保留键名，遮值）
-    re.compile(r"""(?i)\b(api[_\-]?key|secret|password|passwd|pwd|token|access[_\-]?token|private[_\-]?key|client[_\-]?secret)\b(\s*[:=]\s*)['"]?([^\s'"，,;]{6,})['"]?"""),
+    # 形如 api_key="sk_live_xxx", client_secret: 'abc...' 的键值对——但只遮蔽
+    # 「看起来像凭据」的值（长度≥20 且同时含大小写或数字、无空格），避免误伤
+    # 用户数据里名为 token/password 的正常业务列（如 password: 123、token: 启用）。
+    re.compile(r"""(?i)\b(api[_\-]?key|secret|access[_\-]?token|private[_\-]?key|client[_\-]?secret|auth[_\-]?token)\b(\s*[:=]\s*)['"]?(?=[^\s'"，,;]*[A-Za-z])(?=[^\s'"，,;]*[0-9A-Z])([A-Za-z0-9_\-\.+/=]{20,})['"]?"""),
 ]
 
 
@@ -216,8 +258,9 @@ async def compact_messages(
 
     try:
         summary_text = await summarize(_render_for_summary(older))
-    except Exception:
-        # 总结失败：退化为纯窗口，不阻断对话
+    except Exception as e:
+        # 总结失败：退化为纯窗口，不阻断对话（但记录，便于排查长对话压缩异常）
+        logger.warning("compaction summarize failed, falling back to window: %s", e)
         return kept
 
     if not summary_text:

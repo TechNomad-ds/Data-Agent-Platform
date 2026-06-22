@@ -25,7 +25,46 @@ router = APIRouter()
 
 _active_streams: dict[str, int] = defaultdict(int)
 _active_streams_global = 0
+# 进程内回退：Redis 不可用时用它兜底（单 worker 内有效）。
+# 多 worker 下中断信号走 Redis（见 _set_abort / _is_aborted），跨进程可见。
 _abort_signals: dict[str, bool] = {}
+
+_ABORT_TTL = 900  # 中断标记的 Redis TTL（秒），覆盖一次对话的最长时长即可
+
+
+async def _set_abort(abort_key: str) -> None:
+    """设置中断信号：优先 Redis（跨 worker），失败回退进程内 dict。"""
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        await redis.set(f"abort:{abort_key}", "1", ex=_ABORT_TTL)
+        return
+    except Exception:
+        pass
+    _abort_signals[abort_key] = True
+
+
+async def _clear_abort(abort_key: str) -> None:
+    """清除中断信号（对话开始/结束时）。Redis 与本地都清。"""
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        await redis.delete(f"abort:{abort_key}")
+    except Exception:
+        pass
+    _abort_signals.pop(abort_key, None)
+
+
+async def _is_aborted(abort_key: str) -> bool:
+    """查询中断信号：Redis 优先，回退本地。"""
+    try:
+        from app.core.redis_client import get_redis
+        redis = await get_redis()
+        if await redis.get(f"abort:{abort_key}"):
+            return True
+    except Exception:
+        pass
+    return _abort_signals.get(abort_key, False)
 
 
 _ACQUIRE_LUA = """
@@ -234,7 +273,7 @@ async def abort_conversation(
 ):
     """中断正在进行的 Agent 回复"""
     key = f"{current_user.id}:{conv_id}"
-    _abort_signals[key] = True
+    await _set_abort(key)
     return {"message": "已发送中断信号"}
 
 
@@ -302,9 +341,26 @@ async def send_message(
     # 流式返回 Agent 回复
     async def event_stream() -> AsyncGenerator[str, None]:
         from app.core.database import get_session_factory
+        import time as _time
         abort_key = f"{current_user.id}:{conv_id}"
-        _abort_signals[abort_key] = False
-        agent = AgentLoop(abort_check=lambda: _abort_signals.get(abort_key, False))
+        await _clear_abort(abort_key)
+
+        # 中断信号跨 worker 走 Redis，但 abort_check 在热循环里被同步高频调用，
+        # 不能每次都 await Redis。折中：本地标志 + 节流轮询（每 ~1.5s 查一次 Redis），
+        # 命中后翻转本地标志，热循环读本地标志即可。
+        _abort_state = {"flag": False, "last_poll": 0.0}
+
+        async def _refresh_abort() -> None:
+            now = _time.monotonic()
+            if _abort_state["flag"]:
+                return
+            if now - _abort_state["last_poll"] < 1.5:
+                return
+            _abort_state["last_poll"] = now
+            if await _is_aborted(abort_key):
+                _abort_state["flag"] = True
+
+        agent = AgentLoop(abort_check=lambda: _abort_state["flag"])
         full_content = ""
         last_event: dict = {}
         segments: list = []
@@ -320,6 +376,7 @@ async def send_message(
                     user_message=message_content,
                     is_admin=current_user.role == "admin",
                 ):
+                    await _refresh_abort()
                     last_event = event
                     if event["type"] == "text":
                         full_content += event["delta"]
@@ -370,6 +427,12 @@ async def send_message(
             # 保存助手消息：无论是正常完成还是异常中断，只要有内容就保存
             saved_message_id = None
             if save_content or segments:
+                # 限制单回合 canonical 体积，防长任务把单个 JSONB 行撑大
+                if turn_canonical:
+                    from app.agent import context as _ctx
+                    turn_canonical = _ctx.cap_canonical(
+                        turn_canonical, settings.canonical_max_total_chars
+                    )
                 try:
                     async with get_session_factory()() as save_db:
                         assistant_message = Message(
@@ -398,7 +461,7 @@ async def send_message(
             yield "data: [DONE]\n\n"
         finally:
             await _release_stream_slot(user_key, limiter_mode)
-            _abort_signals.pop(abort_key, None)
+            await _clear_abort(abort_key)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
