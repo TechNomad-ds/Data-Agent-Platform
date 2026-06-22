@@ -52,6 +52,27 @@ class Settings(BaseSettings):
     enable_extended_thinking: bool = False
     enable_prompt_caching: bool = True
 
+    # 上下文管理（混合 compaction）
+    # 历史消息（不含系统提示）的 token 预算：超过则保留最近窗口，
+    # 仍超时对更早消息做一次 LLM 总结兜底。
+    context_token_budget: int = 60000
+    # 无论预算如何，至少完整保留最近这么多轮（user→assistant→tools）的消息
+    context_min_recent_messages: int = 6
+    # 单条工具结果在写入历史/重建上下文时的截断上限（字符）
+    context_tool_result_max_chars: int = 4000
+    # 触发 LLM 总结兜底（保留窗口本身仍超预算时）
+    context_enable_summary_fallback: bool = True
+
+    # LLM 调用韧性（重试 + 降级）
+    # 可重试错误（网络/超时/429/5xx）的最大重试次数（不含首次尝试）
+    llm_max_retries: int = 2
+    # 指数退避基准秒数：第 n 次重试等待 base * 2^(n-1) 秒
+    llm_retry_base_delay: float = 1.0
+
+    # 取数结果自检（对齐 codex completion audit）
+    # 模型认为完成、且本轮用过数据工具时，注入一次有界的核对提示
+    enable_answer_self_check: bool = True
+
     # OpenAI 兼容接口（备选，当 llm_backend=openai 时使用）
     llm_backend: str = "anthropic"  # anthropic | openai
     openai_api_base: str = ""  # 如 https://api.deepseek.com/v1

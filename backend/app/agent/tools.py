@@ -230,6 +230,42 @@ def get_tool_definitions() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_plan",
+                "description": (
+                    "维护一个面向用户可见的任务计划清单。当任务需要多个步骤"
+                    "（如逐表分析、多文件汇总、列出大量记录、端到端取数）时，"
+                    "在开始时调用它列出步骤，随后每完成一步就再次调用更新状态。"
+                    "简单的单步问答、概念解释、闲聊不要使用。"
+                    "每次调用都要传入完整的步骤列表（含所有步骤的最新状态），"
+                    "而不是只传变化的那一条。"
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "steps": {
+                            "type": "array",
+                            "description": "完整的步骤列表，按执行顺序排列",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "content": {"type": "string", "description": "这一步要做什么（一句话，面向用户）"},
+                                    "status": {
+                                        "type": "string",
+                                        "enum": ["pending", "in_progress", "completed"],
+                                        "description": "步骤状态：未开始 / 进行中 / 已完成",
+                                    },
+                                },
+                                "required": ["content", "status"],
+                            },
+                        },
+                    },
+                    "required": ["steps"],
+                },
+            },
+        },
     ]
 
 
@@ -413,6 +449,41 @@ def _resolve_tool_name(name: str, valid_names) -> str | None:
         if best_d <= threshold:
             return best
     return None
+
+
+_SUMMARY_BUILDERS = {
+    "search_data_space": lambda a: f"正在检索：{str(a.get('query', '')).strip()[:40]}" if a.get("query") else "正在检索数据空间",
+    "read_file": lambda a: f"正在读取文件 {a.get('filename', '')}".strip() if a.get("filename") else "正在读取文件",
+    "inspect_data": lambda a: f"正在分析数据结构：{a.get('filename')}" if a.get("filename") else "正在分析所有数据的结构",
+    "pandas_query": lambda a: f"正在用 pandas 分析 {a.get('filename', '数据')}".strip(),
+    "sqlite_query": lambda a: "正在执行 SQL 查询",
+    "execute_python": lambda a: "正在运行计算",
+    "generate_chart": lambda a: f"正在生成图表：{a.get('title')}" if a.get("title") else "正在生成图表",
+    "save_memory": lambda a: "正在记录要点",
+    "nl2sql": lambda a: f"正在把问题转成查询：{str(a.get('question', '')).strip()[:40]}" if a.get("question") else "正在把问题转成查询",
+    "kb_reindex_file": lambda a: f"正在更新文件索引：{a.get('filename', '')}".strip(),
+    "db_import_csv": lambda a: f"正在导入数据：{a.get('filename', '')}".strip(),
+    "graph_search": lambda a: f"正在搜索知识图谱：{str(a.get('query', '')).strip()[:40]}" if a.get("query") else "正在搜索知识图谱",
+    "graph_traverse": lambda a: f"正在遍历实体关系：{a.get('entity', '')}".strip(),
+    "graph_extract_from_text": lambda a: "正在抽取知识三元组",
+    "update_plan": lambda a: "正在更新任务计划",
+}
+
+
+def tool_display_summary(tool_name: str, arguments: dict[str, Any]) -> str:
+    """生成给终端用户看的「人话进度」描述（权威来源在后端）。
+
+    刻意不泄露代码 / SQL / 表达式等内部细节，只说明"在干什么"。
+    """
+    builder = _SUMMARY_BUILDERS.get(tool_name)
+    if builder:
+        try:
+            text = builder(arguments or {})
+            if text:
+                return text
+        except Exception:
+            pass
+    return f"正在执行 {tool_name}"
 
 
 async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:

@@ -40,7 +40,7 @@ const toolMeta: Record<string, { label: string; icon: React.ReactNode; userHint:
   graph_extract_from_text: { label: '抽取知识', icon: <FileTextOutlined />, userHint: () => '' },
 }
 
-function ToolResultBlock({ content, isError }: { content?: string; isError?: boolean }) {
+function ToolResultBlock({ content, isError, truncated, totalChars }: { content?: string; isError?: boolean; truncated?: boolean; totalChars?: number }) {
   const [resultExpanded, setResultExpanded] = useState(false)
   if (!content) return null
 
@@ -79,6 +79,13 @@ function ToolResultBlock({ content, isError }: { content?: string; isError?: boo
           >
             {content}
           </Text>
+          {truncated && (
+            <Text style={{ fontSize: 10, color: colors.textMuted, fontStyle: 'italic', display: 'block', marginTop: 2 }}>
+              {totalChars
+                ? `仅显示前 ${Math.min(totalChars, 2000)} / 共约 ${totalChars} 字符`
+                : '结果较长，仅显示开头部分'}
+            </Text>
+          )}
           <span
             onClick={() => setResultExpanded(false)}
             style={{ fontSize: 10, color: colors.primary, cursor: 'pointer', userSelect: 'none', marginTop: 2, display: 'inline-block' }}
@@ -194,7 +201,10 @@ export default function ThinkingBlock({
                     e.type === 'tool_result' &&
                     (useId ? e.id === useId : e.name === name)
                 )
-              const hint = meta.userHint?.(event.input as Record<string, unknown>) || ''
+              // 优先用后端权威生成的人话进度 summary；回退到本地 label + hint
+              const backendSummary = event.summary
+              const label = backendSummary || meta.label
+              const hint = backendSummary ? '' : (meta.userHint?.(event.input as Record<string, unknown>) || '')
               return (
                 <div
                   key={i}
@@ -221,7 +231,7 @@ export default function ThinkingBlock({
                       color: colors.textSecondary,
                     }}
                   >
-                    {meta.label}
+                    {label}
                   </Text>
                   {hint && (
                     <Text
@@ -246,7 +256,7 @@ export default function ThinkingBlock({
                 return null
               }
               return (
-                <ToolResultBlock key={i} content={event.content} isError={event.is_error} />
+                <ToolResultBlock key={i} content={event.content} isError={event.is_error} truncated={event.truncated} totalChars={event.total_chars} />
               )
             }
 

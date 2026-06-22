@@ -16,6 +16,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import MessageContent from '@/components/Chat/MessageContent'
 import MarkdownRenderer from '@/components/Chat/MarkdownRenderer'
 import ThinkingBlock from '@/components/Chat/ThinkingBlock'
+import PlanCard from '@/components/Chat/PlanCard'
 import ExportButton from '@/components/Chat/ExportButton'
 import api from '@/api/client'
 import { colors } from '@/styles/tokens'
@@ -92,6 +93,7 @@ export default function ChatView({
     appendStreamDelta,
     appendThinkingDelta,
     addToolEvent,
+    updatePlan,
     resetStream,
     setAbortController,
     stopStreaming,
@@ -239,6 +241,9 @@ export default function ChatView({
           case 'tool_result':
             addToolEvent(event)
             break
+          case 'plan':
+            if (event.steps) updatePlan(event.steps)
+            break
           case 'done':
             if (event.credits_used != null) creditsUsedRef.current = event.credits_used
             break
@@ -258,7 +263,7 @@ export default function ChatView({
         }
       } catch {}
     },
-    [appendStreamDelta, appendThinkingDelta, addToolEvent, setMessages, setCurrentConversation, onConversationDeleted]
+    [appendStreamDelta, appendThinkingDelta, addToolEvent, updatePlan, setMessages, setCurrentConversation, onConversationDeleted]
   )
 
   const handleSendWithContent = async (content: string) => {
@@ -683,6 +688,10 @@ export default function ChatView({
                             defaultExpanded={false}
                           />
                         </div>
+                      ) : seg.type === 'plan' ? (
+                        <div key={i} style={{ marginBottom: 10 }}>
+                          <PlanCard steps={seg.steps || []} />
+                        </div>
                       ) : (
                         <div key={i} style={{ marginBottom: 10 }}>
                           <ThinkingBlock
@@ -783,9 +792,19 @@ export default function ChatView({
                 shape="circle"
                 icon={<StopOutlined />}
                 onClick={() => {
-                  stopStreaming()
+                  // 优雅暂停：只发中断信号，让后端把已产出内容收尾落盘，
+                  // 流自然结束后走正常 finalize（保留全部 segments，可续）。
+                  // 8s 兜底硬停，防后端无响应。
                   if (streamingConversationId) {
                     api.post(`/chat/conversations/${streamingConversationId}/abort`).catch(() => {})
+                    const ctrl = useChatStore.getState().abortController
+                    setTimeout(() => {
+                      if (useChatStore.getState().abortController === ctrl) {
+                        stopStreaming()
+                      }
+                    }, 8000)
+                  } else {
+                    stopStreaming()
                   }
                 }}
                 style={{

@@ -26,7 +26,7 @@ export interface ConversationDetail extends Conversation {
 }
 
 export interface SSEEvent {
-  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'error' | 'done' | 'saved' | 'conversation_deleted'
+  type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'error' | 'done' | 'saved' | 'conversation_deleted' | 'plan'
   delta?: string
   name?: string
   input?: Record<string, unknown>
@@ -38,6 +38,14 @@ export interface SSEEvent {
   tool_calls_log?: Array<{ name: string; input: Record<string, unknown>; output_preview: string }>
   id?: string
   message_id?: string
+  // P1: 工具调用的人话进度描述（后端权威生成）
+  summary?: string
+  // P1: 工具结果诚实截断标注
+  truncated?: boolean
+  total_chars?: number
+  shown_chars?: number
+  // P2: 计划/进度步骤
+  steps?: Array<{ content: string; status: 'pending' | 'in_progress' | 'completed' }>
 }
 
 export const chatApi = {

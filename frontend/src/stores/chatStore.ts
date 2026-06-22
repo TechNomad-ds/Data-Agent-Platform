@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { Conversation, Message, SSEEvent } from '@/api/chat'
 
 export interface StreamSegment {
-  type: 'text' | 'tools' | 'thinking'
+  type: 'text' | 'tools' | 'thinking' | 'plan'
   content?: string
   events?: SSEEvent[]
+  steps?: Array<{ content: string; status: 'pending' | 'in_progress' | 'completed' }>
 }
 
 interface ChatState {
@@ -22,6 +23,7 @@ interface ChatState {
   appendStreamDelta: (delta: string) => void
   appendThinkingDelta: (delta: string) => void
   addToolEvent: (event: SSEEvent) => void
+  updatePlan: (steps: NonNullable<StreamSegment['steps']>) => void
   setThinkingText: (text: string) => void
   setIsStreaming: (v: boolean) => void
   setStreamingConversationId: (id: string | null) => void
@@ -77,6 +79,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         segs[segs.length - 1] = { type: 'tools', events: [...(last.events || []), event] }
       } else {
         segs.push({ type: 'tools', events: [event] })
+      }
+      return { segments: segs }
+    }),
+
+  // 计划：模型每次发送完整步骤列表。原地更新已有 plan 段（保持其在流中的位置稳定），
+  // 首次出现时追加一个新段。
+  updatePlan: (steps) =>
+    set((state) => {
+      const segs = [...state.segments]
+      const idx = segs.findIndex((s) => s.type === 'plan')
+      if (idx >= 0) {
+        segs[idx] = { type: 'plan', steps }
+      } else {
+        segs.push({ type: 'plan', steps })
       }
       return { segments: segs }
     }),

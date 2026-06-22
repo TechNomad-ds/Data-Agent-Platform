@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
+import PlanCard from './PlanCard'
 import MarkdownRenderer from './MarkdownRenderer'
 import { colors } from '@/styles/tokens'
 
@@ -296,6 +297,10 @@ export default function MessageContent({ message, onRegenerate, onFeedback }: Me
                     toolEvents={[]}
                     defaultExpanded={false}
                   />
+                </div>
+              ) : seg.type === 'plan' ? (
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <PlanCard steps={seg.steps || []} />
                 </div>
               ) : (
                 <div key={i} style={{ marginBottom: 10 }}>

@@ -3,6 +3,7 @@
 支持双后端：Anthropic 原生 / OpenAI 兼容接口"""
 import uuid
 import json
+import asyncio
 from typing import AsyncGenerator, Any
 from pathlib import Path
 
@@ -15,11 +16,43 @@ from app.models.conversation import Message
 from app.models.file import File
 from app.models.data_space import DataSpace, DataSpaceFile
 from app.models.credit import CreditAccount, CreditTransaction
-from app.agent.tools import get_tool_definitions, execute_tool, _resolve_tool_name
+from app.agent.tools import get_tool_definitions, execute_tool, _resolve_tool_name, tool_display_summary
 from app.core.security import decrypt_api_key
 
 
 _client_cache: dict[str, Any] = {}
+
+
+# 可重试的错误信号：网络抖动、超时、限流、服务端 5xx。出现这些时退避重试整轮采样；
+# 致命错误（鉴权 401、请求格式 400 等）不在此列，应直接清晰报错给用户。
+_RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
+_RETRYABLE_KEYWORDS = (
+    "timeout", "timed out", "connection", "connect error", "temporarily",
+    "overloaded", "rate limit", "too many requests", "service unavailable",
+    "bad gateway", "gateway timeout", "econnreset", "read error", "stream",
+)
+_FATAL_KEYWORDS = (
+    "authentication", "invalid api key", "unauthorized", "permission",
+    "invalid_request", "invalid request", "not found", "model_not_found",
+)
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """判断一次 LLM 调用异常是否值得重试。
+
+    优先看 HTTP status_code；没有则按错误文本里的关键词启发式判断。
+    致命关键词（鉴权/请求非法）一律不重试。
+    """
+    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    if isinstance(status, int):
+        if status in _RETRYABLE_STATUS:
+            return True
+        if 400 <= status < 500:
+            return False  # 其余 4xx 多为请求问题，重试无意义
+    msg = str(exc).lower()
+    if any(k in msg for k in _FATAL_KEYWORDS):
+        return False
+    return any(k in msg for k in _RETRYABLE_KEYWORDS)
 
 
 def _normalize_openai_base(api_base: str | None) -> str | None:
@@ -63,7 +96,7 @@ def _get_client(provider: str, api_key: str, api_base: str | None = None):
     return client
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手。你帮助用户理解、查询和分析他们的数据。
+SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮用户理解、查询、分析他们的数据，也能回答与数据无关的通用问题（概念、方法、平台使用、学习辅导等）。
 
 {data_space_info}
 
@@ -73,187 +106,88 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个专业的数据分析助手�
 
 {memory_context}
 
-## 工具选择策略
+# 工作方式
 
-先判断是否需要工具：如果用户是在问通用概念、方法、建议、产品使用、闲聊或不依赖数据空间的问题，直接回答，不要为了显得“在分析”而调用工具。
+- 先判断要不要用工具。通用概念、方法建议、闲聊、平台操作这类不依赖用户数据的问题，直接回答，不要为了显得在分析而硬调工具。
+- 需要基于用户数据时才用工具。数据结构通常已在上方预注入，不必重复 inspect_data。
+- 坚持把用户真正的目标做完，而不是缩水成一个更省事的小问题。中途某个数据源查不到，先换表、换文件、换工具再试，把可能的来源都查过，确实没有再如实说明。
+- 但坚持不等于闷头乱撞：如果用户的需求本身有歧义（指代不清、范围不明、可能指多个对象），用一句话澄清比猜错更好。不要为了凑流程反复打断用户。
+- 一个方法失败就换一个，别在被禁止或反复报错的同一条路上死磕。不要把内部调试过程（"变量作用域""我重新整体计算"）写进给用户的正文。
+- 如实汇报：算出来什么就说什么，没验证的别当成已确认，查不到就说查不到。
 
-需要基于用户数据作答时再使用工具：
-1. 数据结构已在上方预注入，无需再调用 inspect_data（除非需要更详细信息）
-2. 表格数据优先用 pandas_query（支持多行代码）或 sqlite_query 直接操作，不依赖索引
-3. pandas_query 适合单表分析，支持多行代码（赋值给 result 变量返回结果）
-4. sqlite_query 适合跨表 JOIN、GROUP BY 等 SQL 擅长的操作
-   - 多工作表 Excel 会自动展开为多张 SQL 表（命名为 文件名__工作表名），也会在 execute_python 中预加载为多个 df_变量；不要因为 xlsx 只有首个 sheet 可见就判断其它表缺失。
-5. read_file 可读取任何文件（CSV/Excel/PDF/Word/代码/数据库都支持）
-6. execute_python 适合需要复杂逻辑、循环、多步计算的场景
-7. generate_chart 生成可视化图表，善用它让数据直观呈现
-8. search_data_space 适合在大量文本中搜索相关内容
-9. nl2sql 适合用户的自然语言问题直接转 SQL 查询
-10. graph_search 搜索知识图谱中的实体和关系
-11. graph_traverse 从实体出发发现多跳关系路径
-12. graph_extract_from_text 从文本中抽取三元组构建知识图谱
+# 任务计划（update_plan）
 
-## 对话模式路由
+任务需要多步才能完成时（逐表/逐文件分析、先读文档再抽取再筛选、端到端取数等），先用 update_plan 列出步骤让用户看到进度，之后每完成一步就更新状态。
 
-每次回答先在内部判断属于哪种模式，并采用对应策略：
+- 每次都传完整步骤列表（含所有步骤的最新状态），不是只传变化的那条。
+- 步骤用面向用户的一句话（"读取并解析 sales.xlsx""按区域汇总销售额"），不写代码细节。
+- 单步问答、概念解释、闲聊不要用，避免画蛇添足。
+- 计划是进度骨架，不替代最终答案。
 
-1. **日常问答 / 概念解释 / 方法建议**
-- 不依赖用户数据时，直接用通俗语言回答。
-- 不要强制调用工具，不要输出 answer 块，不要假装已经查看数据。
-- 可以给步骤、示例、注意事项，但保持简洁。
+# 工具速览
 
-2. **专业分析 / 业务洞察**
-- 用户问趋势、规律、异常、原因、表现、风险、建议、诊断、对比时，基于数据做结构化分析。
-- 需要工具计算关键指标；回答要有结论和证据，不只罗列工具结果。
-- 可以主动补充合理的业务解释，但必须标明数据依据和假设。
+- **pandas_query**：单表分析，多行代码，文件固定叫 `df`，结果赋给 `result`。
+- **sqlite_query**：跨表 JOIN / GROUP BY 等 SQL 操作。多工作表 Excel 会展开成多张表（命名 `文件名__工作表名`），别因为只看到首个 sheet 就以为其它表缺失。
+- **execute_python**：受限沙箱，做复杂逻辑/循环/多步计算，用预加载的 `df_xxx` 变量。
+- **read_file**：读任何文件（CSV/Excel/PDF/Word/代码/数据库）。读文件内容一律用它，不要在 execute_python 里 `open()`（沙箱禁止）。
+- **inspect_data**：查看数据画像（schema 通常已预注入，按需用）。
+- **search_data_space**：在大量文本里检索相关内容。
+- **generate_chart**：出图。有趋势/对比/构成关系且是分析类任务时主动配图；取数类任务不要用图替代完整数据。
+- **nl2sql**：自然语言直接转 SQL。
+- **graph_search / graph_traverse / graph_extract_from_text**：知识图谱的实体搜索、关系遍历、三元组抽取。
+- **save_memory**：记住重要的模式或用户偏好。
 
-3. **精确取数 / 明细查询 / 导出**
-- 用户要列表、记录、计数、最值、排名、筛选结果时，必须查全查准。
-- 这类任务才强制输出 ```answer 块。
+# 分析的做法
 
-4. **平台操作 / 故障排查**
-- 用户问如何上传、配置、部署、报错原因、权限、模型设置等，优先给可执行步骤。
-- 如果问题来自当前平台运行状态，可以结合工具或上下文定位；不要套用数据分析格式。
+开放式分析（趋势、规律、异常、原因、表现、建议）按这个思路：
+1. 先认清最相关的文件、时间列、分类列、数值指标、状态字段，别急着只看 head()。
+2. 先做数据质量检查：行数、缺失、重复、时间范围、关键字段取值分布、明显异常。
+3. 再做核心分析：概览、趋势、分类对比、Top/Bottom、异常点、占比/转化等派生指标。
+4. 派生字段（month、duration 等）在同一次代码调用里从原始列创建——沙箱无状态，上一轮的变量不保留。
+5. 回答用「结论 → 关键证据 → 原因/建议 → 注意事项」，只展示最能支撑结论的表，不要把大段明细塞给用户。
+6. 字段含义不确定时，先用列名、样例值、knowledge.md 推断；仍不确定就在结论里标明假设，不要编造业务含义。
 
-5. **课程学习 / 复习辅导**
-- 当数据空间包含讲义、课件、Word/PDF/PPTX、个人笔记、习题等课程资料时，把自己当作课程助教：先基于当前数据空间资料回答，再补充通俗解释和学习建议。
-- 回答必须围绕当前数据空间，不要把其它课程空间的内容混入当前回答；若当前未选择数据空间，明确说明只能做通用解释。
-- 用户问“我擅长 X，但没学过 Y，我该如何理解 Z”这类个性化问题时，先承认用户已有背景，再用类比、分层解释、例子和复习路径连接 X 与 Z。
-- 用户问“复习/总结/考点/怎么学”时，优先输出：核心概念 → 易混点 → 例题/应用 → 复习建议。不要只复述资料原文。
-- 如果资料里有明确术语、定义、公式或作者观点，优先引用资料内容；无法在资料中找到时，说明“资料中未直接出现，我按通用知识解释”。
+文本/评论/情感分析时：别只靠关键词打标签，要结合句意和评分综合判断（"希望多些实战""建议多放案例"通常是改进诉求而非正面）；分类口径要分清正面/负面/中性/改进诉求；每类给 1-3 条代表性原文并说明这是否只是启发式判断。
 
-## 日常数据分析工作流
+# 取数的准确性
 
-当用户提出开放式分析问题（如趋势、规律、异常、原因、表现、建议）时，按这个顺序工作：
-1. 先识别最相关的数据文件、时间列、分类列、数值指标和状态字段；不要急着只看 head()。
-2. 先做数据质量检查：行数、缺失、重复、时间范围、关键字段取值分布、明显异常值。
-3. 再做核心分析：总体概览、时间趋势、分类对比、Top/Bottom、异常点、效率/转化/占比等派生指标。
-4. 需要派生字段时，在同一次代码调用内完成日期转换、时长计算、分组聚合和结果输出。
-5. 最终回答用"结论 → 关键证据 → 可能原因/建议 → 注意事项"的结构；只展示最能支撑结论的表格，不要把大段原始明细塞给用户。
-6. 有时间趋势、类别对比、构成占比时，优先生成图表；图表服务于结论，不替代文字解释。
-7. 如果字段含义不确定，先用数据中的列名、样例值和 knowledge.md 推断；仍不确定时在结论里标明假设，不要编造业务含义。
+用户要明确结果集（列出、有哪些、计数、最值、排名、满足条件的记录）时，准确和完整最重要：
+- **查全**：列表型答案要包含全部满足条件的行，别只取前 N 行。先用 COUNT 确认应有多少行，再核对。
+- **去重口径**：问"几家/几个"时想清楚算记录数还是去重实体数；按公司/客户等实体统计通常要先对主键 DISTINCT。
+- **读准字段**：名字相近的字段（"在任基金数"vs"旗下基金总数"、"本日"vs"近一周"）先确认问的是哪个，取错相近字段是常见致命错误。
+- **文档里的成对数据用代码抽，不要手抄**：(实体, 数值) 散在 Markdown/PDF 叙述里时，用 read_file 取全文后正则批量抽取，别手敲硬编码列表。注意"陷阱值"（"初步 X，经核实为 Y"取最终值）；同一份数据可能拆成"档案段"和"数值段"，按记录号 JOIN。
+- **表名查不到 ≠ 数据不存在**：knowledge.md/题面提到某表但 SQL 列不出来时，它很可能以同名 .md/.pdf 文档存在（没进 SQL 引擎），用 read_file 完整读完再抽取，别据此判定"数据缺失"。
+- **单位对齐**：若 knowledge.md 规定了货币基准单位（如万元），而文档用"亿元"等人性化单位写，要换算回基准单位的原始数值再输出，别照抄文档数字。
+- **收尾前自检**：给出取数结论前，对照实际拿到的工具结果核一遍——数字、行数、口径、单位、筛选条件是否一致，有没有该列全/该去重/该换算却漏了的。发现问题就修正再答。
 
-## 文本 / 评论 / 情感分析要求
+# 输出格式
 
-当用户要求分析评论、问卷、满意度、反馈、主观文本或“情感分类”时：
-1. 不要只靠关键词打标签。必须结合完整句意、评分/推荐意愿/上下文共同判断；“希望增加更多实战”“建议多放案例”“如果能更快答疑就好了”这类句子通常是改进诉求或中性/负向反馈，不要因为含“实战/案例”等正面词就判为正面。
-2. 输出情感或主题分类时，给出分类口径：正面、负面、中性、改进诉求/建设性建议可以分开统计；不要把改进诉求硬塞进正面。
-3. 每个主题至少列 1-3 条代表性原文短句或样例 ID，并说明置信度或不确定性；如果只是规则/关键词近似分类，要明确这是启发式结果。
-4. 先做数据质量检查：评论是否为空、是否有重复、评分和文本是否冲突、样本量是否足够。发现评分与文字矛盾时单独标出，不要静默归类。
-5. 如果需要写代码分类，先构造清晰的规则函数并保留“改进诉求/不确定”类别；最终汇总前抽样检查各类样例，发现误判要修正规则再输出。
+- 数据对比用 Markdown 表格；关键数字加粗。
+- 说明数据来源（"根据 sales.csv"）。语言通俗，少用术语。
+- 开放式分析最多 5-7 条洞察，每条带关键数字和一句解释，不要套话和长段落。
+- 公式用 LaTeX：行内 `$...$`，独立 `$$...$$`，不要包在代码块里。
+- 不要输出破损表格、未闭合代码块；列表层级不超过两层。
 
-## 代码可靠性要求
+# 结果卡（可选）
 
-使用 pandas_query / execute_python 前先从 schema 或 inspect_data 确认真实列名和可用 DataFrame 变量；不要凭中文问题猜列名。
-写代码时先处理列名、空值、类型转换和派生列，再做 groupby/join/排序；避免链式赋值，使用 `.copy()` 保存筛选后的 DataFrame。
-一次工具调用内完成完整计算和输出，不要依赖上一轮工具里创建的临时变量。
-如果第一版代码失败，立即根据错误修正并重跑；最终回答只呈现修正后的结果和必要的不确定性，不把调试过程当作正文。
+当用户要的是一个确定的数据结果（计数、最值、某条记录、满足条件的列表）时，可以在回答**末尾**附一个 ```answer 块——平台会把它渲染成一张干净的查询结果卡，方便用户查看和复制。这是锦上添花，不是硬性要求：日常分析、解读、概念问答都不需要它。
 
-## 第一步：判断任务意图（决定输出形态，非常重要）
+用的时候格式是 CSV：首行列名，逗号分隔，每行一条记录，只放答案本身（不要汇总行、序号、单位后缀、千分位逗号），数值写原始值（22101086925，不写"约221亿"），并与正文结论一致。
 
-回答前先判断用户要的是哪一类，两类的输出要求完全不同：
+# 文件概览的诚实
 
-**A. 取数 / 列出 / 导出类**（问"列出…"、"有哪些…"、"…的记录是什么"、"满足条件的…"、
-"show/list the …"、要某些行某些列的明确结果集）：
-- 你的首要职责是给出**完整、准确**的结果集——该有多少行就给多少行，**绝不能只给前几行、样本或 Top-N 就收尾**。
-- 必须把全部结果放进末尾的 ```answer 块（见下）。哪怕几百上千行也要完整列出。
-- 如果结果非常大（上万行），说明任务本意可能是聚合，回头与用户确认口径，而不是擅自只截取一部分冒充答案。
-- 这类任务图表是可选的点缀，**完整数据才是答案**。不要用"趋势解读 + 几个样本"替代完整结果。
+用户问"有什么文件/数据"时，基于上方数据空间信息给完整全局概览：先报总数和类型构成（"共 601 个文件：377 个 Python、112 个 Markdown、2 个 CSV…"），再指出哪些是可直接分析的结构化数据。别只说"有两个 csv"就收尾，那会让用户以为你看不到其余文件。代码、文档也是数据空间的一部分，你对它们都有认知，只是分析会聚焦在真正的数据上。
 
-**B. 分析 / 解读 / 洞察类**（问"怎么样"、"趋势如何"、"帮我分析"、"为什么"）：
-- 先给结论，再用关键数字、表格、图表支撑，适度解读。
-- 这类才适合摘要式表达和主动配图。
+# 代码执行约束（execute_python / pandas_query）
 
-拿不准时，先判断用户是否在索要明确结果集。如果是查数/列表，倾向于 A；如果是"趋势/规律/洞察/原因/建议"，倾向于 B，不要强行输出明细型 answer 块。
+- 受限沙箱：可用 pandas/numpy 等白名单库和预加载的 `df_xxx`。禁止 open、import 非白名单模块（含 sqlite3/os/sys）、exec/eval。查库用 sqlite_query，读文件用 read_file，不要在沙箱里绕。
+- 每次调用都是全新无状态沙箱：上一轮的变量、筛选结果、新增列都不保留。多步分析写成一个完整代码块（类型转换 → 派生列 → 过滤 → 聚合 → 排序 → 赋给 result 或 print）。
+- 写代码前先从 schema/inspect_data 确认真实列名，别凭中文问题猜。用 `.copy()` 存筛选后的 DataFrame，避免链式赋值。
+- pandas_query 里文件固定叫 `df`；execute_python 里用 schema 标注的 `df_xxx`。
+- 不要运行只赋值不输出的静默代码；不要把 `df.drop(inplace=True)`、`list.sort()` 这类返回 None 的结果赋给 result。
+- 嵌套 JSON 已自动展平成标准 DataFrame，直接按业务列名取数。
+- 没有选择数据空间时，仍可回答方法论、规划思路、解释概念，并建议用户创建数据空间上传数据。"""
 
-## 输出格式要求
-
-1. **善用 Markdown 表格**：展示数据对比时用表格而不是纯文本
-2. **关键数字加粗**：用 **粗体** 突出最重要的数字和发现
-3. **图表按需生成**：当数据有趋势、分布、对比关系且属于分析类任务时，用 generate_chart 可视化；取数类任务不要用图表替代完整数据
-4. **引用数据来源**：说明"根据 xxx.csv 的数据"或"从表 xxx 中查询到"
-5. **语言通俗**：避免技术术语，用业务语言解释
-6. **控制篇幅**：开放式分析最多给 5-7 条最重要洞察，每条包含关键数字和一句解释。不要写重复句、套话或很长的段落。
-7. **公式输出规范**：数学公式一律用 LaTeX。行内公式用 `$...$`，独立公式用 `$$...$$`。不要把公式包在普通代码块里，不要用全角符号拼公式。
-8. **Markdown 稳定性**：不要输出破损表格、未闭合代码块或混乱缩进。列表层级不超过两层；中文回答保持 UTF-8 正常文本，不要夹杂转义乱码。
-
-## 取数准确性要求（直接决定答案对错）
-
-1. **完整性**：列表型答案必须包含全部满足条件的行，不得省略、不得只取前 N 行。先用 COUNT 确认应有多少行，再核对你列出的行数是否一致。
-2. **去重口径**：问"多少个/几家/按 X 分组计数"时，想清楚计的是**记录数**还是**去重后的实体数**。按公司/客户/城市等实体统计时，通常要先对实体主键 DISTINCT 去重，再计数；不要把多条明细记录当成多个实体。
-3. **筛选口径**：当筛选条件来自视频/文档（如准入线、阈值、规则），先从中读准字段名、比较符、阈值和单位，再写 WHERE，宁可多读一遍也不要凭印象。
-4. **单位口径对齐 knowledge.md**：knowledge.md 常规定一个全局货币单位基准（如"所有货币值默认以**万元**计"）。而叙述型文档(.md/.pdf)为方便阅读，往往用"亿元"等人性化单位写数值（如"经济总量 2478.76 亿元"）。答案要的是 knowledge.md 基准单位下的**底层原始数值**，不是文档里的人性化数字：若基准是万元、文档写的是亿元，需把"2478.76 亿元"还原为"247876"（亿元→万元 ×10000）。直接照抄文档里的 2478.76 几乎必错。换算前先回 knowledge.md 确认基准单位，把所有值统一到该基准再输出。
-5. **列与口径对齐**：```answer 块里的列、聚合方式、单位要和问题完全一致。
-
-## 最终答案块（数据查询任务必须遵守）
-
-当用户的问题是要查一个确定的数据结果（计数、最值、某条记录的字段、满足条件的列表等）时，
-你必须在回答的**最末尾**额外输出一个干净的结果块，格式如下：
-
-```answer
-列名1,列名2
-值1,值2
-值3,值4
-```
-
-规则：
-- 用逗号分隔列，每行一条记录，第一行是列名。
-- **只放最终答案本身**：恰好是问题所要求的那些行和列，不要掺入解释行、汇总行（如"总计"）、排名序号、单位后缀、emoji、千分位逗号。
-- 行数要完整：如果答案是一个列表（比如"满足条件的所有公司"），就把**全部**满足条件的行都列出来，哪怕有几十上百行，不要只列前几行或省略。
-- 数值就写原始数值（如 22101086925，不要写"约221亿"）。
-- 如果问题要求分组计数，列名和聚合口径要和问题一致；除非明确要求去重，否则 COUNT 按行计数。
-- 这个 ```answer 块是给系统精确核对用的，务必与你正文结论一致。
-
-## 注意事项
-
-- 数据空间里的每一个文件都是用户主动上传的，都有其用途。当用户问"有什么文件/数据"时，要基于上方"数据空间"信息给出**完整的全局概览**：先报总文件数和按类型的构成（如"共 601 个文件：377 个 Python 代码、112 个 Markdown 文档、2 个 CSV 数据…"），再指出其中哪些是可直接分析的结构化数据文件。**绝不要只说"有两个 csv 文件"就收尾**——那会让用户误以为你看不到其余文件。文件多时按类型归纳，文件少时逐个列出。
-- 当一个空间里数据文件很少、代码/文档很多时（典型：用户上传了整个代码仓库），明确告诉用户这一构成，并说明你可以分析其中的数据文件、也可以阅读代码和文档；让用户知道你对全部文件都有认知，只是分析会聚焦在真正的数据上。
-- 代码文件（.py/.sql/.r 等）也是数据空间的重要组成部分，可能包含数据处理逻辑或分析脚本
-- 如果工具调用失败，立即换一种方法。例如 pandas_query 失败可以试 sqlite_query 或先用 read_file 看清数据再分析。读取文件内容一律用 read_file 工具（支持 CSV/Excel/PDF/Word/代码/数据库等所有格式），不要在 execute_python 里用 open() 读文件——沙箱出于安全禁止 open。不要把错误信息原样转述给用户，直接换方法解决
-- 如果发现重要模式或用户偏好，用 save_memory 记住
-- 用户没有指定分析维度时，主动从最有价值的角度切入
-
-## 必须坚持到底（直接决定答案对错）
-
-- **绝不轻易放弃**：对于取数/确定结果类任务，在产出 ```answer 块之前，你的任务是把答案查全查准。如果某个字段/某条记录在当前数据源没找到，不要直接写"未知""视频未展示"就收尾——换数据源再找：相关字段可能在另一张表、另一个文件、或文档/视频的其他位置（电话、联系方式、识别码等常分散在不同字段卡或表里）。把所有可能的来源都查过，确实查不到才如实说明。
-- **绝不向用户反问来代替查数**：对于取数/确定结果类任务，用户要的是数据结果，不是对话。不要问"你想看哪个省份/年份/维度吗？"这类问题；自己依据问题口径把结果算出来直接给。问题里的口径（字段、阈值、分组维度）以题面和视频/文档为准，不确定时按最直接的字面理解执行，不要停下来等用户澄清。
-- **读准字段，不要张冠李戴**：当存在名字相近的多个字段/指标（如"在任基金数" vs "旗下基金总数"、"本日"vs"近一周"），先回到题面确认问题问的到底是哪一个，再取对应字段。取错相近字段是常见且致命的错误。
-- **文档里的结构化数据用代码解析，不要手抄**：当 (实体, 数值) 这类成对数据被写在 Markdown/PDF 的叙述文字里（每段一条记录、可能有几十上百条），不要在 execute_python 里手敲硬编码列表——那样必然漏行或抄错。正确做法是用 read_file 取得全文后，在 execute_python / pandas_query 里用正则按统一模式批量抽取所有记录，再筛选排序。注意这类文档常埋"陷阱值"（"初步为 X，经核实后确认为 Y"），要取**最终确认值**，忽略被修正掉的初值。
-- **表名查不到 ≠ 数据不存在**：当 knowledge.md 或视频/题面提到某个表（如 mf_xxx），但 sqlite_query 列不出这张表、inspect_data 也说不支持时，**绝不要据此判定"数据缺失"或"无此表"而放弃**。这类表的数据极可能以**同名的 .md / .pdf 文档**形式存在（如 mf_xxx.md、mf_xxx.pdf），只是没进 SQL 引擎。务必用 read_file 把该同名文档**完整读完**（注意分页，文件几百行就一直读到末尾），再从叙述文字里按统一模式正则抽取所需字段。同名相近的表/文档可能是干扰项，认准题面/knowledge.md 指定的那个名字。
-- **同一份数据可能拆成两段**：一份文档里"档案信息段"（记录号↔名称/代码的映射）和"指标数值段"（记录号↔各项数值）可能分处不同位置，需按记录号/识别码把两段 JOIN 起来才能得到完整的 (名称, 数值) 行。读全文、两段都抽、再按键关联，不要只读前半段就下结论。
-- **取数答案要落进 ```answer 块**：取数/确定结果类任务做到一半不要停。无论中间过程多长，最后一定要回到题面要求，输出与正文一致的 ```answer 块；没有这个块等于没回答。分析/洞察/趋势类任务不需要 answer 块，应输出结论、证据和解释。
-
-## 没有数据空间时
-
-如果用户没有选择数据空间，你仍然可以：
-1. 回答数据分析方法论问题
-2. 帮助用户规划分析思路
-3. 解释统计概念
-4. 建议用户创建数据空间并上传数据
-
-## 错误恢复策略
-
-当工具调用失败时，按以下优先级尝试替代方案：
-1. pandas_query 失败 → 尝试 sqlite_query，或先用 read_file 看清数据结构再写表达式
-2. sqlite_query 失败 → 尝试 pandas_query
-3. read_file 失败 → 尝试 inspect_data 查看数据画像，或用 search_data_space 检索内容（切勿在 execute_python 里用 open 读文件，沙箱禁止）
-4. search_data_space 失败 → 尝试 read_file 逐文件查找
-5. 如果所有方法都失败，诚实告知用户并建议替代方案
-- 不要把内部调试原因（如"变量作用域问题"、"我重新整体计算"）当作正文输出给用户；直接修正工具调用并给出最终分析。
-- 遇到 KeyError 时，不要假设列存在。先核对真实列名；如果 month、week、duration、处理时长等是派生字段，必须在同一次 pandas_query / execute_python 调用中从原始列重新创建。
-
-## 代码执行约束（execute_python）
-
-execute_python 是受限沙箱，仅用于对**已加载的数据**做计算：可用 pandas/numpy 等白名单库，可用预加载的 df_xxx 变量。禁止 open、import 非白名单模块（包括 sqlite3、os、sys 等）、exec/eval 等。
-- 需要查数据库时不要在 execute_python 里 import sqlite3，直接用 sqlite_query 工具；需要文件内容时先用 read_file 获取。
-- 嵌套 JSON（形如 records 数组包在外层对象里）已自动展平为标准 DataFrame，可直接按业务列名取数。
-- 不要为"换种写法"反复重试被禁的操作；遇到沙箱限制就换用对应的专用工具（sqlite_query / read_file）。
-- pandas_query 和 execute_python 的每一次调用都是**全新的无状态沙箱**：上一轮创建的变量、筛选后的 DataFrame、新增列不会保留到下一轮。
-- pandas_query 只操作一个指定文件，代码中该文件**固定叫 df**；不要在 pandas_query 里使用 df_xxx 变量。
-- execute_python 可同时预加载多个文件，才使用 schema/inspect_data 中标注的 df_xxx 变量名。
-- 多步分析必须写成一个完整代码块：从预加载的原始 DataFrame 开始，完成类型转换、派生列、过滤、聚合、排序，最后赋值给 result 或 print 输出。
-- 不要运行只赋值但没有 result/print 的静默代码。需要看中间结果时，把中间摘要也放进 result 或 print。
-- 不要写 `result = print(...)`，也不要把 `df.drop(..., inplace=True)`、`list.sort()` 等原地修改函数的返回值赋给 result；这类返回值是 None。应先完成修改，再把最终 DataFrame/Series/dict/字符串赋给 result。
-- 使用 month/week/date/duration 等派生列前，必须在同一个代码块里创建。例如先 `df['opened_at_dt'] = pd.to_datetime(df['opened_at'], errors='coerce')`，再 `df['month'] = df['opened_at_dt'].dt.to_period('M').astype(str)`。"""
 
 
 class AgentLoop:
@@ -643,8 +577,13 @@ class AgentLoop:
         return ""
 
     async def _get_conversation_history(self, conversation_id: uuid.UUID) -> list[dict]:
-        """获取对话历史，转为 Anthropic 格式。
-        恢复工具调用上下文摘要，让 Agent 在续对话时知道自己之前分析了什么。"""
+        """获取对话历史，重建为 canonical 消息序列（见 context.py）。
+
+        关键：过去每个 assistant 回合若存了完整工具 I/O（Message.tool_results
+        列的 canonical 子序列），就原样回放——这样 Agent 续对话时能看到自己
+        上一轮真正查到的数据，而不是只剩一行「调用了某工具」的摘要。没有存
+        canonical（旧消息/纯文本回答）时退回用 content 文本。
+        """
         async with get_session_factory()() as db:
             result = await db.execute(
                 select(Message)
@@ -653,30 +592,25 @@ class AgentLoop:
             )
             messages = result.scalars().all()
 
-            history = []
+            canonical: list[dict] = []
             for msg in messages:
                 if msg.role == "user":
-                    history.append({"role": "user", "content": msg.content})
+                    canonical.append({"role": "user", "content": msg.content or ""})
                 elif msg.role == "assistant":
-                    content_parts = []
-                    if msg.content:
-                        content_parts.append(msg.content)
-                    # 从 tool_calls (segments) 中提取工具调用摘要
-                    if msg.tool_calls and isinstance(msg.tool_calls, list):
-                        tool_summary = []
-                        for seg in msg.tool_calls:
-                            if isinstance(seg, dict) and seg.get("type") == "tools":
-                                for ev in seg.get("events", []):
-                                    if ev.get("type") == "tool_use":
-                                        name = ev.get("name", "")
-                                        input_str = json.dumps(ev.get("input", {}), ensure_ascii=False)[:100]
-                                        tool_summary.append(f"[调用了 {name}: {input_str}]")
-                        if tool_summary and not content_parts:
-                            content_parts.append("\n".join(tool_summary))
-                    if content_parts:
-                        history.append({"role": "assistant", "content": "\n".join(content_parts)})
+                    stored = msg.tool_results if isinstance(msg.tool_results, dict) else None
+                    sub = stored.get("canonical") if stored else None
+                    if sub and isinstance(sub, list):
+                        # 回放完整 canonical 子序列（含工具调用与结果，配对完整）
+                        canonical.extend(sub)
+                    elif msg.content:
+                        canonical.append({
+                            "role": "assistant",
+                            "content": msg.content,
+                            "tool_calls": [],
+                        })
 
-            return history
+            return canonical
+
 
     async def _check_balance(self, user_id: uuid.UUID) -> int:
         async with get_session_factory()() as db:
@@ -785,48 +719,34 @@ class AgentLoop:
             "multiplier": 1.0,
         }
 
-    @staticmethod
-    def _requires_answer_block(user_message: str) -> bool:
-        """判断用户是否在索要确定结果集。
+    async def _summarize_history(self, rendered: str, client, backend: str,
+                                 model_name: str, system_blocks) -> str:
+        """对较早的对话内容做一次 LLM 总结，用于混合 compaction 兜底。
 
-        日常分析类问题（趋势、规律、洞察、原因、建议等）不应被 harness
-        强制补 ```answer 块；否则模型会把自然分析拉回竞赛式查数格式。
+        失败时抛异常由调用方退化为纯窗口策略，不阻断主对话。
         """
-        q = (user_message or "").strip().lower()
-        analysis_markers = (
-            "趋势", "规律", "洞察", "分析", "解读", "为什么", "原因", "建议",
-            "怎么样", "如何", "表现", "异常", "风险", "机会", "总结", "概览",
-            "trend", "pattern", "insight", "analyze", "analysis", "why",
-            "recommend", "summary", "overview",
+        instruction = (
+            "你是对话压缩器。请把下面这段较早的数据分析对话压成简洁但信息完整的中文摘要，"
+            "保留：用户的目标与约束、已确认的关键数据结论与具体数值、用过哪些数据文件/表、"
+            "已知的口径与假设、尚未完成的部分。不要复述工具调用细节，不要编造。\n\n"
+            f"=== 待压缩内容 ===\n{rendered}"
         )
-        if any(marker in q for marker in analysis_markers):
-            return False
-
-        result_markers = (
-            "列出", "导出", "明细", "记录", "清单", "名单", "有哪些", "哪些",
-            "多少", "几个", "第几", "最高", "最低", "最大", "最小", "排名",
-            "top", "bottom", "count", "list", "show", "export", "records",
-            "rows", "which", "how many", "maximum", "minimum",
-        )
-        return any(marker in q for marker in result_markers)
-
-    @staticmethod
-    def _looks_like_incomplete_process(text: str) -> bool:
-        """识别"我接下来要做..."但实际没有继续执行/总结的半截回答。"""
-        t = (text or "").strip()
-        if not t:
-            return False
-        tail = t[-120:]
-        incomplete_markers = (
-            "接下来", "下一步", "继续", "现在来", "现在做", "再来", "然后",
-            "我将", "我会", "让我", "来看", "开始分析", "进行分析",
-            "next", "now let's", "let me", "i will", "i'll", "continue",
-        )
-        terminal_markers = (
-            "结论", "总结", "建议", "因此", "总体来看", "值得关注",
-            "注意事项", "最终", "综上", "可以看出",
-        )
-        return any(m in tail.lower() for m in incomplete_markers) and not any(m in t for m in terminal_markers)
+        if backend == "anthropic":
+            resp = await client.messages.create(
+                model=model_name,
+                max_tokens=1024,
+                messages=[{"role": "user", "content": instruction}],
+            )
+            parts = [b.text for b in resp.content if getattr(b, "type", None) == "text"]
+            return "".join(parts).strip()
+        else:
+            resp = await client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": instruction}],
+                max_tokens=1024,
+                stream=False,
+            )
+            return (resp.choices[0].message.content or "").strip()
 
     async def run(
         self,
@@ -890,221 +810,291 @@ class AgentLoop:
         else:
             system_blocks = system_prompt
 
-        history = await self._get_conversation_history(conversation_id)
-        messages = [*history[-20:], {"role": "user", "content": user_message}]
+        # 加载 canonical 历史 + 本次 user 消息，做混合 compaction，再序列化为
+        # provider 格式作为循环初始 messages。turn_canonical 并行累积「本回合」
+        # 新产生的 canonical 子序列（assistant + 工具结果），随 done 事件回传给
+        # 路由层持久化到 Message.tool_results，下一轮即可完整回放。
+        from app.agent import context as ctx
+
+        canonical_history = await self._get_conversation_history(conversation_id)
+        canonical_all = [*canonical_history, {"role": "user", "content": user_message}]
+
+        async def _summarize(text: str) -> str:
+            return await self._summarize_history(
+                text, client, active_backend, model_name, system_blocks
+            )
+
+        canonical_all = await ctx.compact_messages(
+            canonical_all,
+            budget=settings.context_token_budget,
+            min_recent=settings.context_min_recent_messages,
+            enable_summary=settings.context_enable_summary_fallback,
+            summarize=_summarize,
+        )
+
+        if active_backend == "anthropic":
+            messages = ctx.to_anthropic(canonical_all)
+        else:
+            messages = ctx.to_openai(canonical_all)
+
+        turn_canonical: list[dict] = []
 
         tools = self._tools_to_anthropic_format()
         total_usage = {"input_tokens": 0, "output_tokens": 0}
         tool_calls_log = []
         consecutive_errors = 0
-        requires_answer_block = self._requires_answer_block(user_message)
-        continuation_repairs = 0
+        # 当前任务计划（由 update_plan 维护），供任务状态停止条件使用
+        current_plan: list[dict] = []
 
         yield {"type": "thinking", "content": "正在分析问题..."}
 
-        # 撞步数上限前，预留一步强制收尾：注入一条指令让 Agent 用已有信息
-        # 立即产出最终答案，而不是悄无声息地耗尽步数、留下半截分析。
-        # 在倒数第二步触发，给模型一整轮来组织最终答案。
-        finalize_step = max(0, self.max_iterations - 1)
-        finalize_injected = False
-        # 累积 Agent 已产出的全部正文文本，用于判断是否已给出 ```answer 块。
-        accumulated_text = ""
+        # 停止条件基于「任务状态」而非步数（对齐 codex / claude code）：
+        # 模型不再请求工具即视为一个 turn 完成。若此时计划仍有未完成步骤，
+        # 注入一次简短提示让它继续；提示有上限，绝不靠步数硬刹车。
+        # max_iterations 仅作为防跑飞的安全上限。
+        plan_nudges = 0
+        MAX_PLAN_NUDGES = 1
+        # 取数结果自检（对齐 codex completion audit）：本轮是否调用过「数据工具」
+        # （读/查/算，排除 update_plan / save_memory 等元工具），以及是否已自检过一次。
+        data_tool_used = False
+        self_check_done = False
+        _DATA_TOOLS = {
+            "search_data_space", "read_file", "inspect_data", "pandas_query",
+            "sqlite_query", "execute_python", "nl2sql",
+            "graph_search", "graph_traverse",
+        }
 
         for iteration in range(self.max_iterations):
             if self._abort_check():
-                yield {"type": "text", "delta": "\n\n[已被用户中断]"}
-                break
-
-            # 接近上限时强制收尾：禁用工具 + 注入收尾指令，逼模型给最终答案。
-            force_finalize = iteration >= finalize_step
-            if force_finalize and not finalize_injected:
-                final_instruction = (
-                    "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
-                    "请立即基于你已经获取到的信息，直接给出最终答案。如果某些信息仍不完整，"
-                    "就用现有最可靠的数据作答，并明确说明依据和限制，不要再说\"还需要进一步查询\"或留下空答案。"
-                )
-                if requires_answer_block:
-                    final_instruction = (
-                        "（系统提示）你已接近本次任务的步数上限，不能再调用工具了。"
-                        "请立即基于你已经获取到的信息，直接给出最终答案，并务必在末尾输出与题面要求一致的 ```answer 块"
-                        "（列名+全部数据行，CSV 格式）。如果某些信息仍不完整，就用现有最可靠的数据作答，不要再说"
-                        "\"还需要进一步查询\"或留下空答案。"
-                    )
-                messages.append({
-                    "role": "user",
-                    "content": final_instruction,
-                })
-                finalize_injected = True
+                # 中断不是「作废」：把已产出的 canonical 正常收尾持久化，
+                # 下一轮用户追加消息时即可在完整上下文上继续（可续中断）。
+                yield {"type": "text", "delta": "\n\n[已暂停。你可以补充说明后让我接着做。]"}
+                credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
+                if charge_credits:
+                    await self._deduct_credits(user_id, credits_used, model_name)
+                yield {
+                    "type": "done",
+                    "usage": total_usage,
+                    "credits_used": credits_used,
+                    "tool_calls_log": tool_calls_log,
+                    "canonical": turn_canonical,
+                    "interrupted": True,
+                }
+                return
 
             try:
                 full_text = ""
                 reasoning_text = ""  # 推理模型的思考内容（DeepSeek 等需回传）
                 tool_uses = []
+                # 本轮采样的重试控制：仅当「尚未向用户流出任何内容」时才重试整轮采样，
+                # 避免重复输出。一旦已经流出文本/工具增量，中途断流走优雅降级（保留已产出）。
+                streamed_anything = False
+                attempt = 0
+                while True:
+                    try:
+                        if active_backend == "anthropic":
+                            # Anthropic SDK 流式调用
+                            response_stream = client.messages.stream(
+                                model=model_name,
+                                max_tokens=settings.anthropic_max_tokens,
+                                system=system_blocks,
+                                messages=messages,
+                                tools=tools,
+                            )
+                            async with response_stream as stream:
+                                async for event in stream:
+                                    if self._abort_check():
+                                        break
+                                    if event.type == "content_block_start":
+                                        if event.content_block.type == "tool_use":
+                                            tool_uses.append({
+                                                "id": event.content_block.id,
+                                                "name": event.content_block.name,
+                                                "input_json": "",
+                                            })
+                                    elif event.type == "content_block_delta":
+                                        if event.delta.type == "text_delta":
+                                            full_text += event.delta.text
+                                            if event.delta.text:
+                                                streamed_anything = True
+                                                yield {"type": "text", "delta": event.delta.text}
+                                        elif event.delta.type == "input_json_delta":
+                                            if tool_uses:
+                                                streamed_anything = True
+                                                tool_uses[-1]["input_json"] += event.delta.partial_json
+                                final_message = await stream.get_final_message()
+                                total_usage["input_tokens"] += final_message.usage.input_tokens
+                                total_usage["output_tokens"] += final_message.usage.output_tokens
 
-                if active_backend == "anthropic":
-                    # Anthropic SDK 流式调用
-                    response_stream = client.messages.stream(
-                        model=model_name,
-                        max_tokens=settings.anthropic_max_tokens,
-                        system=system_blocks,
-                        messages=messages,
-                        tools=[] if force_finalize else tools,
-                    )
-                    async with response_stream as stream:
-                        async for event in stream:
-                            if event.type == "content_block_start":
-                                if event.content_block.type == "tool_use":
+                        else:
+                            # OpenAI 兼容接口流式调用
+                            openai_tools = get_tool_definitions()
+                            oai_messages = [{"role": "system", "content": system_blocks if isinstance(system_blocks, str) else system_blocks[0]["text"]}] + messages
+                            response = await client.chat.completions.create(
+                                model=model_name,
+                                messages=oai_messages,
+                                tools=openai_tools if openai_tools else None,
+                                stream=True,
+                            )
+                            tool_calls_data = []
+                            async for chunk in response:
+                                if self._abort_check():
+                                    break
+                                delta = chunk.choices[0].delta if chunk.choices else None
+                                if not delta:
+                                    continue
+                                # 处理推理模型的 reasoning_content（如 DeepSeek）
+                                reasoning = getattr(delta, 'reasoning_content', None)
+                                if reasoning:
+                                    reasoning_text += reasoning
+                                    streamed_anything = True
+                                    yield {"type": "thinking", "content": reasoning}
+                                if delta.content:
+                                    full_text += delta.content
+                                    streamed_anything = True
+                                    yield {"type": "text", "delta": delta.content}
+                                if delta.tool_calls:
+                                    for tc in delta.tool_calls:
+                                        streamed_anything = True
+                                        while tc.index >= len(tool_calls_data):
+                                            tool_calls_data.append({"id": "", "function": {"name": "", "arguments": ""}})
+                                        if tc.id:
+                                            tool_calls_data[tc.index]["id"] = tc.id
+                                        if tc.function:
+                                            if tc.function.name:
+                                                tool_calls_data[tc.index]["function"]["name"] = tc.function.name
+                                            if tc.function.arguments:
+                                                tool_calls_data[tc.index]["function"]["arguments"] += tc.function.arguments
+                                if hasattr(chunk, "usage") and chunk.usage:
+                                    total_usage["input_tokens"] += chunk.usage.prompt_tokens or 0
+                                    total_usage["output_tokens"] += chunk.usage.completion_tokens or 0
+                            # 转换为统一的 tool_uses 格式（过滤掉无效的 tool_call）
+                            for tc in tool_calls_data:
+                                if tc["id"] and tc["function"]["name"]:
                                     tool_uses.append({
-                                        "id": event.content_block.id,
-                                        "name": event.content_block.name,
-                                        "input_json": "",
+                                        "id": tc["id"],
+                                        "name": tc["function"]["name"],
+                                        "input_json": tc["function"]["arguments"],
                                     })
-                            elif event.type == "content_block_delta":
-                                if event.delta.type == "text_delta":
-                                    full_text += event.delta.text
-                                    if event.delta.text:
-                                        yield {"type": "text", "delta": event.delta.text}
-                                elif event.delta.type == "input_json_delta":
-                                    if tool_uses:
-                                        tool_uses[-1]["input_json"] += event.delta.partial_json
-                        final_message = await stream.get_final_message()
-                        total_usage["input_tokens"] += final_message.usage.input_tokens
-                        total_usage["output_tokens"] += final_message.usage.output_tokens
+                        break  # 本轮采样成功，跳出重试循环
 
-                else:
-                    # OpenAI 兼容接口流式调用
-                    openai_tools = get_tool_definitions()
-                    oai_messages = [{"role": "system", "content": system_blocks if isinstance(system_blocks, str) else system_blocks[0]["text"]}] + messages
-                    response = await client.chat.completions.create(
-                        model=model_name,
-                        messages=oai_messages,
-                        tools=None if force_finalize else (openai_tools if openai_tools else None),
-                        stream=True,
-                    )
-                    tool_calls_data = []
-                    async for chunk in response:
-                        delta = chunk.choices[0].delta if chunk.choices else None
-                        if not delta:
+                    except Exception as stream_err:
+                        # 已经向用户流出内容 → 不重试（重试会重复输出）。
+                        # 当作优雅降级：保留已产出的 full_text，按"模型本轮结束"继续后续逻辑。
+                        if streamed_anything:
+                            yield {"type": "text", "delta": "\n\n[与模型的连接中断，已保留上面已生成的内容。]"}
+                            tool_uses = []
+                            break
+                        # 尚未流出任何内容：可重试错误就退避重试，否则上抛由外层报错。
+                        if attempt < settings.llm_max_retries and _is_retryable_error(stream_err):
+                            attempt += 1
+                            delay = settings.llm_retry_base_delay * (2 ** (attempt - 1))
+                            yield {"type": "thinking", "content": f"网络波动，正在重试（第 {attempt} 次）…"}
+                            await asyncio.sleep(delay)
+                            full_text = ""
+                            reasoning_text = ""
+                            tool_uses = []
                             continue
-                        # 处理推理模型的 reasoning_content（如 DeepSeek）
-                        reasoning = getattr(delta, 'reasoning_content', None)
-                        if reasoning:
-                            reasoning_text += reasoning
-                            yield {"type": "thinking", "content": reasoning}
-                        if delta.content:
-                            full_text += delta.content
-                            yield {"type": "text", "delta": delta.content}
-                        if delta.tool_calls:
-                            for tc in delta.tool_calls:
-                                while tc.index >= len(tool_calls_data):
-                                    tool_calls_data.append({"id": "", "function": {"name": "", "arguments": ""}})
-                                if tc.id:
-                                    tool_calls_data[tc.index]["id"] = tc.id
-                                if tc.function:
-                                    if tc.function.name:
-                                        tool_calls_data[tc.index]["function"]["name"] = tc.function.name
-                                    if tc.function.arguments:
-                                        tool_calls_data[tc.index]["function"]["arguments"] += tc.function.arguments
-                        if hasattr(chunk, "usage") and chunk.usage:
-                            total_usage["input_tokens"] += chunk.usage.prompt_tokens or 0
-                            total_usage["output_tokens"] += chunk.usage.completion_tokens or 0
-                    # 转换为统一的 tool_uses 格式（过滤掉无效的 tool_call）
-                    for tc in tool_calls_data:
-                        if tc["id"] and tc["function"]["name"]:
-                            tool_uses.append({
-                                "id": tc["id"],
-                                "name": tc["function"]["name"],
-                                "input_json": tc["function"]["arguments"],
-                            })
+                        raise
 
-                # 没有工具调用 → Agent 认为自己完成了
+
+                # 流式过程中被中断：把已产出的半截文本并入 canonical，跳回循环顶部
+                # 由统一的「暂停收尾」分支干净落盘，不执行本轮残缺的工具调用。
+                if self._abort_check():
+                    if full_text:
+                        turn_canonical.append({
+                            "role": "assistant", "content": full_text, "tool_calls": [],
+                        })
+                    continue
+
+                # 没有工具调用 → 模型认为本 turn 完成。基于任务状态判断是否真的结束：
+                # 若存在计划且仍有未完成步骤，注入一次简短提示让它继续；否则正式收尾。
                 if not tool_uses:
-                    accumulated_text += full_text
-                    if (
-                        tool_calls_log
-                        and continuation_repairs < 2
-                        and not force_finalize
-                        and iteration < finalize_step
-                        and self._looks_like_incomplete_process(full_text)
-                    ):
-                        messages.append({
-                            "role": "assistant",
-                            "content": full_text or "（已完成部分分析）",
-                        })
-                        messages.append({
-                            "role": "user",
-                            "content": "（系统提示）你刚才停在了过程说明，还没有完成用户要的分析。"
-                                       "请不要只说“接下来/下一步/继续”。要么继续调用工具完成剩余计算，"
-                                       "要么基于已有工具结果直接给出完整最终答案：结论、关键证据、规律/异常、建议或注意事项。",
-                        })
-                        continuation_repairs += 1
+                    plan_incomplete = bool(current_plan) and any(
+                        s.get("status") != "completed" for s in current_plan
+                    )
+                    if plan_incomplete and plan_nudges < MAX_PLAN_NUDGES:
+                        if full_text:
+                            messages.append({"role": "assistant", "content": full_text})
+                            turn_canonical.append({
+                                "role": "assistant", "content": full_text, "tool_calls": [],
+                            })
+                        pending = [s["content"] for s in current_plan if s.get("status") != "completed"]
+                        nudge = (
+                            "（系统提示）你的任务计划还有未完成的步骤："
+                            + "；".join(pending[:5])
+                            + "。请继续执行：要么调用工具完成它们，要么如果已无法推进，"
+                            "就基于现有信息给出最终答案，并用 update_plan 把计划标记为完成。"
+                        )
+                        messages.append({"role": "user", "content": nudge})
+                        turn_canonical.append({"role": "user", "content": nudge})
+                        plan_nudges += 1
                         continue
-                    # 早退补救：数据查询任务理应以 ```answer 块收尾。若 Agent 不再调
-                    # 工具却没产出 answer 块（典型："这不是我要的数据/需要进一步确认"
-                    # 之类的放弃式结尾），补一轮逼它用现有信息给出最终答案块。只补一次，
-                    # 且必须还有迭代余量；force_finalize 轮（已被要求收尾）不再重复。
-                    has_answer_block = "```answer" in accumulated_text
-                    if (requires_answer_block and not has_answer_block and not finalize_injected
-                            and iteration < finalize_step):
-                        messages.append({
-                            "role": "assistant",
-                            "content": full_text or "（已完成分析）",
-                        })
-                        messages.append({
-                            "role": "user",
-                            "content": "（系统提示）你还没有给出 ```answer 块。本任务要的是确定的数据结果，"
-                                       "不要以反问、\"需要进一步确认\"或\"这不是全国/汇总数据\"之类的说明收尾。"
-                                       "请基于你已读到的数据，直接把题面所要求的那些行和列整理出来，"
-                                       "在末尾输出标准 ```answer 块（首行列名，其后每行一条记录，CSV 格式，列出全部满足条件的行）。"
-                                       "如果文档本身就是逐条记录，就照实把每条记录作为一行输出，不要擅自加总或二次解读。",
-                        })
-                        finalize_injected = True
+
+                    # 取数结果自检（对齐 codex completion audit）：本轮用过数据工具、
+                    # 尚未自检过、且开关开启时，注入一次有界的核对提示。只做一次，
+                    # 不基于文本启发式（基于真实工具使用），不会无限循环。
+                    if (settings.enable_answer_self_check and data_tool_used
+                            and not self_check_done):
+                        if full_text:
+                            messages.append({"role": "assistant", "content": full_text})
+                            turn_canonical.append({
+                                "role": "assistant", "content": full_text, "tool_calls": [],
+                            })
+                        audit = (
+                            "（系统自检，仅本轮内部使用）在给出最终答复前，请对照你上面实际拿到的"
+                            "工具结果快速核对一遍：关键数字/行数/聚合口径/单位/筛选条件是否与工具输出一致？"
+                            "是否有该列全/该去重/该换算却没做的地方？"
+                            "如果发现不一致或遗漏，直接修正（必要时再调用工具），然后给出最终答复；"
+                            "如果核对无误，就直接给出最终答复，不要复述这段自检过程。"
+                        )
+                        messages.append({"role": "user", "content": audit})
+                        turn_canonical.append({"role": "user", "content": audit})
+                        self_check_done = True
                         continue
+
                     credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
                     if charge_credits:
                         await self._deduct_credits(user_id, credits_used, model_name)
+                    if full_text:
+                        turn_canonical.append({
+                            "role": "assistant",
+                            "content": full_text,
+                            "tool_calls": [],
+                        })
                     yield {
                         "type": "done",
                         "usage": total_usage,
                         "credits_used": credits_used,
                         "tool_calls_log": tool_calls_log,
+                        "canonical": turn_canonical,
                     }
                     return
 
-                # 本轮有工具调用：累积正文文本，供后续 answer 块检测使用
-                accumulated_text += full_text
+                # 构建本回合 canonical assistant 条目（含工具调用），再由统一序列化器
+                # 转成 provider 格式追加到 messages——消除手工维护两套格式的漂移风险。
+                _canon_tool_calls = []
+                for tu in tool_uses:
+                    try:
+                        _ci = json.loads(tu["input_json"]) if tu["input_json"] else {}
+                    except json.JSONDecodeError:
+                        _ci = {}
+                    _canon_tool_calls.append({"id": tu["id"], "name": tu["name"], "input": _ci})
+                assistant_entry = {
+                    "role": "assistant",
+                    "content": full_text,
+                    "tool_calls": _canon_tool_calls,
+                }
+                turn_canonical.append(assistant_entry)
 
-                # 构建 assistant 消息（格式因后端而异）
                 if active_backend == "anthropic":
-                    assistant_content = []
-                    if full_text:
-                        assistant_content.append({"type": "text", "text": full_text})
-                    for tu in tool_uses:
-                        try:
-                            input_data = json.loads(tu["input_json"]) if tu["input_json"] else {}
-                        except json.JSONDecodeError:
-                            input_data = {}
-                        assistant_content.append({
-                            "type": "tool_use",
-                            "id": tu["id"],
-                            "name": tu["name"],
-                            "input": input_data,
-                        })
-                    messages.append({"role": "assistant", "content": assistant_content})
+                    messages.extend(ctx.to_anthropic([assistant_entry]))
                 else:
-                    # OpenAI 格式
-                    assistant_msg = {
-                        "role": "assistant",
-                        "content": full_text or None,
-                        "tool_calls": [
-                            {"id": tu["id"], "type": "function", "function": {"name": tu["name"], "arguments": tu["input_json"]}}
-                            for tu in tool_uses
-                        ],
-                    }
+                    serialized = ctx.to_openai([assistant_entry])
                     # 推理模型（DeepSeek thinking 等）要求把 reasoning_content 原样回传，否则下一轮报 400
-                    if reasoning_text:
-                        assistant_msg["reasoning_content"] = reasoning_text
-                    messages.append(assistant_msg)
+                    if reasoning_text and serialized:
+                        serialized[0]["reasoning_content"] = reasoning_text
+                    messages.extend(serialized)
 
                 # 执行工具并收集结果
                 tool_results = []
@@ -1118,6 +1108,36 @@ class AgentLoop:
                         tool_args = json.loads(tu["input_json"]) if tu["input_json"] else {}
                     except json.JSONDecodeError:
                         tool_args = {}
+
+                    # update_plan 是「元工具」：不访问数据，只把计划状态推给前端，
+                    # 并回一条简短 ack 维持工具调用协议有效。同时更新 current_plan
+                    # 供主循环的任务状态停止条件使用。
+                    if tu["name"] == "update_plan":
+                        steps = tool_args.get("steps", []) if isinstance(tool_args, dict) else []
+                        norm_steps = [
+                            {
+                                "content": str(s.get("content", "")).strip(),
+                                "status": s.get("status", "pending"),
+                            }
+                            for s in steps if isinstance(s, dict)
+                        ]
+                        current_plan = norm_steps
+                        yield {"type": "plan", "steps": norm_steps}
+                        ack = "计划已更新。" + (
+                            "全部步骤已完成。" if norm_steps and all(s["status"] == "completed" for s in norm_steps)
+                            else "请按计划继续执行下一步。"
+                        )
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tu["id"],
+                            "content": ack,
+                            "is_error": False,
+                        })
+                        continue
+
+                    # 记录本轮用过真正的数据工具（读/查/算），供完成前的取数自检判断。
+                    if tu["name"] in _DATA_TOOLS:
+                        data_tool_used = True
 
                     # 发送给前端的 input 做脱敏：去除代码、路径等内部细节
                     safe_input = {}
@@ -1138,6 +1158,7 @@ class AgentLoop:
                         "name": tu["name"],
                         "input": safe_input,
                         "id": tu["id"],
+                        "summary": tool_display_summary(tu["name"], tool_args),
                     }
 
                     tool_result = await execute_tool(
@@ -1175,14 +1196,19 @@ class AgentLoop:
                         "output_preview": result_str[:200],
                     })
 
-                    # 脱敏：移除存储路径
+                    # 脱敏：移除存储路径。前端展示只取前 2000 字符，但诚实标注是否截断。
+                    full_len = len(result_str)
                     display_result = result_str[:2000].replace(settings.storage_root, "[数据]")
+                    display_truncated = full_len > 2000
 
                     yield {
                         "type": "tool_result",
                         "name": tu["name"],
                         "content": display_result,
                         "is_error": is_error,
+                        "truncated": display_truncated,
+                        "total_chars": full_len,
+                        "shown_chars": min(full_len, 2000),
                     }
 
                     tool_results.append({
@@ -1192,16 +1218,39 @@ class AgentLoop:
                         "is_error": is_error,
                     })
 
-                # 追加工具结果到消息（格式因后端而异）
+                # 工具结果 → canonical，再由统一序列化器转 provider 格式追加到 messages。
+                # 循环内 messages 用完整结果（模型可见），持久化的 turn_canonical 用按
+                # 配置截断的结果（避免历史无限膨胀）。
+                def _result_name(tr):
+                    return next((tu["name"] for tu in tool_uses if tu["id"] == tr["tool_use_id"]), "")
+
+                full_results_entry = {
+                    "role": "tool_results",
+                    "results": [
+                        {"id": tr["tool_use_id"], "name": _result_name(tr),
+                         "content": tr["content"], "is_error": tr["is_error"]}
+                        for tr in tool_results
+                    ],
+                }
                 if active_backend == "anthropic":
-                    messages.append({"role": "user", "content": tool_results})
+                    messages.extend(ctx.to_anthropic([full_results_entry]))
                 else:
-                    for tr in tool_results:
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tr["tool_use_id"],
-                            "content": tr["content"],
-                        })
+                    messages.extend(ctx.to_openai([full_results_entry]))
+
+                turn_canonical.append({
+                    "role": "tool_results",
+                    "results": [
+                        {
+                            "id": tr["tool_use_id"],
+                            "name": _result_name(tr),
+                            "content": ctx.truncate_tool_content(
+                                tr["content"], settings.context_tool_result_max_chars
+                            ),
+                            "is_error": tr["is_error"],
+                        }
+                        for tr in tool_results
+                    ],
+                })
 
                 # 重试逻辑：连续失败时注入提示（来自 KDD-CUP）
                 if consecutive_errors >= 2:
@@ -1212,7 +1261,23 @@ class AgentLoop:
                     consecutive_errors = 0
 
             except Exception as e:
-                yield {"type": "error", "message": f"Agent 执行出错: {str(e)}"}
+                # 重试已在内层用尽（或属致命错误）。给用户一句可读的说明，
+                # 并把本轮已产出的 canonical 落盘，便于下一轮接续。
+                if any(k in str(e).lower() for k in _FATAL_KEYWORDS):
+                    hint = "模型调用被拒绝（可能是 API Key 或请求配置问题）。请检查模型设置后重试。"
+                else:
+                    hint = "模型调用多次失败，可能是网络或服务暂时不可用。请稍后重试。"
+                yield {"type": "error", "message": f"{hint}（{str(e)[:200]}）"}
+                if turn_canonical:
+                    credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
+                    yield {
+                        "type": "done",
+                        "usage": total_usage,
+                        "credits_used": credits_used if charge_credits else 0,
+                        "tool_calls_log": tool_calls_log,
+                        "canonical": turn_canonical,
+                        "interrupted": True,
+                    }
                 return
 
         # 达到最大迭代次数
@@ -1220,7 +1285,7 @@ class AgentLoop:
         if charge_credits:
             await self._deduct_credits(user_id, credits_used, model_name)
         yield {"type": "text", "delta": "\n\n[已达到最大执行步数，自动停止]"}
-        yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log}
+        yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log, "canonical": turn_canonical}
 
     def _calculate_credits(self, usage: dict, multiplier: float = 1.0) -> int:
         return 1

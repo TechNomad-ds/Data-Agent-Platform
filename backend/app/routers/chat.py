@@ -308,6 +308,7 @@ async def send_message(
         full_content = ""
         last_event: dict = {}
         segments: list = []
+        turn_canonical: list = []
 
         try:
             try:
@@ -336,6 +337,9 @@ async def send_message(
                             segments[-1]["events"].append(event)
                         else:
                             segments.append({"type": "tools", "events": [event]})
+                    elif event["type"] == "done":
+                        # 本回合完整 canonical 子序列（含工具 I/O），用于历史回放
+                        turn_canonical = event.get("canonical", []) or []
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
                 import traceback
@@ -373,6 +377,8 @@ async def send_message(
                             role="assistant",
                             content=save_content or None,
                             tool_calls=segments if len(segments) > 1 else None,
+                            # 完整 canonical 子序列（含工具 I/O），供后续轮次回放上下文
+                            tool_results={"canonical": turn_canonical} if turn_canonical else None,
                             token_usage=last_event.get("usage") if last_event.get("type") == "done" else None,
                             credits_used=last_event.get("credits_used") if last_event.get("type") == "done" else None,
                         )
