@@ -173,3 +173,73 @@ def test_multi_tool_results_in_one_entry():
     assert len(o) == 2 and all(m["role"] == "tool" for m in o)
     assert [m["tool_call_id"] for m in o] == ["t1", "t2"]
 
+
+
+# ---- 密钥脱敏 -----------------------------------------------------------
+
+def test_redact_common_secrets():
+    assert ctx.redact_secrets("key sk-abcdefghij1234567890") == "key [已隐藏]"
+    assert ctx.redact_secrets("AKIA1234567890ABCDEF") == "[已隐藏]"
+    assert "[已隐藏]" in ctx.redact_secrets("Authorization: Bearer abc123def456ghi789")
+    assert ctx.redact_secrets('api_key="supersecretvalue"') == "api_key=[已隐藏]"
+    assert "[已隐藏]" in ctx.redact_secrets("password: hunter2xyz")
+
+
+def test_redact_keeps_clean_text_intact():
+    clean = "北京 2024 年销售额 1234567，共 42 行记录"
+    assert ctx.redact_secrets(clean) == clean
+    # 短数字/普通词不应误伤
+    assert ctx.redact_secrets("count=42") == "count=42"
+
+
+def test_redact_pem_private_key():
+    pem = "-----BEGIN PRIVATE KEY-----\nMIIBVwIBADANB\n-----END PRIVATE KEY-----"
+    assert ctx.redact_secrets(pem) == "[已隐藏]"
+
+
+def test_redact_handles_none_and_empty():
+    assert ctx.redact_secrets(None) == ""
+    assert ctx.redact_secrets("") == ""
+
+
+# ---- 压缩后健康校验 -----------------------------------------------------
+
+def test_validate_sequence_accepts_well_formed():
+    msgs = [
+        _user("查一下"),
+        _assistant("好", tool_calls=[{"id": "t1", "name": "sqlite_query", "input": {}}]),
+        _tool_results([{"id": "t1", "name": "sqlite_query", "content": "r", "is_error": False}]),
+        _user("再看看"),
+    ]
+    ok, _ = ctx.validate_sequence(msgs)
+    assert ok
+
+
+def test_validate_sequence_rejects_orphan_tool_results():
+    # tool_results 前面没有对应的 assistant 工具调用（典型压缩切断事故）
+    msgs = [
+        _tool_results([{"id": "t1", "name": "sqlite_query", "content": "r", "is_error": False}]),
+        _user("继续"),
+    ]
+    ok, reason = ctx.validate_sequence(msgs)
+    assert not ok and "孤立" in reason
+
+
+def test_validate_sequence_rejects_mismatched_id():
+    msgs = [
+        _assistant("好", tool_calls=[{"id": "t1", "name": "x", "input": {}}]),
+        _tool_results([{"id": "t999", "name": "x", "content": "r", "is_error": False}]),
+    ]
+    ok, reason = ctx.validate_sequence(msgs)
+    assert not ok
+
+
+def test_validate_sequence_summary_prefix_ok():
+    # 摘要(summary) + 保留窗口，窗口从 user 开始 → 合法
+    msgs = [
+        {"role": "summary", "content": "早期摘要"},
+        _user("新问题"),
+        _assistant("答案"),
+    ]
+    ok, _ = ctx.validate_sequence(msgs)
+    assert ok

@@ -76,6 +76,48 @@ def truncate_tool_content(content: str, max_chars: int) -> str:
     )
 
 
+# 密钥脱敏：工具结果可能含用户数据/代码里的真实凭据。写入持久化历史或发往前端
+# 展示前过一遍，避免凭据被原文存进对话库或回显。注意：只在 persist/display 边界
+# 调用，绝不改模型当轮实际看到的完整结果（否则会缺数据）。
+_REDACT = "[已隐藏]"
+_SECRET_PATTERNS = [
+    # OpenAI / Anthropic / 通用 sk- 风格 key
+    re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"),
+    re.compile(r"\b(?:sk|pk|rk)-(?:live|test|proj)-[A-Za-z0-9_\-]{8,}"),
+    # AWS Access Key ID
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    # GitHub token
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
+    # Google API key
+    re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}"),
+    # Slack token
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9\-]{10,}"),
+    # JWT（三段 base64url）
+    re.compile(r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"),
+    # PEM 私钥块
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
+    # Authorization: Bearer xxx
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9_\-\.=]{12,}"),
+    # 形如 api_key="...", password: '...', token=xxx 的键值对（保留键名，遮值）
+    re.compile(r"""(?i)\b(api[_\-]?key|secret|password|passwd|pwd|token|access[_\-]?token|private[_\-]?key|client[_\-]?secret)\b(\s*[:=]\s*)['"]?([^\s'"，,;]{6,})['"]?"""),
+]
+
+
+def redact_secrets(text: str | None) -> str:
+    """把文本里的常见凭据替换为占位符。用于持久化/展示边界，不用于模型上下文。"""
+    if not text:
+        return text or ""
+    s = str(text)
+    for pat in _SECRET_PATTERNS:
+        if pat.groups >= 3:
+            # 键值对模式：保留键名和分隔符，只遮蔽值
+            s = pat.sub(lambda m: f"{m.group(1)}{m.group(2)}{_REDACT}", s)
+        else:
+            s = pat.sub(_REDACT, s)
+    return s
+
+
+
 def _is_pair_boundary_safe(messages: list[dict], cut: int) -> bool:
     """判断在 index=cut 处切（保留 messages[cut:]）是否会孤立 tool_results。
 
@@ -265,3 +307,35 @@ def to_openai(messages: list[dict]) -> list[dict]:
                     "content": str(r.get("content", "")),
                 })
     return out
+
+
+def validate_sequence(messages: list[dict]) -> tuple[bool, str]:
+    """compaction 后的健康校验：确认消息序列结构合法，能安全送进 provider。
+
+    对齐 claude code「压缩后健康探针」的意图，但适配本架构——这里真正的失败面
+    不是「工具执行器死了」，而是「压缩边界 bug 产出畸形序列」（孤立的 tool_results、
+    或带 tool_calls 的 assistant 后面缺结果），那会让下一步 API 调用直接 400。
+
+    返回 (ok, reason)。ok=False 时调用方应安全降级（如退回纯窗口、丢弃摘要）。
+    """
+    prev_tool_call_ids: set[str] = set()
+    for i, m in enumerate(messages):
+        role = m.get("role")
+        if role == "assistant":
+            prev_tool_call_ids = {
+                tc.get("id") for tc in (m.get("tool_calls") or []) if tc.get("id")
+            }
+        elif role == "tool_results":
+            results = m.get("results", [])
+            if not results:
+                continue
+            # tool_results 必须紧跟在带对应 tool_calls 的 assistant 之后
+            if not prev_tool_call_ids:
+                return False, f"index {i}: 孤立的 tool_results（前面没有对应的工具调用）"
+            for r in results:
+                if r.get("id") and r["id"] not in prev_tool_call_ids:
+                    return False, f"index {i}: tool_result id={r.get('id')} 没有匹配的 tool_use"
+            prev_tool_call_ids = set()
+        else:
+            prev_tool_call_ids = set()
+    return True, ""

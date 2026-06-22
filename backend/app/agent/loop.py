@@ -109,7 +109,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮�
 # 工作方式
 
 - 先判断要不要用工具。通用概念、方法建议、闲聊、平台操作这类不依赖用户数据的问题，直接回答，不要为了显得在分析而硬调工具。
-- 需要基于用户数据时才用工具。数据结构通常已在上方预注入，不必重复 inspect_data。
+- 需要基于用户数据时才用工具。上方「数据概览」是**根据你这次的问题检索出的最相关文件**的详细结构，未必涵盖全部——它下面的「其余数据文件」清单列出了还没展开的文件。如果你判断需要的表不在已展开的范围里，直接用 inspect_data / read_file 去读清单里（或你认为相关）的文件，不要因为"概览里没有"就断定数据缺失。
 - 坚持把用户真正的目标做完，而不是缩水成一个更省事的小问题。中途某个数据源查不到，先换表、换文件、换工具再试，把可能的来源都查过，确实没有再如实说明。
 - 但坚持不等于闷头乱撞：如果用户的需求本身有歧义（指代不清、范围不明、可能指多个对象），用一句话澄清比猜错更好。不要为了凑流程反复打断用户。
 - 一个方法失败就换一个，别在被禁止或反复报错的同一条路上死磕。不要把内部调试过程（"变量作用域""我重新整体计算"）写进给用户的正文。
@@ -290,10 +290,60 @@ class AgentLoop:
 
 其余 {len(other_files)} 个文件（代码/文档/图片/配置等，需要时可用 read_file 查看）：{other_line or '无'}"""
 
-    async def _build_schema_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
+    async def _rank_files_by_relevance(self, user_message: str, data_space_id: uuid.UUID,
+                                       files: list) -> dict[str, float] | None:
+        """按用户问题给文件打相关性分（0~1）。复用已有的混合检索：把块级命中
+        聚合成文件级分数（同一文件取最高分 + 命中数轻微加权），叠加文件名/列名的
+        字面匹配。返回 {file_id: score}；检索不可用或问题为空时返回 None（调用方退回静态策略）。
+        """
+        q = (user_message or "").strip()
+        if not q or not files:
+            return None
+        scores: dict[str, float] = {}
+        # 1) 向量/BM25 混合检索（块级 → 文件级聚合）
+        try:
+            from app.services.retrieval import get_retrieval_service
+            import asyncio as _asyncio
+            svc = get_retrieval_service(str(data_space_id))
+            results = await _asyncio.get_event_loop().run_in_executor(
+                None, lambda: svc.search(q, top_k=30)
+            )
+            hit_counts: dict[str, int] = {}
+            for r in results or []:
+                fid = (r.metadata or {}).get("file_id")
+                if not fid:
+                    continue
+                fid = str(fid)
+                scores[fid] = max(scores.get(fid, 0.0), float(getattr(r, "score", 0.0) or 0.0))
+                hit_counts[fid] = hit_counts.get(fid, 0) + 1
+            # 命中块越多越相关：每多一个块 +0.03，封顶 +0.15
+            for fid, c in hit_counts.items():
+                scores[fid] = min(1.0, scores[fid] + min(0.15, (c - 1) * 0.03))
+        except Exception:
+            pass
+
+        # 2) 文件名字面匹配（轻量、零依赖兜底，检索挂了也有效）
+        try:
+            from app.services.retrieval import _tokenize_filtered
+            q_tokens = set(_tokenize_filtered(q))
+            if q_tokens:
+                for f in files:
+                    name_tokens = set(_tokenize_filtered(str(f.filename)))
+                    if name_tokens & q_tokens:
+                        fid = str(f.id)
+                        scores[fid] = min(1.0, scores.get(fid, 0.0) + 0.2)
+        except Exception:
+            pass
+
+        return scores or None
+
+    async def _build_schema_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID,
+                                    user_message: str = "") -> str:
         """预注入 schema + 质量信息。
-        合并策略：已有 profile 的文件用 profile 数据，还没处理完的用实时加载兜底。
-        保证所有文件都出现在 Agent 视野中。"""
+        选文件策略：先按用户问题做相关性排序（检索 + 文件名匹配），相关文件注入详细
+        schema，其余数据文件只给一行「文件名 + 行列数」清单——让模型知道它们存在、
+        需要时自己 inspect_data。问题为空或检索不可用时退回静态「数据文件优先 + 前 N」。
+        合并策略：已有 profile 的文件用 profile 数据，还没处理完的用实时加载兜底。"""
         if not data_space_id:
             return ""
 
@@ -331,17 +381,33 @@ class AgentLoop:
             # 避免代码仓库类空间里几百个 .py/.md 把仅有的几个数据文件挤出前 N。
             DATA_EXTS = TABULAR_EXTS | {"sqlite", "db", "sqlite3"}
 
-            # 数据文件优先排序：数据型在前、其余在后，再截断。这样 601 文件里的 2 个 csv
-            # 一定会进入 schema 预注入，而不是被前 15 个代码文件占满名额。
-            sorted_files = sorted(
-                all_files,
-                key=lambda f: 0 if f.file_type in DATA_EXTS else 1,
-            )
+            # 选文件：优先按用户问题的相关性排序；问题为空/检索不可用时退回
+            # 「数据文件优先」的静态排序。相关文件进详细 schema，其余只列清单。
+            relevance = await self._rank_files_by_relevance(user_message, data_space_id, all_files)
+            if relevance:
+                # 相关性优先；同分内数据文件在前；再按相关分降序。无分的排后面。
+                sorted_files = sorted(
+                    all_files,
+                    key=lambda f: (
+                        0 if relevance.get(str(f.id), 0.0) > 0 else 1,
+                        0 if f.file_type in DATA_EXTS else 1,
+                        -relevance.get(str(f.id), 0.0),
+                    ),
+                )
+            else:
+                # 数据文件优先排序：数据型在前、其余在后，再截断。这样 601 文件里的 2 个 csv
+                # 一定会进入 schema 预注入，而不是被前 15 个代码文件占满名额。
+                sorted_files = sorted(
+                    all_files,
+                    key=lambda f: 0 if f.file_type in DATA_EXTS else 1,
+                )
             MAX_SCHEMA_FILES = 25
+            shown_ids: set[str] = set()
 
-            # 遍历文件（数据文件优先）
+            # 遍历文件（相关/数据文件优先）
             for f in sorted_files[:MAX_SCHEMA_FILES]:
                 fid = str(f.id)
+                shown_ids.add(fid)
                 profile = profile_map.get(fid)
 
                 # 有 profile 且已就绪 → 用 profile 的丰富信息
@@ -503,6 +569,25 @@ class AgentLoop:
                     elif f.file_type == "ppt":
                         lines.append("    旧版 .ppt 暂不支持抽取文本，请转换为 .pptx 后上传")
                     lines.append("")
+
+            # 其余数据文件清单：没进详细 schema 的数据文件，只给一行「文件名 + 行列数」，
+            # 几乎不耗 token，但让模型知道它们存在、需要时可自己 inspect_data / read_file。
+            remaining = [f for f in all_files
+                         if str(f.id) not in shown_ids and f.file_type in DATA_EXTS]
+            if remaining:
+                lines.append("")
+                lines.append(f"### 其余数据文件（共 {len(remaining)} 个，未展开详细结构；如与问题相关可用 inspect_data 查看）")
+                for f in remaining[:60]:
+                    p = profile_map.get(str(f.id))
+                    dims = ""
+                    if p and p.status == "ready" and isinstance(p.profile_data, dict):
+                        rc = p.profile_data.get("row_count")
+                        cc = p.profile_data.get("column_count")
+                        if rc is not None or cc is not None:
+                            dims = f"  rows={rc or '?'} cols={cc or '?'}"
+                    lines.append(f"- {f.filename}{dims}")
+                if len(remaining) > 60:
+                    lines.append(f"- …（还有 {len(remaining) - 60} 个数据文件）")
 
             # JOIN 检测
             joins = self._detect_joins_for_schema(all_columns)
@@ -781,7 +866,7 @@ class AgentLoop:
 
         # 构建系统提示（含文件列表 + schema 预注入 + knowledge.md + 记忆）
         data_space_info = await self._get_data_space_info(data_space_id, user_id)
-        schema_context = await self._build_schema_context(data_space_id, user_id)
+        schema_context = await self._build_schema_context(data_space_id, user_id, user_message)
         knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
 
         memory_context = ""
@@ -831,6 +916,19 @@ class AgentLoop:
             enable_summary=settings.context_enable_summary_fallback,
             summarize=_summarize,
         )
+
+        # 压缩后健康校验（对齐 claude code 的压缩后探针，适配本架构）：确认序列结构
+        # 合法、不会让下一步 API 调用因孤立 tool_results 而 400。畸形则安全降级到
+        # 纯窗口策略（不加摘要、不重排，绝不切断配对）。
+        ok, reason = ctx.validate_sequence(canonical_all)
+        if not ok:
+            canonical_all = await ctx.compact_messages(
+                [*canonical_history, {"role": "user", "content": user_message}],
+                budget=settings.context_token_budget,
+                min_recent=settings.context_min_recent_messages,
+                enable_summary=False,
+                summarize=None,
+            )
 
         if active_backend == "anthropic":
             messages = ctx.to_anthropic(canonical_all)
@@ -1196,9 +1294,11 @@ class AgentLoop:
                         "output_preview": result_str[:200],
                     })
 
-                    # 脱敏：移除存储路径。前端展示只取前 2000 字符，但诚实标注是否截断。
+                    # 脱敏：移除存储路径 + 遮蔽凭据。前端展示只取前 2000 字符，诚实标注是否截断。
                     full_len = len(result_str)
-                    display_result = result_str[:2000].replace(settings.storage_root, "[数据]")
+                    display_result = ctx.redact_secrets(
+                        result_str[:2000].replace(settings.storage_root, "[数据]")
+                    )
                     display_truncated = full_len > 2000
 
                     yield {
@@ -1243,9 +1343,11 @@ class AgentLoop:
                         {
                             "id": tr["tool_use_id"],
                             "name": _result_name(tr),
-                            "content": ctx.truncate_tool_content(
+                            # 持久化/回放边界：先截断再脱敏凭据（当轮模型看到的完整结果
+                            # 在 messages 里，不受影响）。
+                            "content": ctx.redact_secrets(ctx.truncate_tool_content(
                                 tr["content"], settings.context_tool_result_max_chars
-                            ),
+                            )),
                             "is_error": tr["is_error"],
                         }
                         for tr in tool_results
