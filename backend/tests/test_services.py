@@ -3,6 +3,7 @@ import json
 import importlib.util
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -185,6 +186,34 @@ def test_system_prompt_contains_text_analysis_quality_guidance():
         "确认真实列名",
         "避免链式赋值",
         "不要依赖上一轮工具里创建的临时变量",
+    ):
+        assert phrase in SYSTEM_PROMPT_TEMPLATE
+
+
+def test_agent_data_context_is_intent_gated():
+    """普通设计/提示词问题不应因为选了数据空间就被 schema 上下文带偏。"""
+    from app.agent.loop import AgentLoop
+
+    space_id = uuid.uuid4()
+    assert not AgentLoop._should_include_data_context(
+        "我怎么感觉 agent 问什么都关注 json/csv，是提示词里强调了吗？需要调整",
+        space_id,
+    )
+    assert not AgentLoop._should_include_data_context("你觉得这个 agent 架构怎么设计更好？", space_id)
+
+    assert AgentLoop._should_include_data_context("帮我统计 sales.csv 里每个区域的收入", space_id)
+    assert AgentLoop._should_include_data_context("基于课程资料总结一下 cache miss 的考点", space_id)
+
+
+def test_system_prompt_calls_schema_context_preview_not_full_inventory():
+    """schema 预注入是相关文件预览，不能暗示模型已经看完全部文件。"""
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+
+    for phrase in (
+        "本轮相关文件预览",
+        "不是完整文件清单",
+        "不代表你已经读取了全部文件",
+        "未展开文件仍属于数据空间",
     ):
         assert phrase in SYSTEM_PROMPT_TEMPLATE
 

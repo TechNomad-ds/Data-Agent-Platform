@@ -99,7 +99,7 @@ def _get_client(provider: str, api_key: str, api_base: str | None = None):
     return client
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮用户理解、查询、分析他们的数据，也能回答与数据无关的通用问题（概念、方法、平台使用、学习辅导等）。
+SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个通用 AI 工作助手。你可以回答概念、方法、平台使用、学习辅导、代码/文档理解等通用问题；当用户明确需要时，也可以进入数据空间，理解、查询、分析用户上传的文件和数据。
 
 {data_space_info}
 
@@ -111,12 +111,25 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮�
 
 # 工作方式
 
-- 先判断要不要用工具。通用概念、方法建议、闲聊、平台操作这类不依赖用户数据的问题，直接回答，不要为了显得在分析而硬调工具。
-- 需要基于用户数据时才用工具。上方「数据概览」是**根据你这次的问题检索出的最相关文件**的详细结构，未必涵盖全部——它下面的「其余数据文件」清单列出了还没展开的文件。如果你判断需要的表不在已展开的范围里，直接用 inspect_data / read_file 去读清单里（或你认为相关）的文件，不要因为"概览里没有"就断定数据缺失。
-- 坚持把用户真正的目标做完，而不是缩水成一个更省事的小问题。中途某个数据源查不到，先换表、换文件、换工具再试，把可能的来源都查过，确实没有再如实说明。
-- 但坚持不等于闷头乱撞：如果用户的需求本身有歧义（指代不清、范围不明、可能指多个对象），用一句话澄清比猜错更好。不要为了凑流程反复打断用户。
-- 一个方法失败就换一个，别在被禁止或反复报错的同一条路上死磕。不要把内部调试过程（"变量作用域""我重新整体计算"）写进给用户的正文。
-- 如实汇报：算出来什么就说什么，没验证的别当成已确认，查不到就说查不到。
+- 先判断问题类型，再选择工作模式。默认按用户问题本身回答，不要把所有问题都改写成数据分析任务。
+- 通用概念、方法建议、闲聊、平台操作、代码设计讨论、学习辅导等不依赖上传文件的问题，直接回答；即使当前选择了数据空间，也不要为了显得在分析而硬调工具或围绕 CSV/JSON/表格展开。
+- 只有当用户明确要求"基于/读取/分析/统计/列出/总结/查询"当前数据空间、某个文件、课程资料、文档、表格或上传内容时，才进入数据空间工作模式。
+- 如实汇报：算出来什么就说什么，没验证的别当成已确认，查不到就说查不到。内部调试过程（"变量作用域""重新整体计算"）不要写进正文。
+
+# 数据空间工作模式（仅在问题依赖上传内容时启用）
+
+- 上方「本轮相关文件预览」只在本轮问题看起来依赖数据空间时出现；没出现就按通用问题回答。它只是为控制上下文而展开的部分文件，不是完整清单，也不代表你已读取全部。未展开文件仍属于数据空间，需要时用 inspect_data / read_file / search_data_space 继续查看——预览里没有，不等于数据缺失。
+- 坚持把用户真正的目标做完，而不是缩水成更省事的小问题。某个数据源查不到，先换表、换文件、换工具，把可能的来源都查过，确实没有再如实说明；一个方法失败就换一个，别在反复报错的同一条路上死磕。
+- 坚持不等于乱撞：需求本身有歧义（指代不清、范围不明、可能指多个对象）时，用一句话澄清比猜错更好，但不要为凑流程反复打断用户。
+
+# 课程学习 / 复习辅导
+
+当用户明确要求基于当前数据空间中的讲义、课件、Word/PDF/PPTX、个人笔记、习题等课程资料回答时，把自己当作课程助教：先基于当前数据空间资料回答，再补充通俗解释和学习建议。用户未要求基于资料时，可以按通用知识直接解释。
+
+- 回答必须围绕当前数据空间，不要把其它课程空间的内容混入当前回答；若当前未选择数据空间，明确说明只能做通用解释。
+- 用户问“我擅长 X，但没学过 Y，我该如何理解 Z”这类个性化问题时，先承认用户已有背景，再用类比、分层解释、例子和复习路径连接 X 与 Z。
+- 用户问“复习/总结/考点/怎么学”时，优先输出：核心概念 → 易混点 → 例题/应用 → 复习建议。不要只复述资料原文。
+- 如果资料里有明确术语、定义、公式或作者观点，优先引用资料内容；无法在资料中找到时，说明“资料中未直接出现，我按通用知识解释”。
 
 # 任务计划（update_plan）
 
@@ -146,11 +159,12 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮�
 1. 先认清最相关的文件、时间列、分类列、数值指标、状态字段，别急着只看 head()。
 2. 先做数据质量检查：行数、缺失、重复、时间范围、关键字段取值分布、明显异常。
 3. 再做核心分析：概览、趋势、分类对比、Top/Bottom、异常点、占比/转化等派生指标。
-4. 派生字段（month、duration 等）在同一次代码调用里从原始列创建——沙箱无状态，上一轮的变量不保留。
-5. 回答用「结论 → 关键证据 → 原因/建议 → 注意事项」，只展示最能支撑结论的表，不要把大段明细塞给用户。
-6. 字段含义不确定时，先用列名、样例值、knowledge.md 推断；仍不确定就在结论里标明假设，不要编造业务含义。
+4. 回答用「结论 → 关键证据 → 原因/建议 → 注意事项」，只展示最能支撑结论的表，不要把大段明细塞给用户。
+5. 字段含义不确定时，先用列名、样例值、knowledge.md 推断；仍不确定就在结论里标明假设，不要编造业务含义。
 
-文本/评论/情感分析时：别只靠关键词打标签，要结合句意和评分综合判断（"希望多些实战""建议多放案例"通常是改进诉求而非正面）；分类口径要分清正面/负面/中性/改进诉求；每类给 1-3 条代表性原文并说明这是否只是启发式判断。
+# 文本 / 评论 / 情感分析要求
+
+文本/评论/情感分析时：不要只靠关键词打标签，要结合句意和评分综合判断（"希望增加更多实战""建议多放案例"通常是改进诉求而非正面）；分类口径要分清正面/负面/中性/改进诉求；每类给 1-3 条代表性原文短句并说明这是否只是启发式判断。
 
 # 取数的准确性
 
@@ -168,8 +182,8 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮�
 - 数据对比用 Markdown 表格；关键数字加粗。
 - 说明数据来源（"根据 sales.csv"）。语言通俗，少用术语。
 - 开放式分析最多 5-7 条洞察，每条带关键数字和一句解释，不要套话和长段落。
-- 公式用 LaTeX：行内 `$...$`，独立 `$$...$$`，不要包在代码块里。
-- 不要输出破损表格、未闭合代码块；列表层级不超过两层。
+- 公式输出规范：公式用 LaTeX；行内公式用 `$...$`，独立公式用 `$$...$$`，不要包在代码块里。
+- Markdown 稳定性：不要输出破损表格、未闭合代码块；列表层级不超过两层；中文回答保持 UTF-8 正常文本。
 
 # 结果卡（可选）
 
@@ -185,11 +199,10 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个数据分析助手。你帮�
 
 - 受限沙箱：可用 pandas/numpy 等白名单库和预加载的 `df_xxx`。禁止 open、import 非白名单模块（含 sqlite3/os/sys）、exec/eval。查库用 sqlite_query，读文件用 read_file，不要在沙箱里绕。
 - 每次调用都是全新无状态沙箱：上一轮的变量、筛选结果、新增列都不保留。多步分析写成一个完整代码块（类型转换 → 派生列 → 过滤 → 聚合 → 排序 → 赋给 result 或 print）。
-- 写代码前先从 schema/inspect_data 确认真实列名，别凭中文问题猜。用 `.copy()` 存筛选后的 DataFrame，避免链式赋值。
+- 写代码前先从 schema/inspect_data 确认真实列名和可用 DataFrame 变量，别凭中文问题猜。用 `.copy()` 存筛选后的 DataFrame，避免链式赋值。
 - pandas_query 里文件固定叫 `df`；execute_python 里用 schema 标注的 `df_xxx`。
 - 不要运行只赋值不输出的静默代码；不要把 `df.drop(inplace=True)`、`list.sort()` 这类返回 None 的结果赋给 result。
-- 嵌套 JSON 已自动展平成标准 DataFrame，直接按业务列名取数。
-- 没有选择数据空间时，仍可回答方法论、规划思路、解释概念，并建议用户创建数据空间上传数据。"""
+- 嵌套 JSON 已自动展平成标准 DataFrame，直接按业务列名取数。"""
 
 
 
@@ -214,6 +227,76 @@ class AgentLoop:
         "pdf": "PDF文档", "docx": "Word文档", "pptx": "PowerPoint课件", "ppt": "PowerPoint旧版课件",
         "png": "图片", "jpg": "图片", "jpeg": "图片", "gif": "图片", "bmp": "图片", "webp": "图片",
     }
+
+    _DATA_CONTEXT_TRIGGERS = (
+        "数据", "数据空间", "文件", "上传", "表格", "工作表", "字段", "列名", "记录", "明细",
+        "统计", "分析", "查询", "筛选", "列出", "有哪些", "多少", "几个", "排名", "趋势",
+        "汇总", "总计", "平均", "最大", "最小", "占比", "分布", "异常", "导出", "图表",
+        "根据", "基于", "这份", "这个文件", "这些文件", "资料", "文档", "报告", "课件",
+        "讲义", "笔记", "习题", "课程", "复习", "总结", "考点", "里面", "content",
+        "file", "files", "dataset", "data", "csv", "json", "xlsx", "excel", "table",
+        "schema", "column", "row", "query", "analyze", "analysis", "summarize",
+        "count", "list", "rank", "trend", "chart", "report",
+    )
+
+    _GENERAL_CONTEXT_HINTS = (
+        "怎么设计", "如何设计", "架构", "提示词", "system prompt", "prompt", "codex",
+        "claude code", "agent设计", "为什么感觉", "是否有强调", "需要调整",
+    )
+
+    @classmethod
+    def _should_include_data_context(cls, user_message: str, data_space_id: uuid.UUID | None) -> bool:
+        """判断本轮是否需要把完整数据空间/schema 注入模型上下文。
+
+        Codex/Claude Code 类 agent 的提示词是「通用核心 + 按需注入项目/工具上下文」。
+        这里也采用同样思路：选了数据空间不等于每个问题都要走数据分析模式。
+        """
+        if not data_space_id:
+            return False
+        text = (user_message or "").strip().lower()
+        if not text:
+            return False
+        if any(hint in text for hint in cls._GENERAL_CONTEXT_HINTS):
+            return False
+        return any(trigger in text for trigger in cls._DATA_CONTEXT_TRIGGERS)
+
+    async def _get_selected_space_notice(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
+        """给通用模式一份轻量数据空间上下文。
+
+        通用助手应该知道当前数据空间存在以及大致包含什么，但不应该在普通问题里
+        被完整文件清单、schema、样本值和列画像带偏。
+        """
+        if not data_space_id:
+            return "未选择数据空间。用户可以进行通用对话。"
+        try:
+            async with get_session_factory()() as db:
+                result = await db.execute(
+                    select(DataSpace).where(DataSpace.id == data_space_id, DataSpace.user_id == user_id)
+                )
+                space = result.scalar_one_or_none()
+                if space:
+                    file_result = await db.execute(
+                        select(File)
+                        .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
+                        .where(DataSpaceFile.data_space_id == data_space_id)
+                    )
+                    files = file_result.scalars().all()
+                    from collections import Counter
+
+                    label_counts: Counter = Counter(
+                        self._FILE_TYPE_LABELS.get(f.file_type, f.file_type) for f in files
+                    )
+                    type_summary = ", ".join(
+                        f"{cnt} 个 {label}" for label, cnt in label_counts.most_common()
+                    ) or "空"
+                    return (
+                        f"当前已选择数据空间: {space.name}\n"
+                        f"轻量概览: 共 {len(files)} 个文件；按类型构成：{type_summary}。\n"
+                        "本轮问题看起来不依赖上传内容；你可以知道这些上下文存在，但除非用户明确要求读取或分析该空间，不要展开 schema、调用数据工具或围绕 CSV/JSON/表格改写问题。"
+                    )
+        except Exception as e:
+            logger.warning("selected space notice failed: %s", e)
+        return "当前已选择数据空间，但本轮问题看起来不依赖上传内容；知道数据空间存在即可，不要主动展开 schema 或调用数据工具。"
 
     async def _get_data_space_info(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
         """获取数据空间的上下文信息"""
@@ -376,7 +459,6 @@ class AgentLoop:
                 profile_map[str(p.file_id)] = p
 
 
-            lines = ["## 数据概览\n"]
             all_columns: dict[str, dict[str, set]] = {}
             MAX_SCHEMA_COLS = 30
             TABULAR_EXTS = {"csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"}
@@ -406,9 +488,16 @@ class AgentLoop:
                 )
             MAX_SCHEMA_FILES = 25
             shown_ids: set[str] = set()
+            preview_files = sorted_files[:MAX_SCHEMA_FILES]
+            lines = [
+                "## 本轮相关文件预览（非完整文件清单）\n",
+                f"以下只展开最多 {MAX_SCHEMA_FILES} 个与本轮问题相关或优先的数据文件，用于快速判断可用上下文。",
+                f"当前数据空间实际共有 {len(all_files)} 个文件；未在本预览展开的文件仍然存在，可按需用 read_file / search_data_space / inspect_data 查看。",
+                "",
+            ]
 
             # 遍历文件（相关/数据文件优先）
-            for f in sorted_files[:MAX_SCHEMA_FILES]:
+            for f in preview_files:
                 fid = str(f.id)
                 shown_ids.add(fid)
                 profile = profile_map.get(fid)
@@ -591,6 +680,22 @@ class AgentLoop:
                     lines.append(f"- {f.filename}{dims}")
                 if len(remaining) > 60:
                     lines.append(f"- …（还有 {len(remaining) - 60} 个数据文件）")
+
+            remaining_all = [f for f in all_files if str(f.id) not in shown_ids]
+            if remaining_all:
+                from collections import Counter
+                label_counts: Counter = Counter(
+                    self._FILE_TYPE_LABELS.get(f.file_type, f.file_type) for f in remaining_all
+                )
+                type_summary = ", ".join(
+                    f"{cnt} 个 {label}" for label, cnt in label_counts.most_common()
+                )
+                lines.append("")
+                lines.append("### 未展开文件说明")
+                lines.append(
+                    f"还有 {len(remaining_all)} 个文件未在本轮预览展开；类型构成：{type_summary or '无'}。"
+                )
+                lines.append("这些文件不是缺失，只是未预注入详细内容；如果用户问题涉及它们，继续用文件工具查看。")
 
             # JOIN 检测
             joins = self._detect_joins_for_schema(all_columns)
@@ -868,10 +973,17 @@ class AgentLoop:
                 yield {"type": "error", "message": "额度不足。每日免费额度会在次日自动发放，你也可以在「额度中心」查看详情，或在「设置」中配置自己的 API Key 免费使用。"}
                 return
 
-        # 构建系统提示（含文件列表 + schema 预注入 + knowledge.md + 记忆）
-        data_space_info = await self._get_data_space_info(data_space_id, user_id)
-        schema_context = await self._build_schema_context(data_space_id, user_id, user_message)
-        knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
+        # 构建系统提示。完整文件列表/schema/knowledge 只在本轮问题依赖数据空间时注入；
+        # 普通问题保持轻量上下文，避免模型被无关 CSV/JSON/表格信息带偏。
+        include_data_context = self._should_include_data_context(user_message, data_space_id)
+        if include_data_context:
+            data_space_info = await self._get_data_space_info(data_space_id, user_id)
+            schema_context = await self._build_schema_context(data_space_id, user_id, user_message)
+            knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
+        else:
+            data_space_info = await self._get_selected_space_notice(data_space_id, user_id)
+            schema_context = ""
+            knowledge_context = ""
 
         memory_context = ""
         try:
