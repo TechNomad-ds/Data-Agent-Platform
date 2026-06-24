@@ -324,6 +324,65 @@ def _load_df(file_path: Path, ext: str) -> pd.DataFrame:
     return load_dataframe(file_path, ext)
 
 
+def _col_describe(series) -> str:
+    """生成一列的描述行，对含 list/dict 等不可哈希值的列安全降级。
+
+    LLM 训练数据常见的 json/jsonl（messages/tools/golden_answers 等嵌套数组）
+    会把 list/dict 放进单元格。pandas 的 nunique() 要对值做哈希去重，遇到
+    list 直接抛 unhashable type，导致整个 inspect_data 失败、模型误判数据缺失。
+    这里：先按 dtype 取非空数；唯一值用可哈希值直接算，不可哈希时按 repr 字符串去重；
+    示例值统一截断，list/dict 用紧凑 JSON 片段展示。"""
+    non_null = int(series.notna().sum())
+    total = len(series)
+    nn = series.dropna()
+    try:
+        unique = int(nn.nunique())
+    except TypeError:
+        # 含不可哈希值（list/dict）：按字符串化去重
+        try:
+            unique = int(nn.map(lambda v: json.dumps(v, ensure_ascii=False, sort_keys=True)
+                                 if isinstance(v, (list, dict)) else str(v)).nunique())
+        except Exception:
+            unique = "?"
+
+    sample_val = "N/A"
+    if non_null > 0:
+        raw = nn.iloc[0]
+        if isinstance(raw, (list, dict)):
+            try:
+                sample_val = json.dumps(raw, ensure_ascii=False)[:80]
+            except Exception:
+                sample_val = str(raw)[:80]
+        else:
+            sample_val = str(raw)[:50]
+    return f"  - {series.name}: {series.dtype} ({non_null}/{total} 非空, {unique} 唯一值, 示例: {sample_val})"
+
+
+def _df_preview(df: pd.DataFrame, n: int = 5, cell_chars: int = 60) -> str:
+    """前 N 行预览，硬截断每个单元格，避免长文本列（instruction/output/全文）
+    把单次 inspect 输出撑到几十万字符、污染上下文预算。
+
+    不依赖 pandas 的 display.max_colwidth：它对宽 object 列、list/dict 单元格的
+    截断在不同版本下不可靠（实测一篇 4 万字论文的列仍会整列刷出）。这里在渲染前
+    把每个单元格字符串化并截断，从根上限制输出体量。"""
+    head = df.head(n).copy()
+
+    def _trunc(v):
+        if isinstance(v, (list, dict)):
+            try:
+                s = json.dumps(v, ensure_ascii=False)
+            except Exception:
+                s = str(v)
+        else:
+            s = str(v)
+        return s[:cell_chars] + "…" if len(s) > cell_chars else s
+
+    for col in head.columns:
+        head[col] = head[col].map(_trunc)
+    with pd.option_context("display.max_colwidth", cell_chars + 4, "display.width", 200):
+        return head.to_string()
+
+
 DATAFRAME_FILE_KINDS = {
     "csv": "csv",
     "xlsx": "excel",
@@ -726,11 +785,8 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
                     info.append(f"列数: {len(df.columns)}")
                     info.append("列信息:")
                     for col in df.columns:
-                        non_null = int(df[col].notna().sum())
-                        unique = int(df[col].nunique())
-                        sample = str(df[col].dropna().iloc[0])[:50] if non_null > 0 else "N/A"
-                        info.append(f"  - {col}: {df[col].dtype} ({non_null}/{len(df)} 非空, {unique} 唯一值, 示例: {sample})")
-                    info.append(f"\n前5行:\n{df.head(5).to_string()}")
+                        info.append(_col_describe(df[col]))
+                    info.append(f"\n前5行:\n{_df_preview(df)}")
                 return "\n".join(info)
 
             df = _load_df(file_path, ext)
@@ -742,11 +798,8 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
                     "（仅 execute_python 使用；pandas_query 中该文件固定叫 df）",
                 )
             for col in df.columns:
-                non_null = int(df[col].notna().sum())
-                unique = int(df[col].nunique())
-                sample = str(df[col].dropna().iloc[0])[:50] if non_null > 0 else "N/A"
-                info.append(f"  - {col}: {df[col].dtype} ({non_null}/{len(df)} 非空, {unique} 唯一值, 示例: {sample})")
-            info.append(f"\n前5行:\n{df.head(5).to_string()}")
+                info.append(_col_describe(df[col]))
+            info.append(f"\n前5行:\n{_df_preview(df)}")
             return "\n".join(info)
         except Exception as e:
             return f"解析失败: {str(e)}"

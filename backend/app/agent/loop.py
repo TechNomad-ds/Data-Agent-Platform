@@ -135,13 +135,17 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个通用 AI 工作助手。你
 {data_mode_guidance}"""
 
 
-# 数据空间工作模式指引：只有当本轮问题确实依赖上传内容时才拼接到系统提示词里
-# （见 AgentLoop._should_include_data_context）。通用问答时这段不注入，避免模型被
-# 满屏数据工具、取数口径、结果卡格式等细节带偏，语气也更自然。
-DATA_MODE_GUIDANCE = """# 数据空间工作模式
+# 数据空间工作规范：始终注入到系统提示词中，但开头讲清「按需使用」。
+# 这样模型在任意一轮都知道两种模式如何切换，而不是靠入口关键词替它一刀切；
+# 常驻也让 prompt 缓存稳定命中，不会因为门控翻转而每轮击穿缓存。
+# 详细 schema / knowledge 全文仍按需预取（见 AgentLoop._should_include_data_context）。
+DATA_MODE_GUIDANCE = """# 数据空间工作（按需使用）
 
-- 上方「本轮相关文件预览」只是为控制上下文而展开的部分文件，不是完整清单，也不代表你已读取全部。未展开文件仍属于数据空间，需要时用 inspect_data / read_file / search_data_space 继续查看——预览里没有，不等于数据缺失。
-- 坚持把用户真正的目标做完，而不是缩水成更省事的小问题。某个数据源查不到，先换表、换文件、换工具，把可能的来源都查过，确实没有再如实说明；一个方法失败就换一个，别在反复报错的同一条路上死磕。
+下面是处理数据空间文件时的工作规范，是「需要时才参考」的，不是让你把每个问题都变成数据分析：
+- 默认按用户问题本身回答。只有当用户明确要求读取、查询或分析本数据空间里的某个文件 / 表格 / 课程资料 / 文档 / 上传内容时，才使用下面的数据工具和取数口径。
+- 通用概念、方法、代码/架构讨论、学习辅导、闲聊等不依赖上传文件的问题，直接回答即可，不要因为这些工具和规范摆在这里就硬去 inspect_data / 调 SQL / 围绕 CSV/JSON/表格改写问题。
+- 上方若有「本轮相关文件预览」或数据空间索引，那只是为控制上下文而展开的部分文件，不是完整清单，也不代表你已读取全部。未展开文件仍属于数据空间，需要时用 inspect_data / read_file / search_data_space 继续查看——预览里没有，不等于数据缺失。
+- 进入数据工作后，坚持把用户真正的目标做完，而不是缩水成更省事的小问题。某个数据源查不到，先换表、换文件、换工具，把可能的来源都查过，确实没有再如实说明；一个方法失败就换一个，别在反复报错的同一条路上死磕。
 
 # 课程学习 / 复习辅导
 
@@ -246,8 +250,11 @@ class AgentLoop:
         # 数据空间 / 文件 / 表结构（强信号）
         "数据空间", "数据集", "文件", "上传", "工作表", "字段", "列名", "明细", "表格",
         "有什么数据", "有哪些数据", "有什么文件", "有哪些文件",
-        # 课程资料类名词（本产品的核心场景，强信号）
-        "资料", "文档", "课件", "讲义", "笔记", "习题", "课程", "复习", "考点",
+        # 课程资料类名词：指向「上传的资料文件」的才保留为预取信号。
+        # "课程/复习/考点" 是学习意图词，纯概念问答里同样高频（"复习傅里叶变换"），
+        # 留着会过度预取且轻微把模型往找文件方向带，故移除——这类问题命中与否都能
+        # 正确回答，差别仅在是否多预取一层 schema，按「偏向少预取」原则去掉。
+        "资料", "文档", "课件", "讲义", "笔记", "习题",
         # 数据特有的强动词（很少用于抽象对象）
         "查询", "筛选", "列出", "去重", "取数", "导出", "图表", "排名",
         # 明确指向上传内容的指代
@@ -311,10 +318,32 @@ class AgentLoop:
                     type_summary = ", ".join(
                         f"{cnt} 个 {label}" for label, cnt in label_counts.most_common()
                     ) or "空"
+
+                    # 一行式数据文件索引（只列文件名，几十 token）：让模型即使在通用模式下
+                    # 也知道有哪些可直接分析的结构化数据存在，需要时自己用 inspect_data /
+                    # read_file 拉取详细 schema，而不必把列级细节预注入进来。
+                    DATA_EXTS = {
+                        "csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet",
+                        "feather", "dta", "sav", "sas7bdat", "sqlite", "db", "sqlite3",
+                    }
+                    data_files = [f for f in files if f.file_type in DATA_EXTS]
+                    index_line = ""
+                    if data_files:
+                        names = "、".join(f.filename for f in data_files[:15])
+                        more = f" 等 {len(data_files)} 个" if len(data_files) > 15 else ""
+                        index_line = f"可直接分析的数据文件：{names}{more}。\n"
+
+                    # knowledge.md 存在性提示（不注入全文，只标存在）
+                    knowledge_note = ""
+                    if any(f.filename.lower() == "knowledge.md" for f in files):
+                        knowledge_note = "本空间含 knowledge.md（领域知识/口径说明），需要时用 read_file 读取。\n"
+
                     return (
                         f"当前已选择数据空间: {space.name}\n"
                         f"轻量概览: 共 {len(files)} 个文件；按类型构成：{type_summary}。\n"
-                        "本轮问题看起来不依赖上传内容；你可以知道这些上下文存在，但除非用户明确要求读取或分析该空间，不要展开 schema、调用数据工具或围绕 CSV/JSON/表格改写问题。"
+                        f"{index_line}"
+                        f"{knowledge_note}"
+                        "本轮问题看起来不依赖上传内容；你可以知道这些上下文存在，但除非用户明确要求读取或分析该空间，不要展开 schema、调用数据工具或围绕 CSV/JSON/表格改写问题。需要时再用 inspect_data / read_file / search_data_space 按需拉取。"
                     )
         except Exception as e:
             logger.warning("selected space notice failed: %s", e)
@@ -644,13 +673,24 @@ class AgentLoop:
                             py_hint = f"  python变量={df_var}" if df_var else ""
                             lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}{py_hint}")
                             for col in list(df.columns)[:MAX_SCHEMA_COLS]:
-                                unique = int(df[col].nunique())
                                 dtype = str(df[col].dtype)
-                                samples = ", ".join(str(s)[:20] for s in df[col].dropna().unique()[:3])
+                                nn = df[col].dropna()
+                                # list/dict 单元格（LLM 训练数据类 json/jsonl 常见）不可哈希，
+                                # nunique()/unique() 会抛 unhashable type，整块掉进 except 被误
+                                # 标「加载中」。统一字符串化后再统计/取样，保证 schema 正常预注入。
+                                str_vals = nn.map(
+                                    lambda v: json.dumps(v, ensure_ascii=False)
+                                    if isinstance(v, (list, dict)) else str(v)
+                                )
+                                try:
+                                    unique = int(str_vals.nunique())
+                                except Exception:
+                                    unique = "?"
+                                samples = ", ".join(s[:20] for s in str_vals.unique()[:3])
                                 lines.append(f"    - {col} ({dtype}) unique={unique} ex=[{samples}]")
                                 if col not in all_columns:
                                     all_columns[col] = {}
-                                all_columns[col][f.filename] = set(str(s) for s in df[col].dropna().unique()[:50].tolist())
+                                all_columns[col][f.filename] = set(str_vals.unique()[:50].tolist())
                             lines.append("")
                         except Exception:
                             lines.append(f"### {f.filename} ({f.file_type}, 加载中...)")
@@ -995,19 +1035,22 @@ class AgentLoop:
                 yield {"type": "error", "message": "额度不足。每日免费额度会在次日自动发放，你也可以在「额度中心」查看详情，或在「设置」中配置自己的 API Key 免费使用。"}
                 return
 
-        # 构建系统提示。完整文件列表/schema/knowledge 只在本轮问题依赖数据空间时注入；
-        # 普通问题保持轻量上下文，避免模型被无关 CSV/JSON/表格信息带偏。
-        include_data_context = self._should_include_data_context(user_message, data_space_id)
-        if include_data_context:
+        # 构建系统提示。数据工作规范（DATA_MODE_GUIDANCE）始终注入，让模型在任意一轮
+        # 都知道两种模式如何切换、且 prompt 缓存稳定命中。关键词只决定「要不要顺手多预取
+        # 一层 schema / knowledge 细节」这一性能优化，不再当行为开关：判错顶多多带/少带
+        # 一点上下文，模型仍能用 inspect_data / read_file 等工具按需补齐。
+        data_mode_guidance = DATA_MODE_GUIDANCE
+        prefetch_data_detail = self._should_include_data_context(user_message, data_space_id)
+        if prefetch_data_detail:
             data_space_info = await self._get_data_space_info(data_space_id, user_id)
             schema_context = await self._build_schema_context(data_space_id, user_id, user_message)
             knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
-            data_mode_guidance = DATA_MODE_GUIDANCE
         else:
+            # 通用问答：只给轻量数据空间索引（文件总数/类型构成 + 一行式清单），
+            # 不预注入列级 schema、样本值、knowledge 全文——这些留给模型按需用工具拉。
             data_space_info = await self._get_selected_space_notice(data_space_id, user_id)
             schema_context = ""
             knowledge_context = ""
-            data_mode_guidance = ""
 
         memory_context = ""
         try:

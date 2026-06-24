@@ -32,6 +32,42 @@ def test_file_loader_json():
     assert "a" in df.columns
 
 
+def test_inspect_data_handles_nested_list_columns():
+    """LLM 训练数据类 json/jsonl 常把 list/dict 放进单元格（messages、golden_answers、
+    abbreviations 等）。inspect_data 的列统计若用裸 nunique() 会抛 unhashable type，
+    导致整个文件「解析失败」、模型误判数据缺失。这里锁住 list/dict 安全降级。"""
+    from app.agent.tools import _load_df, _col_describe, _df_preview
+
+    rows = [
+        {"id": i, "question": f"q{i}", "golden_answers": ["A", "B", str(i)],
+         "meta": {"k": i}}
+        for i in range(5)
+    ]
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
+        json.dump(rows, f)
+        f.flush()
+        df = _load_df(Path(f.name), "json")
+
+    # 含 list 的列不再崩，且能给出唯一值统计与示例
+    for col in df.columns:
+        line = _col_describe(df[col])
+        assert col in line and "唯一值" in line
+    # list 列示例值以紧凑 JSON 呈现
+    ga_line = _col_describe(df["golden_answers"])
+    assert "[" in ga_line
+
+
+def test_df_preview_bounds_long_cell_output():
+    """长文本列（论文全文等）单元格可达数万字符，若不截断会把单次 inspect 输出
+    撑到几十万字符、污染上下文预算。预览须对每个单元格硬截断。"""
+    from app.agent.tools import _df_preview
+
+    df = pd.DataFrame({"text": ["x" * 50000 for _ in range(3)], "n": [1, 2, 3]})
+    out = _df_preview(df, cell_chars=60)
+    assert len(out) < 2000  # 远小于 3 * 50000
+    assert "…" in out  # 标注了截断
+
+
 def test_file_loader_excel_sheets():
     """多 sheet Excel 会被完整枚举，不再只读第一个 sheet。"""
     pytest.importorskip("openpyxl")
