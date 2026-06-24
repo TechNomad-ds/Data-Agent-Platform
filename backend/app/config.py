@@ -70,8 +70,8 @@ class Settings(BaseSettings):
     llm_retry_base_delay: float = 1.0
 
     # 取数结果自检（对齐 codex completion audit）
-    # 模型认为完成、且本轮用过数据工具时，注入一次有界的核对提示
-    enable_answer_self_check: bool = True
+    # 默认关闭，避免模型把内部核对过程复述给用户；如需更强取数保守性可用环境变量开启。
+    enable_answer_self_check: bool = False
 
     # 单回合 canonical 持久化的总字符上限（防长任务把单个 JSONB 行撑大、
     # 拖慢下一轮全量历史加载）。超限丢弃更早的工具记录，保住最终答案。

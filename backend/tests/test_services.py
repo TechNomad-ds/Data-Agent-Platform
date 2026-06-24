@@ -154,9 +154,14 @@ def test_extract_title():
 
 
 def test_system_prompt_contains_pku_study_guidance():
-    """北大课程复习场景依赖这些提示词约束回答格式和范围。"""
-    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+    """北大课程复习场景依赖这些提示词约束回答格式和范围。
 
+    课程辅导细节现在归入数据模式段（DATA_MODE_GUIDANCE），只有问题确实依赖上传资料时
+    才注入；公式/Markdown 规范留在通用核心。测试断言整体提示词（核心 + 数据段）。
+    """
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE, DATA_MODE_GUIDANCE
+
+    full = SYSTEM_PROMPT_TEMPLATE + DATA_MODE_GUIDANCE
     for phrase in (
         "课程学习 / 复习辅导",
         "课程助教",
@@ -169,53 +174,72 @@ def test_system_prompt_contains_pku_study_guidance():
         "Markdown 稳定性",
         "UTF-8 正常文本",
     ):
-        assert phrase in SYSTEM_PROMPT_TEMPLATE
+        assert phrase in full
 
 
 def test_system_prompt_contains_text_analysis_quality_guidance():
-    """报告中暴露的评论情感误判和首版代码报错，需要提示词长期约束。"""
-    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+    """报告中暴露的评论情感误判和首版代码报错，需要提示词长期约束。
 
+    这些都属于数据模式段，断言核心 + 数据段的整体提示词。
+    """
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE, DATA_MODE_GUIDANCE
+
+    full = SYSTEM_PROMPT_TEMPLATE + DATA_MODE_GUIDANCE
     for phrase in (
         "文本 / 评论 / 情感分析要求",
         "不要只靠关键词打标签",
         "希望增加更多实战",
         "改进诉求",
         "代表性原文短句",
-        "代码可靠性要求",
+        "代码执行约束",
         "确认真实列名",
         "避免链式赋值",
-        "不要依赖上一轮工具里创建的临时变量",
+        "每次调用都是全新无状态沙箱",
     ):
-        assert phrase in SYSTEM_PROMPT_TEMPLATE
+        assert phrase in full
 
 
 def test_agent_data_context_is_intent_gated():
-    """普通设计/提示词问题不应因为选了数据空间就被 schema 上下文带偏。"""
+    """普通设计/提示词/代码讨论问题不应因为选了数据空间就被 schema 上下文带偏。"""
     from app.agent.loop import AgentLoop
 
     space_id = uuid.uuid4()
-    assert not AgentLoop._should_include_data_context(
+    # 通用：架构/提示词讨论、代码逻辑、概念、泛化的"总结/分析"动词都应留在通用模式
+    for q in (
         "我怎么感觉 agent 问什么都关注 json/csv，是提示词里强调了吗？需要调整",
-        space_id,
-    )
-    assert not AgentLoop._should_include_data_context("你觉得这个 agent 架构怎么设计更好？", space_id)
+        "你觉得这个 agent 架构怎么设计更好？",
+        "帮我分析下这段代码的逻辑",
+        "总结一下我们刚讨论的这个思路",
+        "什么是缓存穿透？",
+        "快速排序和归并排序有什么区别",
+    ):
+        assert not AgentLoop._should_include_data_context(q, space_id), q
 
-    assert AgentLoop._should_include_data_context("帮我统计 sales.csv 里每个区域的收入", space_id)
-    assert AgentLoop._should_include_data_context("基于课程资料总结一下 cache miss 的考点", space_id)
+    # 数据：点名了文件/表/课程资料，或用了数据特有强动词
+    for q in (
+        "帮我统计 sales.csv 里每个区域的收入",
+        "基于课程资料总结一下 cache miss 的考点",
+        "这份文件里有多少条记录",
+        "查询订单表里金额最大的客户",
+        "当前数据空间有什么文件",
+    ):
+        assert AgentLoop._should_include_data_context(q, space_id), q
 
 
 def test_system_prompt_calls_schema_context_preview_not_full_inventory():
-    """schema 预注入是相关文件预览，不能暗示模型已经看完全部文件。"""
-    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+    """schema 预注入是相关文件预览，不能暗示模型已经看完全部文件。
+
+    该指引归入数据模式段（DATA_MODE_GUIDANCE）。
+    """
+    from app.agent.loop import DATA_MODE_GUIDANCE
 
     for phrase in (
         "本轮相关文件预览",
-        "不是完整文件清单",
-        "不代表你已经读取了全部文件",
+        "不是完整清单",
+        "不代表你已读取全部",
         "未展开文件仍属于数据空间",
     ):
-        assert phrase in SYSTEM_PROMPT_TEMPLATE
+        assert phrase in DATA_MODE_GUIDANCE
 
 
 def _load_pku_llm_acceptance_module():
