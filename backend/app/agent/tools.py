@@ -39,13 +39,13 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "read_file",
-                "description": "读取数据空间中指定文件的原始内容或表格分页预览。适合查看文档全文、确认文件内容、读取非表格文件；表格统计分析优先用 pandas_query/sqlite_query。",
+                "description": "读取数据空间中指定文件的原始内容或表格分页预览。适合查看文档全文、确认文件内容、读取非表格文件；表格统计分析优先用 pandas_query/sqlite_query。返回结果末尾会标注是否已读到文件结尾——逐篇讲解/总结整篇文档时，必须翻页读到出现“已读到文件结尾”再下结论，不要只读开头一页就概括全文。",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "filename": {"type": "string", "description": "文件名"},
-                        "start_line": {"type": "integer", "description": "起始行号（从0开始）", "default": 0},
-                        "max_lines": {"type": "integer", "description": "最大读取行数", "default": 100},
+                        "start_line": {"type": "integer", "description": "起始行号（从0开始）。文件未读完时，用上次返回的结尾行号继续读。", "default": 0},
+                        "max_lines": {"type": "integer", "description": "最大读取行数。默认 400；想一次读完较长文档可调大。", "default": 400},
                     },
                     "required": ["filename"],
                 },
@@ -625,10 +625,25 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
     return "\n\n".join(keyword_results) if keyword_results else f"未找到与 '{query}' 相关的内容"
 
 
+def _read_footer(start_line: int, shown: int, total: int) -> str:
+    """文本/文档分页阅读的结尾信号：明确告诉模型读完没、还剩多少行。
+
+    没有这条信号时，模型会把读到的一页当成全文，开头读一页就概括整篇——
+    这正是「讲解论文没读全就开讲」的根因，所以每次分页读都要带上。"""
+    end = start_line + shown
+    if end >= total:
+        return f"\n---\n[已读到文件结尾：共 {total} 行，本次第 {start_line+1}-{total} 行，全文已读完]"
+    remaining = total - end
+    return (
+        f"\n---\n[未读完：共 {total} 行，本次第 {start_line+1}-{end} 行，"
+        f"后面还有 {remaining} 行未读。如需讲解/总结整篇，请用 start_line={end} 继续读到出现“全文已读完”为止。]"
+    )
+
+
 async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     filename = args.get("filename", "")
     start_line = args.get("start_line", 0)
-    max_lines = args.get("max_lines", 100)
+    max_lines = args.get("max_lines", 400)
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():
         return f"文件 '{filename}' 不存在或无权访问"
@@ -681,10 +696,10 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
                     if ocr_text:
                         lines = ocr_text.split("\n")
                         selected = lines[start_line:start_line + max_lines]
-                        return f"文件: {filename} (PDF/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+                        return f"文件: {filename} (PDF/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
                 lines = content.split("\n")
                 selected = lines[start_line:start_line + max_lines]
-                return f"文件: {filename} (PDF, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+                return f"文件: {filename} (PDF, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             except ImportError:
                 pass
 
@@ -695,7 +710,7 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
             if ocr_text:
                 lines = ocr_text.split("\n")
                 selected = lines[start_line:start_line + max_lines]
-                return f"文件: {filename} ({kind}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+                return f"文件: {filename} ({kind}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             return f"'{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
 
 
@@ -707,7 +722,7 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
                 lines = content.split("\n")
                 selected = lines[start_line:start_line + max_lines]
                 label = "PowerPoint" if ext == "pptx" else "Word"
-                return f"文件: {filename} ({label}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+                return f"文件: {filename} ({label}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             except ImportError:
                 pass
 
@@ -741,7 +756,7 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
         content = file_path.read_text(encoding=encoding, errors="ignore")
         lines = content.split("\n")
         selected = lines[start_line:start_line + max_lines]
-        return f"文件: {filename} (共 {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected)
+        return f"文件: {filename} (共 {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
     except Exception as e:
         return f"读取文件失败: {str(e)}"
 
