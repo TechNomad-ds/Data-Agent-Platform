@@ -51,8 +51,8 @@ body {
 /* Markdown body */
 .markdown-body {
   color: #1f2328;
-  line-height: 1.75;
-  font-size: 15px;
+  line-height: 1.78;
+  font-size: 16px;
 }
 
 .markdown-body p {
@@ -321,4 +321,27 @@ body {
     border-radius: 12px;
     padding: 24px 20px 16px;
   }
+}
+
+/* 数据空间绑定选择器（聊天框下方，显眼且精致） */
+.space-bind-select .ant-select-selector {
+  border-radius: 999px !important;
+  border: 1px solid #e4e4e7 !important;
+  background: #ffffff !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.space-bind-select:hover .ant-select-selector {
+  border-color: #c7c7cf !important;
+}
+.space-bind-select.ant-select-focused .ant-select-selector {
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
+}
+.space-bind-select .ant-select-selection-item,
+.space-bind-select .ant-select-selection-placeholder {
+  line-height: 34px !important;
+  font-size: 13px;
 }

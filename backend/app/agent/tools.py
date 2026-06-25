@@ -46,7 +46,7 @@ def get_tool_definitions() -> list[dict]:
                         "filename": {"type": "string", "description": "文件名"},
                         "find": {"type": "string", "description": "可选：在文件内按关键词/短语定位（大小写不敏感），跳到第一处匹配并返回其上下文窗口，而不是从头读。适合在厚文档里定位某个主题/章节。用 search_data_space 命中的原文短语做 find 效果最好。"},
                         "start_line": {"type": "integer", "description": "起始行号（从0开始）。文件未读完时，用上次返回的结尾行号继续读；配合 find 时，从该行之后查找下一处匹配。", "default": 0},
-                        "max_lines": {"type": "integer", "description": "最大读取行数（find 模式下为匹配处上下文窗口大小）。默认 400；想一次读完较长文档可调大。", "default": 400},
+                        "max_lines": {"type": "integer", "description": "最大读取行数（find 模式下为匹配处上下文窗口大小）。默认 800；表格/长章节想一次读完可调到更大（如 2000）。", "default": 800},
                     },
                     "required": ["filename"],
                 },
@@ -819,7 +819,7 @@ def _render_find(filename: str, label: str, lines: list[str], needle: str,
 async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     filename = args.get("filename", "")
     start_line = args.get("start_line", 0)
-    max_lines = args.get("max_lines", 400)
+    max_lines = args.get("max_lines", 800)
     find = (args.get("find") or "").strip()
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():

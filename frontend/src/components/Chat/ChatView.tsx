@@ -109,6 +109,8 @@ export default function ChatView({
   const [loadingConversation, setLoadingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  // 输入法（拼音等）组字状态：组字中按回车是确认候选词，不应触发发送
+  const isComposingRef = useRef(false)
   // 用户是否贴在底部（决定流式时是否自动跟随滚动）
   const stickToBottomRef = useRef(true)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
@@ -413,6 +415,26 @@ export default function ChatView({
     sendMessage(conversationId, lastUserMsg.content, true)
   }, [isStreaming, conversationId, selectedModel])
 
+  // 编辑某条用户消息并重新发送：截断到该消息之前，插入编辑后的新消息，再发起请求。
+  const handleEditResend = useCallback(
+    (messageId: string, newContent: string) => {
+      if (isStreaming || !conversationId) return
+      const currentMessages = useChatStore.getState().messages
+      const idx = currentMessages.findIndex((m) => m.id === messageId)
+      if (idx < 0) return
+      const editedMsg: Message = {
+        ...currentMessages[idx],
+        content: newContent,
+        created_at: new Date().toISOString(),
+      }
+      // 保留被编辑消息之前的历史 + 编辑后的这条；其后（旧回答等）丢弃
+      setMessages([...currentMessages.slice(0, idx), editedMsg])
+      // skipAddUserMsg：用户消息已手动插入，避免重复
+      sendMessage(conversationId, newContent, true)
+    },
+    [isStreaming, conversationId, selectedModel]
+  )
+
   const handleFeedback = useCallback(
     async (messageId: string, rating: number) => {
       try {
@@ -448,49 +470,31 @@ export default function ChatView({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {spaceLockedByConversation && selectedSpaceId ? (
-            <Tooltip title="此对话已绑定数据空间，不可切换" placement="bottom">
+          {/* 数据空间绑定入口已前移到输入框下方（更显眼）。这里仅在已绑定时显示一个
+              只读指示，不再放可交互的选择器，避免两处控件重复。 */}
+          {selectedSpaceId && (
+            <>
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  padding: '6px 12px',
+                  padding: '4px 10px',
                   borderRadius: 8,
                   background: colors.bgSubtle,
-                  border: `1px solid ${colors.border}`,
                 }}
               >
-                <DatabaseOutlined
-                  style={{ fontSize: 12, color: colors.textSecondary }}
-                />
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: colors.textPrimary,
-                    fontWeight: 500,
-                  }}
-                >
-                  {spaces.find((s) => s.id === selectedSpaceId)?.name ||
-                    '数据空间'}
+                <DatabaseOutlined style={{ fontSize: 12, color: colors.primary }} />
+                <span style={{ fontSize: 13, color: colors.textPrimary, fontWeight: 500 }}>
+                  {spaces.find((s) => s.id === selectedSpaceId)?.name || '数据空间'}
                 </span>
-                <LockOutlined
-                  style={{ fontSize: 10, color: colors.textMuted }}
-                />
+                {spaceLockedByConversation && (
+                  <LockOutlined style={{ fontSize: 10, color: colors.textMuted }} />
+                )}
               </div>
-            </Tooltip>
-          ) : (
-            <Select
-              value={spaces.some((s) => s.id === selectedSpaceId) ? selectedSpaceId : undefined}
-              onChange={onSpaceChange}
-              placeholder="数据空间"
-              style={{ minWidth: isMobile ? 100 : 140 }}
-              popupMatchSelectWidth={false}
-              variant="borderless"
-              options={spaces.map((s) => ({ label: s.name, value: s.id }))}
-            />
+              <span style={{ color: colors.border }}>|</span>
+            </>
           )}
-          <span style={{ color: colors.border }}>|</span>
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
@@ -533,19 +537,19 @@ export default function ChatView({
               <HeroMark />
               <Text
                 style={{
-                  fontSize: 22,
+                  fontSize: 26,
                   fontWeight: 600,
                   color: colors.textPrimary,
                   display: 'block',
-                  marginBottom: 6,
-                  letterSpacing: -0.3,
+                  marginBottom: 8,
+                  letterSpacing: -0.4,
                 }}
               >
                 有什么可以帮你分析的？
               </Text>
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 15,
                   color: colors.textMuted,
                   display: 'block',
                   marginBottom: 36,
@@ -571,13 +575,13 @@ export default function ChatView({
                       key={q}
                       onClick={() => { if (!isStreaming && selectedModel) { setInputValue(''); handleSendWithContent(q) } else { setInputValue(q) } }}
                       style={{
-                        padding: '14px 16px',
+                        padding: '15px 17px',
                         borderRadius: 12,
                         border: `1px solid ${colors.border}`,
                         background: colors.surface,
                         cursor: 'pointer',
                         textAlign: 'left',
-                        fontSize: 13.5,
+                        fontSize: 14.5,
                         color: colors.textSecondary,
                         lineHeight: 1.55,
                         transition: 'all 0.15s',
@@ -611,6 +615,7 @@ export default function ChatView({
                         : undefined
                     }
                     onFeedback={msg.role === 'assistant' ? handleFeedback : undefined}
+                    onEditResend={msg.role === 'user' && !isStreaming ? handleEditResend : undefined}
                   />
                 </div>
               ))}
@@ -764,6 +769,8 @@ export default function ChatView({
             onChange={(e) => setInputValue(e.target.value)}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
             placeholder={
               selectedSpaceId
                 ? isMobile
@@ -774,11 +781,15 @@ export default function ChatView({
                   : '选择数据空间后可分析数据，或直接提问…'
             }
             autoSize={{ minRows: 1, maxRows: 6 }}
-            onPressEnter={(e) => {
-              if (!e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
+            onKeyDown={(e) => {
+              // 仅在「非组字 + 非 Shift」时回车发送。
+              // 拼音/输入法组字中按回车是确认候选词（e.nativeEvent.isComposing 为 true），
+              // 不能当成发送——这正是「想上屏英文却被直接发送」的根因。
+              if (e.key !== 'Enter') return
+              if (e.shiftKey) return
+              if (isComposingRef.current || (e.nativeEvent as any).isComposing || (e.nativeEvent as any).keyCode === 229) return
+              e.preventDefault()
+              handleSend()
             }}
             disabled={inputDisabled}
             variant="borderless"
@@ -786,9 +797,9 @@ export default function ChatView({
               flex: 1,
               resize: 'none',
               // 移动端用 16px 避免 iOS 聚焦时自动放大
-              fontSize: isMobile ? 16 : 14.5,
+              fontSize: isMobile ? 16 : 15.5,
               padding: '8px 0',
-              lineHeight: 1.55,
+              lineHeight: 1.6,
             }}
           />
           {showStreaming ? (
@@ -839,6 +850,64 @@ export default function ChatView({
                 }}
               />
             </Tooltip>
+          )}
+        </div>
+        {/* 数据空间绑定条：放在输入框正下方，显眼且高端（用户反馈左上角太不显眼） */}
+        <div
+          style={{
+            maxWidth: READING_WIDTH,
+            margin: '10px auto 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          {spaceLockedByConversation && selectedSpaceId ? (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '6px 14px',
+                borderRadius: 999,
+                background: colors.bgSubtle,
+                border: `1px solid ${colors.border}`,
+                fontSize: 13,
+                color: colors.textSecondary,
+              }}
+            >
+              <DatabaseOutlined style={{ fontSize: 13, color: colors.primary }} />
+              <span style={{ color: colors.textPrimary, fontWeight: 500 }}>
+                {spaces.find((s) => s.id === selectedSpaceId)?.name || '数据空间'}
+              </span>
+              <LockOutlined style={{ fontSize: 10, color: colors.textMuted }} />
+            </div>
+          ) : (
+            <Select
+              value={spaces.some((s) => s.id === selectedSpaceId) ? selectedSpaceId : undefined}
+              onChange={onSpaceChange}
+              allowClear
+              placeholder={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <DatabaseOutlined style={{ fontSize: 13 }} />
+                  绑定数据空间（可选，基于你的数据回答）
+                </span>
+              }
+              popupMatchSelectWidth={false}
+              suffixIcon={<DatabaseOutlined style={{ color: selectedSpaceId ? colors.primary : colors.textMuted }} />}
+              style={{ minWidth: 280 }}
+              className="space-bind-select"
+              options={spaces.map((s) => ({
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                    <DatabaseOutlined style={{ fontSize: 13, color: colors.primary }} />
+                    {s.name}
+                  </span>
+                ),
+                value: s.id,
+              }))}
+            />
           )}
         </div>
         <div

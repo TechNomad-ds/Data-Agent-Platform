@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Typography, message as antMessage, Tooltip } from 'antd'
+import { Typography, message as antMessage, Tooltip, Input, Button } from 'antd'
 import {
   CopyOutlined,
   CheckOutlined,
@@ -9,6 +9,7 @@ import {
   DislikeOutlined,
   DislikeFilled,
   ReloadOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
@@ -17,11 +18,13 @@ import MarkdownRenderer from './MarkdownRenderer'
 import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
+const { TextArea } = Input
 
 interface MessageContentProps {
   message: Message
   onRegenerate?: () => void
   onFeedback?: (messageId: string, rating: number) => void
+  onEditResend?: (messageId: string, newContent: string) => void
 }
 
 function formatTime(dateStr: string): string {
@@ -225,7 +228,154 @@ function FeedbackButtons({
   )
 }
 
-export default function MessageContent({ message, onRegenerate, onFeedback }: MessageContentProps) {
+// 用户消息：右对齐胶囊；hover 显示编辑/复制（类似 ChatGPT/DeepSeek）。
+// 编辑进入内联文本框，确认后回调 onEditResend 截断该消息之后的对话并重新发送。
+function UserMessage({
+  message,
+  onEditResend,
+}: {
+  message: Message
+  onEditResend?: (messageId: string, newContent: string) => void
+}) {
+  const [hover, setHover] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(message.content || '')
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content || '')
+      setCopied(true)
+      antMessage.success('已复制')
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      antMessage.error('复制失败')
+    }
+  }
+
+  const startEdit = () => {
+    setDraft(message.content || '')
+    setEditing(true)
+  }
+
+  const submitEdit = () => {
+    const next = draft.trim()
+    if (!next) return
+    setEditing(false)
+    if (next !== (message.content || '')) {
+      onEditResend?.(message.id, next)
+    }
+  }
+
+  return (
+    <div
+      style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse', alignItems: 'flex-start' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <UserAvatar />
+      <div style={{ maxWidth: '78%', minWidth: 0, width: editing ? '100%' : undefined }}>
+        {editing ? (
+          <div
+            style={{
+              background: colors.surface,
+              border: `1px solid ${colors.borderStrong}`,
+              borderRadius: 14,
+              padding: 10,
+            }}
+          >
+            <TextArea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              autoSize={{ minRows: 1, maxRows: 8 }}
+              variant="borderless"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as any).isComposing) {
+                  e.preventDefault()
+                  submitEdit()
+                }
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              style={{ fontSize: 15, padding: 0, lineHeight: 1.6 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <Button size="small" onClick={() => setEditing(false)}>取消</Button>
+              <Button size="small" type="primary" onClick={submitEdit} disabled={!draft.trim()}>
+                发送
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                padding: '11px 15px',
+                borderRadius: 14,
+                background: colors.userBubble,
+                color: colors.userBubbleText,
+                fontSize: 15.5,
+                lineHeight: 1.7,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {message.content}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 6,
+                marginTop: 4,
+                paddingRight: 4,
+                minHeight: 18,
+              }}
+            >
+              <span
+                style={{
+                  display: 'flex',
+                  gap: 4,
+                  opacity: hover ? 1 : 0,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {onEditResend && (
+                  <Tooltip title="编辑" placement="top">
+                    <span onClick={startEdit} style={iconBtnStyle}>
+                      <EditOutlined />
+                    </span>
+                  </Tooltip>
+                )}
+                <Tooltip title={copied ? '已复制' : '复制'} placement="top">
+                  <span onClick={handleCopy} style={iconBtnStyle}>
+                    {copied ? <CheckOutlined /> : <CopyOutlined />}
+                  </span>
+                </Tooltip>
+              </span>
+              <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                {formatTime(message.created_at)}
+              </Text>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const iconBtnStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  color: colors.textMuted,
+  fontSize: 12.5,
+  padding: 4,
+  borderRadius: 4,
+  display: 'inline-flex',
+  alignItems: 'center',
+}
+
+export default function MessageContent({ message, onRegenerate, onFeedback, onEditResend }: MessageContentProps) {
   const isUser = message.role === 'user'
   const segments = hasSegments(message.tool_calls) ? message.tool_calls! : null
   const textContent = segments
@@ -236,46 +386,7 @@ export default function MessageContent({ message, onRegenerate, onFeedback }: Me
     : message.content || ''
 
   if (isUser) {
-    // 用户消息：右对齐淡灰胶囊，不再使用花哨的渐变头像
-    return (
-      <div
-        style={{
-          display: 'flex',
-          gap: 12,
-          flexDirection: 'row-reverse',
-          alignItems: 'flex-start',
-        }}
-      >
-        <UserAvatar />
-        <div style={{ maxWidth: '78%', minWidth: 0 }}>
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: 14,
-              background: colors.userBubble,
-              color: colors.userBubbleText,
-              fontSize: 14.5,
-              lineHeight: 1.65,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {message.content}
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: colors.textMuted,
-              marginTop: 4,
-              textAlign: 'right',
-              paddingRight: 4,
-            }}
-          >
-            {formatTime(message.created_at)}
-          </div>
-        </div>
-      </div>
-    )
+    return <UserMessage message={message} onEditResend={onEditResend} />
   }
 
   // 助手消息：ChatGPT 风 — 不加卡片/边框，直接展示
