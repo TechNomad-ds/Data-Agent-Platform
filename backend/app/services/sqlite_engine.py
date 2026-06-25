@@ -24,7 +24,19 @@ CACHE_TTL = 300  # 5 分钟后重建
 
 async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> str:
     """将数据空间的表格文件加载到 SQLite，返回数据库路径"""
-    cache_key = str(data_space_id)
+    return await load_spaces_to_sqlite([data_space_id], user_id)
+
+
+async def load_spaces_to_sqlite(space_ids: list, user_id: uuid.UUID) -> str:
+    """#12：把一个或多个数据空间的表格文件加载到同一个 SQLite 库，返回库路径。
+
+    单空间时与原 load_space_to_sqlite 行为一致；多空间时按空间顺序依次载入，
+    同名表自动后缀避让。缓存键用排序后的空间集合，复用同一组合的结果。
+    """
+    ids = [str(s) for s in space_ids if s]
+    if not ids:
+        ids = []
+    cache_key = "+".join(sorted(set(ids)))
 
     with _cache_lock:
         entry = _cache.get(cache_key)
@@ -35,9 +47,18 @@ async def load_space_to_sqlite(data_space_id: uuid.UUID, user_id: uuid.UUID) -> 
         result = await db.execute(
             select(File)
             .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
-            .where(DataSpaceFile.data_space_id == data_space_id, File.user_id == user_id)
+            .where(DataSpaceFile.data_space_id.in_(space_ids), File.user_id == user_id)
         )
         files = result.scalars().all()
+    # 跨空间去重（同一文件可能属于多个空间）
+    seen = set()
+    uniq_files = []
+    for f in files:
+        if f.id in seen:
+            continue
+        seen.add(f.id)
+        uniq_files.append(f)
+    files = uniq_files
 
     fd, db_path = tempfile.mkstemp(suffix=".db", prefix="space_")
     import os

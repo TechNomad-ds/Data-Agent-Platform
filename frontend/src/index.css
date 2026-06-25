@@ -328,10 +328,14 @@ body {
   border-radius: 999px !important;
   border: 1px solid #e4e4e7 !important;
   background: #ffffff !important;
-  height: 36px !important;
+  min-height: 36px !important;
   padding: 0 14px !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+/* 多选模式有 tag 时放开圆角，避免胶囊形挤压 tag */
+.space-bind-select.ant-select-multiple .ant-select-selector {
+  border-radius: 14px !important;
 }
 .space-bind-select:hover .ant-select-selector {
   border-color: #c7c7cf !important;

@@ -145,6 +145,7 @@ DATA_MODE_GUIDANCE = """# 处理上传文件的工作规范
 下面分两部分：**A 是读文件答问题（你的主场，凡是涉及上传内容都适用）**；**B 是表格数据分析（额外能力，只有当任务确实是分析结构化表格数据时才参考）**。不要因为 B 的规范摆在这里就把每个问题都变成数据分析。
 
 - 上方若有「本轮相关文件预览」或数据空间索引，那只是为控制上下文而展开的部分文件，不是完整清单，也不代表你已读取全部。未展开文件仍属于数据空间，需要时用 list_files / read_file / search_data_space 继续查看——预览里没有，不等于数据缺失。
+- 用户可能同时绑定了多个数据空间。list_files / search_data_space / read_file / sqlite_query 都会自动跨这些空间工作（列出/检索/查表覆盖全部已绑定空间），不必纠结某文件具体属于哪个空间；按文件名直接用即可。
 - 不依赖上传文件的通用问题（概念、方法、代码/架构讨论、学习辅导、闲聊）直接回答，不要硬调工具。
 - 进入工作后坚持把用户真正的目标做完，不要缩水成更省事的小问题。某个来源查不到先换文件、换工具，把可能的来源都查过再如实说明；一个方法失败就换一个，别在反复报错的同一条路上死磕。
 
@@ -178,6 +179,10 @@ DATA_MODE_GUIDANCE = """# 处理上传文件的工作规范
 - **sqlite_query**：跨表 JOIN / GROUP BY 等 SQL（已自动把空间内所有表格加载进库，直接查）。多工作表 Excel 会展开成多张表（命名 `文件名__工作表名`），别因为只看到首个 sheet 就以为其它表缺失。
 - **execute_python**：需要循环/多步/自定义逻辑的复杂计算时用，受限沙箱，用预加载的 `df_xxx` 变量。
 - **generate_chart**：出图。有趋势/对比/构成关系且是分析类任务时主动配图；取数类任务不要用图替代完整数据。
+
+联网与外部数据：
+- **web_search**：联网搜索公网信息（数据空间里没有的实时/外部内容）。注意它搜的是互联网、不是用户数据——搜用户上传文件用 search_data_space。若未配置搜索 key 会返回提示，此时如实告知用户或改用空间内资料。
+- **download_to_space**：把外部文件（直链 URL / GitHub / HuggingFace，自动走国内镜像）下载进当前数据空间，下载后自动建索引，可继续用 read_file/inspect_data 处理。用户说「下载某数据到数据空间」时用。
 
 少数场景才用的工具：
 - **nl2sql**：自然语言直接转 SQL，仅当表结构复杂、自己写 SQL 没把握时用；表结构清楚时直接 sqlite_query 更可控。
@@ -1065,8 +1070,19 @@ class AgentLoop:
         model_id: str,
         user_message: str,
         is_admin: bool = False,
+        extra_space_ids: list | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """执行 Agent 循环，流式返回事件"""
+        # #12 多数据空间：把本轮活跃空间集合注入 contextvar，供工具层跨空间检索/查表。
+        # 主空间 + 额外绑定空间；为空集合时工具退化为单主空间，行为不变。
+        from app.agent.tools import set_active_space_ids
+        _all_spaces = []
+        if data_space_id:
+            _all_spaces.append(data_space_id)
+        for s in (extra_space_ids or []):
+            if s and s not in _all_spaces:
+                _all_spaces.append(s)
+        set_active_space_ids(_all_spaces)
         # 解析模型配置（平台模型 or 用户自带）
         model_config = await self._resolve_model_config(model_id, user_id)
         charge_credits = model_config["charge_credits"] and not is_admin

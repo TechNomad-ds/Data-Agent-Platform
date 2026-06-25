@@ -27,6 +27,10 @@ class ConversationResponse(BaseModel):
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=20000)
     model_id: Optional[str] = None
+    # #13 对话中切换数据空间：本轮起改用该空间，并更新会话绑定（None 表示不改）
+    data_space_id: Optional[uuid.UUID] = None
+    # #12 同时绑定多个数据空间：本轮活跃空间全集（含主空间）。传了则跨这些空间检索/查表。
+    data_space_ids: Optional[list[uuid.UUID]] = None
 
 
 class MessageResponse(BaseModel):

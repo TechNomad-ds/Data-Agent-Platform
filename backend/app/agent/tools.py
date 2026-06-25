@@ -4,6 +4,7 @@ import json
 import ast
 import os
 import re
+import contextvars
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,30 @@ from app.config import settings
 from app.core.database import get_session_factory
 from app.models.file import File
 from app.models.data_space import DataSpaceFile
+
+# #12 多数据空间：除了工具签名里的主 data_space_id，本轮还可能绑定额外空间。
+# 用 contextvar 注入「本轮活跃空间全集」，避免给 15 个工具逐一加参数。
+# 为空时退化为「只用主空间」，与改造前行为完全一致（向后兼容）。
+_active_space_ids: contextvars.ContextVar[list] = contextvars.ContextVar(
+    "active_space_ids", default=[]
+)
+
+
+def set_active_space_ids(space_ids: list) -> None:
+    """由 loop 在每轮开始时设置本轮活跃数据空间集合（含主空间）。"""
+    _active_space_ids.set([s for s in (space_ids or []) if s])
+
+
+def _spaces_for(primary: uuid.UUID | None) -> list:
+    """返回本轮应检索的空间列表：活跃集合优先，否则回退到主空间。"""
+    active = _active_space_ids.get()
+    if active:
+        # 去重并保证主空间在内
+        out = list(dict.fromkeys(active))
+        if primary and primary not in out:
+            out.append(primary)
+        return out
+    return [primary] if primary else []
 
 
 def get_tool_definitions() -> list[dict]:
@@ -187,6 +212,36 @@ def get_tool_definitions() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "download_to_space",
+                "description": "把一个外部文件下载到当前数据空间（下载后自动登记并建立索引，之后可用 read_file/inspect_data/search_data_space 处理）。支持直链 URL、GitHub 文件直链、HuggingFace 数据集/模型文件（自动走国内镜像 hf-mirror.com）。用户说“下载某某数据/文件到数据空间”“把这个链接的数据拿进来”时用。注意：需要的是文件的直接下载链接；HuggingFace 用形如 https://huggingface.co/datasets/<repo>/resolve/main/<file> 的 resolve 链接。Kaggle 需登录认证，暂不支持，遇到时如实告知用户。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "文件的直接下载链接（http/https）"},
+                        "filename": {"type": "string", "description": "可选：保存为的文件名，不传则从 URL 推断"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "联网搜索互联网获取实时/外部信息（数据空间里没有的内容）。适合查最新信息、概念资料、外部事实、找数据集/资源的链接等。返回若干网页的标题、链接和摘要。注意：这是搜公网，不是搜用户数据空间——搜用户上传的文件用 search_data_space。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "搜索查询"},
+                        "max_results": {"type": "integer", "description": "返回结果数（默认 5）", "default": 5},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "graph_search",
                 "description": "【少数场景】在知识图谱中搜索实体，返回匹配节点及连接度。仅当任务明确涉及实体关系网络时用；普通查表/读文档不要用。",
                 "parameters": {
@@ -272,10 +327,12 @@ async def _get_file_path(filename: str, user_id: uuid.UUID, data_space_id: uuid.
     async with get_session_factory()() as db:
         query = select(File).where(File.user_id == user_id, File.filename == filename)
         if data_space_id:
+            # #12：在本轮所有活跃空间里找该文件名，不止主空间
+            space_ids = _spaces_for(data_space_id)
             query = (
                 select(File)
                 .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
-                .where(File.user_id == user_id, File.filename == filename, DataSpaceFile.data_space_id == data_space_id)
+                .where(File.user_id == user_id, File.filename == filename, DataSpaceFile.data_space_id.in_(space_ids))
             )
         # 同一空间内可能存在同名文件（如 zip 解压出多份 package.json / incident_records.csv），
         # 此时不能用 scalar_one_or_none()——它在多行时会抛 MultipleResultsFound，导致
@@ -288,12 +345,22 @@ async def _get_file_path(filename: str, user_id: uuid.UUID, data_space_id: uuid.
 
 
 async def _get_space_files(user_id: uuid.UUID, data_space_id: uuid.UUID) -> list:
+    space_ids = _spaces_for(data_space_id)
     async with get_session_factory()() as db:
         result = await db.execute(
             select(File).join(DataSpaceFile, DataSpaceFile.file_id == File.id)
-            .where(DataSpaceFile.data_space_id == data_space_id, File.user_id == user_id)
+            .where(DataSpaceFile.data_space_id.in_(space_ids), File.user_id == user_id)
         )
-        return result.scalars().all()
+        files = result.scalars().all()
+    # 跨空间可能拿到同一 file_id（文件被加到多个空间），按 id 去重
+    seen = set()
+    uniq = []
+    for f in files:
+        if f.id in seen:
+            continue
+        seen.add(f.id)
+        uniq.append(f)
+    return uniq
 
 
 async def _get_profile_ocr_text(filename: str, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str | None:
@@ -520,6 +587,8 @@ _SUMMARY_BUILDERS = {
     "save_memory": lambda a: "正在记录要点",
     "nl2sql": lambda a: f"正在把问题转成查询：{str(a.get('question', '')).strip()[:40]}" if a.get("question") else "正在把问题转成查询",
     "kb_reindex_file": lambda a: f"正在更新文件索引：{a.get('filename', '')}".strip(),
+    "download_to_space": lambda a: f"正在下载到数据空间：{str(a.get('filename') or a.get('url', '')).strip()[:50]}",
+    "web_search": lambda a: f"正在联网搜索：{str(a.get('query', '')).strip()[:40]}" if a.get("query") else "正在联网搜索",
     "graph_search": lambda a: f"正在搜索知识图谱：{str(a.get('query', '')).strip()[:40]}" if a.get("query") else "正在搜索知识图谱",
     "graph_traverse": lambda a: f"正在遍历实体关系：{a.get('entity', '')}".strip(),
     "graph_extract_from_text": lambda a: "正在抽取知识三元组",
@@ -557,6 +626,8 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
             "save_memory": _tool_save_memory,
             "nl2sql": _tool_nl2sql,
             "kb_reindex_file": _tool_kb_reindex,
+            "download_to_space": _tool_download_to_space,
+            "web_search": _tool_web_search,
             "graph_search": _tool_graph_search,
             "graph_traverse": _tool_graph_traverse,
             "graph_extract_from_text": _tool_graph_extract,
@@ -587,12 +658,22 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
         return "未选择数据空间，无法搜索"
 
     from app.services.retrieval import get_retrieval_service
-    svc = get_retrieval_service(str(data_space_id))
-    # 向量检索含 ONNX 推理（同步阻塞），丢到线程池避免冻结事件循环
     import asyncio
-    results = await asyncio.get_running_loop().run_in_executor(
-        None, lambda: svc.search(query, top_k=top_k)
-    )
+    # #12：跨本轮所有活跃空间检索，再按得分合并取 top_k
+    space_ids = _spaces_for(data_space_id)
+
+    def _search_all():
+        merged = []
+        for sid in space_ids:
+            try:
+                svc = get_retrieval_service(str(sid))
+                merged.extend(svc.search(query, top_k=top_k))
+            except Exception:
+                continue
+        merged.sort(key=lambda r: getattr(r, "score", 0), reverse=True)
+        return merged[:top_k]
+
+    results = await asyncio.get_running_loop().run_in_executor(None, _search_all)
 
     if results:
         output = []
@@ -1325,8 +1406,8 @@ async def _tool_sqlite_query(args: dict, user_id: uuid.UUID, data_space_id: uuid
     if not data_space_id:
         return "未选择数据空间"
 
-    from app.services.sqlite_engine import load_space_to_sqlite, execute_query, list_tables
-    db_path = await load_space_to_sqlite(data_space_id, user_id)
+    from app.services.sqlite_engine import load_spaces_to_sqlite, execute_query, list_tables
+    db_path = await load_spaces_to_sqlite(_spaces_for(data_space_id), user_id)
 
     if sql.strip().upper().startswith("SHOW") or sql.strip() == "":
         tables = list_tables(db_path)
@@ -1413,6 +1494,82 @@ def _tool_generate_chart(args: dict) -> str:
         "y_label": args.get("y_label", ""),
     }
     return "```chart\n" + json.dumps(chart_spec, ensure_ascii=False) + "\n```"
+
+
+async def _tool_web_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """联网搜索公网信息。未配置搜索 API key 时如实告知，不报错。"""
+    query = (args.get("query") or "").strip()
+    if not query:
+        return "请提供搜索查询内容。"
+    max_results = args.get("max_results", 5)
+    from app.services.web_search import web_search, WebSearchNotConfigured
+    try:
+        results = await web_search(query, max_results=max_results)
+    except WebSearchNotConfigured:
+        return (
+            "联网搜索未配置（管理员需在设置中填入搜索 API Key，如 Tavily/Serper）。"
+            "当前无法联网；如果问题能用数据空间里的资料回答，我可以改用 search_data_space。"
+        )
+    except Exception as e:
+        return f"联网搜索失败：{str(e)[:150]}"
+    if not results:
+        return f"联网搜索 “{query}” 没有返回结果。可换个关键词再试。"
+    lines = [f"联网搜索 “{query}” 的结果（共 {len(results)} 条）："]
+    for i, r in enumerate(results, 1):
+        lines.append(f"\n{i}. {r['title']}\n   {r['url']}\n   {r['snippet'][:300]}")
+    lines.append("\n\n（以上为公网搜索摘要，引用时请注明来源链接；需要正文细节可据链接进一步核实。）")
+    return "\n".join(lines)
+
+
+async def _tool_download_to_space(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """下载外部文件到当前数据空间，登记并触发索引。"""
+    if not data_space_id:
+        return "未选择数据空间，无法下载。请先绑定一个数据空间。"
+    url = (args.get("url") or "").strip()
+    if not url:
+        return "请提供文件的下载链接（url）。"
+    override_name = (args.get("filename") or "").strip()
+
+    from app.services.downloader import download_url_to_path
+    from app.services.file_intake import register_file_to_space, user_space_dir
+    import uuid as _uuid
+
+    # 先落到一个新的 file_id 目录（与上传路径一致），再登记
+    file_id = _uuid.uuid4()
+    dest_dir = user_space_dir(user_id, file_id)
+    try:
+        saved_path, fname = await download_url_to_path(url, dest_dir)
+    except ValueError as e:
+        return f"下载失败：{e}"
+    except Exception as e:
+        return f"下载失败：{e}"
+
+    final_name = override_name or fname
+    if override_name and override_name != fname:
+        # 用户指定了文件名：重命名落盘文件
+        new_path = saved_path.parent / override_name
+        try:
+            saved_path.rename(new_path)
+            saved_path = new_path
+        except Exception:
+            final_name = fname
+
+    try:
+        info = await register_file_to_space(
+            user_id=user_id,
+            data_space_id=data_space_id,
+            src_path=saved_path,
+            filename=final_name,
+        )
+    except Exception as e:
+        return f"文件已下载但登记进数据空间失败：{e}"
+
+    size_mb = info["file_size"] / 1024 / 1024
+    size_str = f"{size_mb:.1f}MB" if size_mb >= 1 else f"{info['file_size']//1024}KB"
+    return (
+        f"已下载并加入数据空间：{final_name}（{info['file_type']}, {size_str}）。"
+        "正在后台建立索引，稍后即可用 read_file / inspect_data / search_data_space 处理。"
+    )
 
 
 async def _tool_save_memory(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:

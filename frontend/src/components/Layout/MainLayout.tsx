@@ -23,7 +23,6 @@ export default function MainLayout() {
   const [currentConvId, setCurrentConvId] = useState<string | undefined>()
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [checkingSpaces, setCheckingSpaces] = useState(true)
-  const [spaceLockedByConversation, setSpaceLockedByConversation] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const isMobile = useIsMobile()
@@ -66,7 +65,6 @@ export default function MainLayout() {
 
   const handleNewChat = useCallback(() => {
     setCurrentConvId(undefined)
-    setSpaceLockedByConversation(false)
     setCurrentView('chat')
   }, [])
 
@@ -77,22 +75,19 @@ export default function MainLayout() {
       const res = await chatApi.getConversation(id)
       if (res.data.data_space_id) {
         setSelectedSpaceId(res.data.data_space_id)
-        setSpaceLockedByConversation(true)
       } else {
         setSelectedSpaceId(undefined)
-        setSpaceLockedByConversation(false)
       }
     } catch {
-      setSpaceLockedByConversation(true)
+      // 加载失败不阻断
     }
   }, [])
 
   const handleSpaceChange = useCallback((id: string | undefined) => {
-    if (!spaceLockedByConversation) {
-      setSelectedSpaceId(id)
-      setCurrentConvId(undefined)
-    }
-  }, [spaceLockedByConversation])
+    // #13 对话中切换数据空间：直接切换当前对话所用空间，保留同一对话与记忆，
+    // 不再新建对话。后端在收到带 data_space_id 的消息时会更新会话绑定。
+    setSelectedSpaceId(id)
+  }, [])
 
   const handleOpenDataManager = useCallback(() => {
     setSelectedSpaceId(undefined)
@@ -113,12 +108,10 @@ export default function MainLayout() {
 
   const handleConversationCreated = useCallback((id: string) => {
     setCurrentConvId(id)
-    setSpaceLockedByConversation(true)
   }, [])
 
   const handleStartChat = useCallback(() => {
     setCurrentConvId(undefined)
-    setSpaceLockedByConversation(false)
     setCurrentView('chat')
   }, [])
 
@@ -154,7 +147,6 @@ export default function MainLayout() {
         onConversationCreated={handleConversationCreated}
         onConversationDeleted={handleNewChat}
         onSpaceChange={handleSpaceChange}
-        spaceLockedByConversation={spaceLockedByConversation}
       />
     ) : currentView === 'data' ? (
       <DataManager

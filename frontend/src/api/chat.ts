@@ -56,8 +56,13 @@ export const chatApi = {
   deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
   renameConversation: (id: string, title: string) =>
     api.patch<Conversation>(`/chat/conversations/${id}`, { title }),
+  persistToSpace: (id: string, data: { data_space_id?: string; message_ids?: string[] }) =>
+    api.post<{ ok: boolean; filename: string; data_space_id: string; message_count: number }>(
+      `/chat/conversations/${id}/persist-to-space`,
+      data
+    ),
 
-  sendMessage: async (conversationId: string, content: string, signal?: AbortSignal, modelId?: string): Promise<Response> => {
+  sendMessage: async (conversationId: string, content: string, signal?: AbortSignal, modelId?: string, dataSpaceId?: string, dataSpaceIds?: string[]): Promise<Response> => {
     const token = await getValidToken()
     const url = `/api/chat/conversations/${conversationId}/messages`
     return fetch(url, {
@@ -66,7 +71,7 @@ export const chatApi = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ content, model_id: modelId }),
+      body: JSON.stringify({ content, model_id: modelId, data_space_id: dataSpaceId, data_space_ids: dataSpaceIds }),
       signal,
     })
   },

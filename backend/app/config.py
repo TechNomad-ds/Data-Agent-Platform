@@ -94,6 +94,21 @@ class Settings(BaseSettings):
     ocr_api_key: str = ""
     ocr_model: str = "PaddleOCR-VL-1.6"
 
+    # 联网搜索（web_search 工具）。provider 目前支持 tavily（推荐，单次 POST 返回干净结果）
+    # 与 serper（google serper.dev）。不配 key 时工具会如实告知"未配置"，不报错。
+    web_search_provider: str = "tavily"  # tavily | serper
+    web_search_api_key: str = ""
+    web_search_max_results: int = 5
+
+    # 飞书集成（#5/#6，需开放平台应用凭据；留空则相关入口不启用）
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
+    feishu_redirect_uri: str = ""
+
+    # 邮件导入（#5，IMAP；全局默认，生产建议每用户单独配置）
+    email_imap_host: str = ""
+    email_imap_port: int = 993
+
     # 检索配置
     retrieval_mode: str = "hybrid"  # vector | bm25 | hybrid | multi_query
     rrf_k: int = 60

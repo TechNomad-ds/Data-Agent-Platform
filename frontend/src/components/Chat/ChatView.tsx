@@ -3,9 +3,12 @@ import { Input, Button, Select, Typography, Spin, message, Tooltip } from 'antd'
 import {
   SendOutlined,
   StopOutlined,
-  LockOutlined,
   DatabaseOutlined,
   ArrowDownOutlined,
+  PaperClipOutlined,
+  FileOutlined,
+  CloseOutlined,
+  SaveOutlined,
 } from '@ant-design/icons'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
@@ -43,7 +46,6 @@ interface Props {
   onConversationCreated: (id: string) => void
   onConversationDeleted?: () => void
   onSpaceChange: (id: string | undefined) => void
-  spaceLockedByConversation?: boolean
 }
 
 // AI 大头像 — 用于空状态
@@ -79,7 +81,6 @@ export default function ChatView({
   onConversationCreated,
   onConversationDeleted,
   onSpaceChange,
-  spaceLockedByConversation = false,
 }: Props) {
   const {
     setCurrentConversation,
@@ -107,6 +108,13 @@ export default function ChatView({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [inputFocused, setInputFocused] = useState(false)
   const [loadingConversation, setLoadingConversation] = useState(false)
+  // 聊天附件（#8）：拖拽或按钮上传的文件，上传到当前绑定的数据空间后以 chip 展示
+  const [attachments, setAttachments] = useState<{ id: string; name: string; type: string }[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  // #12 多数据空间：本轮活跃空间集合（含主空间）。主空间 = selectedSpaceId（与外层同步）。
+  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   // 输入法（拼音等）组字状态：组字中按回车是确认候选词，不应触发发送
@@ -181,6 +189,16 @@ export default function ChatView({
     } else {
       setSuggestions(DEFAULT_SUGGESTIONS)
     }
+  }, [selectedSpaceId])
+
+  // #12：外层主空间变化时，确保它在活跃集合里且排第一（主空间）。
+  // 外层清空时一并清空活跃集合。
+  useEffect(() => {
+    setSelectedSpaceIds((prev) => {
+      if (!selectedSpaceId) return []
+      const rest = prev.filter((id) => id !== selectedSpaceId)
+      return [selectedSpaceId, ...rest]
+    })
   }, [selectedSpaceId])
 
 
@@ -268,6 +286,46 @@ export default function ChatView({
     [appendStreamDelta, appendThinkingDelta, addToolEvent, updatePlan, setMessages, setCurrentConversation, onConversationDeleted]
   )
 
+  // 上传聊天附件到当前绑定的数据空间（#8）。需要先绑定数据空间。
+  const uploadAttachments = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return
+      if (!selectedSpaceId) {
+        message.warning('请先在下方绑定一个数据空间，再添加文件')
+        return
+      }
+      setUploadingFiles(true)
+      try {
+        const formData = new FormData()
+        files.forEach((f) => formData.append('files', f))
+        const res = await dataSpacesApi.uploadFiles(selectedSpaceId, formData)
+        const uploaded = (res.data || []).map((f: any) => ({
+          id: f.id,
+          name: f.filename || f.original_filename || '文件',
+          type: f.file_type || '',
+        }))
+        setAttachments((prev) => [...prev, ...uploaded])
+        message.success(`已添加 ${uploaded.length} 个文件，可以就它们提问`)
+        loadSpaces()
+      } catch {
+        message.error('文件上传失败')
+      } finally {
+        setUploadingFiles(false)
+      }
+    },
+    [selectedSpaceId]
+  )
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragOver(false)
+      const files = Array.from(e.dataTransfer.files || [])
+      if (files.length) uploadAttachments(files)
+    },
+    [uploadAttachments]
+  )
+
   const handleSendWithContent = async (content: string) => {
     if (!content.trim() || isStreaming) return
     if (!selectedModel) { message.warning('请先选择模型'); return }
@@ -307,7 +365,15 @@ export default function ChatView({
         return
       }
     }
-    await sendMessage(convId, inputValue)
+    // 附件提示：把本轮新增的附件文件名告诉 agent，引导它围绕这些文件回答
+    const atts = attachments
+    let toSend = inputValue
+    if (atts.length > 0) {
+      const names = atts.map((a) => a.name).join('、')
+      toSend = `【本次附带文件：${names}】\n${inputValue}`
+    }
+    setAttachments([])
+    await sendMessage(convId, toSend)
   }
 
   const sendMessage = async (convId: string, content: string, skipAddUserMsg = false) => {
@@ -341,7 +407,9 @@ export default function ChatView({
         convId,
         content,
         controller.signal,
-        selectedModel
+        selectedModel,
+        selectedSpaceId,
+        selectedSpaceIds.length > 1 ? selectedSpaceIds : undefined
       )
       if (!response.ok) {
         if (response.status === 401) {
@@ -444,6 +512,22 @@ export default function ChatView({
     []
   )
 
+  // #7 把当前对话沉淀为数据空间里的 Markdown 文件
+  const handlePersistToSpace = useCallback(async () => {
+    if (!conversationId) return
+    if (!selectedSpaceId) {
+      message.warning('请先绑定一个数据空间，再沉淀对话')
+      return
+    }
+    try {
+      const res = await chatApi.persistToSpace(conversationId, { data_space_id: selectedSpaceId })
+      message.success(`已沉淀为「${res.data.filename}」，正在建索引`)
+      loadSpaces()
+    } catch {
+      message.error('沉淀失败')
+    }
+  }, [conversationId, selectedSpaceId])
+
   const showStreaming = isStreaming && streamingConversationId === conversationId
   const showEmpty = messages.length === 0 && !showStreaming
   const inputDisabled = isStreaming
@@ -488,9 +572,6 @@ export default function ChatView({
                 <span style={{ fontSize: 13, color: colors.textPrimary, fontWeight: 500 }}>
                   {spaces.find((s) => s.id === selectedSpaceId)?.name || '数据空间'}
                 </span>
-                {spaceLockedByConversation && (
-                  <LockOutlined style={{ fontSize: 10, color: colors.textMuted }} />
-                )}
               </div>
               <span style={{ color: colors.border }}>|</span>
             </>
@@ -510,6 +591,19 @@ export default function ChatView({
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {conversationId && selectedSpaceId && (
+            <Tooltip title="把这段对话沉淀为数据空间里的文档，便于以后检索引用">
+              <Button
+                type="text"
+                icon={<SaveOutlined />}
+                onClick={handlePersistToSpace}
+                style={{ color: colors.textSecondary }}
+                size="small"
+              >
+                沉淀
+              </Button>
+            </Tooltip>
+          )}
           <ExportButton conversationId={conversationId} />
         </div>
       </div>
@@ -746,24 +840,107 @@ export default function ChatView({
           </Tooltip>
         )}
         <div
+          onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
+          onDragLeave={(e) => { e.preventDefault(); setDragOver(false) }}
+          onDrop={handleDrop}
           style={{
             maxWidth: READING_WIDTH,
             margin: '0 auto',
             background: colors.surface,
             borderRadius: 18,
             border: `1px solid ${
-              inputFocused ? colors.borderStrong : colors.border
+              dragOver ? colors.primary : inputFocused ? colors.borderStrong : colors.border
             }`,
             padding: '8px 8px 8px 16px',
             display: 'flex',
-            alignItems: 'flex-end',
-            gap: 6,
+            flexDirection: 'column',
+            gap: 8,
             boxShadow: inputFocused
               ? '0 4px 16px rgba(15, 23, 42, 0.06)'
               : '0 1px 3px rgba(15, 23, 42, 0.04)',
             transition: 'border-color 0.15s, box-shadow 0.15s',
+            position: 'relative',
           }}
         >
+          {/* 拖拽提示遮罩 */}
+          {dragOver && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: 18,
+                background: 'rgba(79, 70, 229, 0.06)',
+                border: `1.5px dashed ${colors.primary}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.primary,
+                fontSize: 14,
+                fontWeight: 500,
+                zIndex: 3,
+                pointerEvents: 'none',
+              }}
+            >
+              松开以添加文件{selectedSpaceId ? '到当前数据空间' : '（请先绑定数据空间）'}
+            </div>
+          )}
+          {/* 附件 chips */}
+          {(attachments.length > 0 || uploadingFiles) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 4 }}>
+              {attachments.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 8px 4px 10px',
+                    background: colors.bgSubtle,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 8,
+                    fontSize: 12.5,
+                    color: colors.textPrimary,
+                    maxWidth: 220,
+                  }}
+                >
+                  <FileOutlined style={{ color: colors.primary, fontSize: 13 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.name}
+                  </span>
+                  <CloseOutlined
+                    onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                    style={{ fontSize: 10, color: colors.textMuted, cursor: 'pointer' }}
+                  />
+                </div>
+              ))}
+              {uploadingFiles && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 12.5, color: colors.textMuted }}>
+                  <Spin size="small" /> 上传中…
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files || [])
+              if (files.length) uploadAttachments(files)
+              if (fileInputRef.current) fileInputRef.current.value = ''
+            }}
+          />
+          <Tooltip title={selectedSpaceId ? '添加文件' : '请先绑定数据空间'}>
+            <Button
+              type="text"
+              icon={<PaperClipOutlined />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || uploadingFiles}
+              style={{ width: 34, height: 34, color: colors.textMuted, flexShrink: 0 }}
+            />
+          </Tooltip>
           <TextArea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -851,6 +1028,7 @@ export default function ChatView({
               />
             </Tooltip>
           )}
+          </div>
         </div>
         {/* 数据空间绑定条：放在输入框正下方，显眼且高端（用户反馈左上角太不显眼） */}
         <div
@@ -863,52 +1041,33 @@ export default function ChatView({
             gap: 8,
           }}
         >
-          {spaceLockedByConversation && selectedSpaceId ? (
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '6px 14px',
-                borderRadius: 999,
-                background: colors.bgSubtle,
-                border: `1px solid ${colors.border}`,
-                fontSize: 13,
-                color: colors.textSecondary,
-              }}
-            >
-              <DatabaseOutlined style={{ fontSize: 13, color: colors.primary }} />
-              <span style={{ color: colors.textPrimary, fontWeight: 500 }}>
-                {spaces.find((s) => s.id === selectedSpaceId)?.name || '数据空间'}
-              </span>
-              <LockOutlined style={{ fontSize: 10, color: colors.textMuted }} />
-            </div>
-          ) : (
+          {(() => (
             <Select
-              value={spaces.some((s) => s.id === selectedSpaceId) ? selectedSpaceId : undefined}
-              onChange={onSpaceChange}
+              mode="multiple"
+              value={selectedSpaceIds.filter((id) => spaces.some((s) => s.id === id))}
+              onChange={(ids: string[]) => {
+                setSelectedSpaceIds(ids)
+                // 主空间 = 第一个；同步给外层（与 #13 单空间路径兼容）
+                onSpaceChange(ids[0])
+              }}
               allowClear
+              maxTagCount="responsive"
               placeholder={
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <DatabaseOutlined style={{ fontSize: 13 }} />
-                  绑定数据空间（可选，基于你的数据回答）
+                  绑定数据空间（可多选，基于你的数据回答）
                 </span>
               }
               popupMatchSelectWidth={false}
               suffixIcon={<DatabaseOutlined style={{ color: selectedSpaceId ? colors.primary : colors.textMuted }} />}
-              style={{ minWidth: 280 }}
+              style={{ minWidth: 280, maxWidth: 560 }}
               className="space-bind-select"
               options={spaces.map((s) => ({
-                label: (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                    <DatabaseOutlined style={{ fontSize: 13, color: colors.primary }} />
-                    {s.name}
-                  </span>
-                ),
+                label: s.name,
                 value: s.id,
               }))}
             />
-          )}
+          ))()}
         </div>
         <div
           style={{

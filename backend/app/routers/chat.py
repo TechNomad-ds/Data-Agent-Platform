@@ -345,10 +345,42 @@ async def send_message(
         if data.model_id and data.model_id != conv.model_id:
             conv.model_id = data.model_id
 
+        # #13 对话中切换数据空间：校验归属后更新会话绑定，本轮即生效。
+        # None 表示本轮不改（沿用原绑定）；传了就切换并持久化，后续轮次延续。
+        if data.data_space_id is not None and data.data_space_id != conv.data_space_id:
+            sp = await db.execute(
+                select(DataSpace).where(
+                    DataSpace.id == data.data_space_id,
+                    DataSpace.user_id == current_user.id,
+                )
+            )
+            if sp.scalar_one_or_none():
+                conv.data_space_id = data.data_space_id
+            else:
+                raise HTTPException(status_code=404, detail="数据空间不存在或无权访问")
+
+        # #12 多数据空间：若前端传了 data_space_ids 全集，校验归属，取第一个为主空间
+        # （持久化到 conv.data_space_id），其余作为本轮额外检索空间。
+        extra_space_ids: list = []
+        if data.data_space_ids:
+            valid = await db.execute(
+                select(DataSpace.id).where(
+                    DataSpace.id.in_(data.data_space_ids),
+                    DataSpace.user_id == current_user.id,
+                )
+            )
+            valid_ids = [r for r in valid.scalars().all()]
+            # 保持前端给定顺序
+            ordered = [sid for sid in data.data_space_ids if sid in valid_ids]
+            if ordered:
+                conv.data_space_id = ordered[0]
+                extra_space_ids = ordered[1:]
+
         await db.commit()
 
         # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）
         conv_data_space_id = conv.data_space_id
+        conv_extra_space_ids = [str(s) for s in extra_space_ids]
         conv_model_id = conv.model_id
         message_content = data.content
     except Exception:
@@ -392,6 +424,7 @@ async def send_message(
                     model_id=conv_model_id,
                     user_message=message_content,
                     is_admin=current_user.role == "admin",
+                    extra_space_ids=[uuid.UUID(s) for s in conv_extra_space_ids],
                 ):
                     await _refresh_abort()
                     last_event = event
@@ -481,6 +514,95 @@ async def send_message(
             await _clear_abort(abort_key)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/conversations/{conv_id}/persist-to-space")
+async def persist_conversation_to_space(
+    conv_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """把一段对话沉淀为数据空间里的一个 Markdown 文件（#7 历史数据沉淀）。
+
+    body: { data_space_id?: str（默认用会话绑定的空间）, message_ids?: [str]（默认整段对话） }
+    沉淀后该文件会被索引，后续可在该数据空间里检索/引用。
+    """
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id, Conversation.user_id == current_user.id
+        )
+    )
+    conv = conv_result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    target_space_id = body.get("data_space_id") or (
+        str(conv.data_space_id) if conv.data_space_id else None
+    )
+    if not target_space_id:
+        raise HTTPException(status_code=400, detail="请指定要沉淀到的数据空间")
+    try:
+        target_space_uuid = uuid.UUID(str(target_space_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="数据空间 ID 无效")
+
+    # 校验空间归属
+    space_result = await db.execute(
+        select(DataSpace).where(
+            DataSpace.id == target_space_uuid, DataSpace.user_id == current_user.id
+        )
+    )
+    if not space_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="数据空间不存在")
+
+    msg_result = await db.execute(
+        select(Message).where(Message.conversation_id == conv_id).order_by(Message.created_at)
+    )
+    all_messages = msg_result.scalars().all()
+    wanted_ids = body.get("message_ids")
+    if wanted_ids:
+        wanted = set(str(x) for x in wanted_ids)
+        messages = [m for m in all_messages if str(m.id) in wanted]
+    else:
+        messages = list(all_messages)
+    if not messages:
+        raise HTTPException(status_code=400, detail="没有可沉淀的对话内容")
+
+    # 复用报告渲染逻辑生成 Markdown
+    from app.services.report_generator import _build_markdown
+    space_name_row = await db.execute(
+        select(DataSpace.name).where(DataSpace.id == target_space_uuid)
+    )
+    space_name = space_name_row.scalar() or "数据空间"
+    md = _build_markdown(conv, messages, space_name)
+
+    # 落盘到用户存储目录，再登记进空间并索引
+    from app.services.file_intake import register_file_to_space, user_space_dir
+    file_id = uuid.uuid4()
+    safe_title = (conv.title or "对话沉淀").strip().replace("/", "_").replace("\\", "_")[:40]
+    from datetime import datetime as _dt
+    fname = f"对话沉淀_{safe_title}_{_dt.now().strftime('%Y%m%d_%H%M')}.md"
+    dest = user_space_dir(current_user.id, file_id) / fname
+    dest.write_text(md, encoding="utf-8")
+
+    try:
+        info = await register_file_to_space(
+            user_id=current_user.id,
+            data_space_id=target_space_uuid,
+            src_path=dest,
+            filename=fname,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"沉淀失败: {e}")
+
+    return {
+        "ok": True,
+        "file_id": info["file_id"],
+        "filename": fname,
+        "data_space_id": str(target_space_uuid),
+        "message_count": len(messages),
+    }
 
 
 import re as _re
