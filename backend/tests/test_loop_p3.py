@@ -138,6 +138,95 @@ async def test_simple_text_answer_stops(patched_loop, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_hits_iteration_cap_forces_final_answer(patched_loop, monkeypatch):
+    """P1-#3：撞步数上限时注入收尾轮，模型用已有信息给最终答复，而非裸中止。"""
+    monkeypatch.setattr(patched_loop.settings, "enable_answer_self_check", False)
+    # 前几轮调工具；收尾轮（工具被禁用）模型返回文本。max_iterations=3 时收尾轮落在第3个turn。
+    turns = [
+        _tool_events("第0步", "t0", "read_file", {"filename": "0.pdf"}),
+        _tool_events("第1步", "t1", "read_file", {"filename": "1.pdf"}),
+        _text_events("基于已读到的内容，给出阶段性结论"),
+    ]
+    client = _FakeClient(turns)
+    monkeypatch.setattr(patched_loop, "_get_client", lambda *a, **k: client)
+
+    async def fake_exec(tool_name, arguments, user_id, data_space_id):
+        return "读到一些内容"
+    monkeypatch.setattr(patched_loop, "execute_tool", fake_exec)
+
+    agent = AgentLoop()
+    agent.max_iterations = 3  # 故意调小，强制撞上限
+    events = await _collect(
+        agent,
+        conversation_id=uuid.uuid4(), user_id=uuid.uuid4(), data_space_id=None,
+        model_id="m", user_message="逐篇精读很多文件", is_admin=True,
+    )
+    text = "".join(e.get("delta", "") for e in events if e["type"] == "text")
+    # 关键：撞上限后仍给出了真正的最终答复，而不是只有"已达到最大执行步数"
+    assert "阶段性结论" in text, text
+    # 正常 done 收尾（非 interrupted 裸停）
+    assert any(e["type"] == "done" for e in events)
+
+
+def _multi_tool_events(text, calls):
+    """生成一段含多个工具调用的流事件（calls: [(id, name, input)]）。"""
+    ev = []
+    if text:
+        ev.append(types.SimpleNamespace(type="content_block_delta",
+                                        delta=types.SimpleNamespace(type="text_delta", text=text)))
+    for tool_id, tool_name, tool_input in calls:
+        ev.append(types.SimpleNamespace(type="content_block_start",
+                                        content_block=types.SimpleNamespace(type="tool_use", id=tool_id, name=tool_name)))
+        ev.append(types.SimpleNamespace(type="content_block_delta",
+                                        delta=types.SimpleNamespace(type="input_json_delta",
+                                                                    partial_json=json.dumps(tool_input))))
+    return ev
+
+
+@pytest.mark.asyncio
+async def test_multiple_tools_run_concurrently(patched_loop, monkeypatch):
+    """P0-2：一轮内多个工具并发执行，每个都得到 tool_result，且按 id 正确配对。"""
+    import asyncio as _aio
+    monkeypatch.setattr(patched_loop.settings, "enable_answer_self_check", False)
+    client = _FakeClient([
+        _multi_tool_events("同时读两个文件", [
+            ("t1", "read_file", {"filename": "a.pdf"}),
+            ("t2", "read_file", {"filename": "b.pdf"}),
+        ]),
+        _text_events("两个都读完了"),
+    ])
+    monkeypatch.setattr(patched_loop, "_get_client", lambda *a, **k: client)
+
+    running = 0
+    max_concurrent = 0
+    async def fake_exec(tool_name, arguments, user_id, data_space_id):
+        nonlocal running, max_concurrent
+        running += 1
+        max_concurrent = max(max_concurrent, running)
+        await _aio.sleep(0.05)  # 模拟 I/O；若串行则总耗时叠加、并发数恒为 1
+        running -= 1
+        return f"内容: {arguments.get('filename')}"
+    monkeypatch.setattr(patched_loop, "execute_tool", fake_exec)
+
+    agent = AgentLoop()
+    events = await _collect(
+        agent,
+        conversation_id=uuid.uuid4(), user_id=uuid.uuid4(), data_space_id=None,
+        model_id="m", user_message="读 a 和 b", is_admin=True,
+    )
+    # 两个工具都产出了 tool_result
+    results = [e for e in events if e["type"] == "tool_result"]
+    assert len(results) == 2, results
+    # 关键：确实并发（峰值并发数 >= 2），不是串行
+    assert max_concurrent >= 2, f"max_concurrent={max_concurrent}（应并发）"
+    # canonical 里两个工具结果都按 id 配对
+    done = next(e for e in events if e["type"] == "done")
+    tr = next(c for c in done["canonical"] if c["role"] == "tool_results")
+    ids = {r["id"] for r in tr["results"]}
+    assert ids == {"t1", "t2"}, ids
+
+
+@pytest.mark.asyncio
 async def test_tool_call_then_answer(patched_loop, monkeypatch):
     """turn1 调工具 → turn2 出答案。验证工具结果回填 canonical。"""
     monkeypatch.setattr(patched_loop.settings, "enable_answer_self_check", False)  # 单独测取数自检

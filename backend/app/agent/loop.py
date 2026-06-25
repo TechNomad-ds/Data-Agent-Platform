@@ -26,6 +26,33 @@ logger = logging.getLogger("datamind.agent.loop")
 _client_cache: dict[str, Any] = {}
 
 
+# 工具结果是否算「执行失败」。用于累计 consecutive_errors 触发「换个方法」提示，
+# 并标记前端 is_error。之前只认 4 个前缀，漏掉文件不存在/读取失败/解析失败等真实
+# 失败，导致 agent 拿着错误结果继续或反复同法重试、纠错提示永不触发（P0-1）。
+#
+# 关键区分：只把「真失败」算错误（需要换方法），不把「合法的空结果/未配置」当错误
+# ——后者是有效结论，不该触发纠错循环。
+_ERROR_PREFIXES = (
+    "工具执行错误", "SQL 错误", "代码执行错误", "查询执行错误",
+    "读取文件失败", "解析失败", "下载失败", "联网搜索失败",
+)
+_ERROR_SUBSTRINGS = (
+    "不存在或无权访问", "不存在或不在当前数据空间",
+    "无法以 Excel", "无法以表格方式读取",
+    "不支持 inspect_data 的文件类型", "暂不支持抽取文本",
+)
+
+
+def _is_tool_error(result_str: str) -> bool:
+    """判断工具返回是否表示「执行失败」（而非合法的空结果）。"""
+    s = (result_str or "").lstrip()
+    if s.startswith(_ERROR_PREFIXES):
+        return True
+    # 文件名/类型类失败常出现在开头一小段，截一段判断子串，避免误伤正文里出现这些词
+    head = s[:200]
+    return any(sub in head for sub in _ERROR_SUBSTRINGS)
+
+
 # 可重试的错误信号：网络抖动、超时、限流、服务端 5xx。出现这些时退避重试整轮采样；
 # 致命错误（鉴权 401、请求格式 400 等）不在此列，应直接清晰报错给用户。
 _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
@@ -38,6 +65,11 @@ _FATAL_KEYWORDS = (
     "authentication", "invalid api key", "unauthorized", "permission",
     "invalid_request", "invalid request", "not found", "model_not_found",
 )
+
+# 单轮内并发执行工具的上限（P0-2 的配套兜底）：模型偶尔一次发起十几个工具调用，
+# 无上限的 gather 会瞬间打满 DB 连接池/文件句柄，叠加多用户更危险。限到 5 个一批，
+# 既保留并发收益（多文件读取提速），又不放大尾部资源风险。
+_TOOL_CONCURRENCY = 5
 
 
 def _is_retryable_error(exc: Exception) -> bool:
@@ -1203,15 +1235,17 @@ class AgentLoop:
         # max_iterations 仅作为防跑飞的安全上限。
         plan_nudges = 0
         MAX_PLAN_NUDGES = 1
+        # 撞上限收尾（P1-#3）：跑到最后一步时，不再让模型继续调工具，而是注入一次
+        # 「用已有信息给最终答复」的提示并再采样一轮，避免大任务直接烂尾、token 白花。
+        final_forced = False
         # 取数结果自检（对齐 codex completion audit）：本轮是否调用过「数据工具」
         # （读/查/算，排除 update_plan / save_memory 等元工具），以及是否已自检过一次。
         data_tool_used = False
         self_check_done = False
-        _DATA_TOOLS = {
-            "search_data_space", "read_file", "inspect_data", "pandas_query",
-            "sqlite_query", "execute_python", "nl2sql",
-            "graph_search", "graph_traverse",
-        }
+        # 反向判定：除了「元工具」（不产生需核实结果），其余工具都算「数据/信息工具」，
+        # 用过就该在收尾前自检。这样新增工具（如 download_to_space / web_search）自动纳入，
+        # 不会像写死白名单那样漏掉。
+        _META_TOOLS = {"update_plan", "save_memory"}
 
         # 用显式计数的 while 循环：只有「真正向模型采样的轮次」才消耗配额。
         # plan_nudge / self_check 这类注入轮通过 continue 回到顶部，但不计入 iteration，
@@ -1244,6 +1278,8 @@ class AgentLoop:
                 # 避免重复输出。一旦已经流出文本/工具增量，中途断流走优雅降级（保留已产出）。
                 streamed_anything = False
                 attempt = 0
+                # 收尾轮禁用工具，强制模型用已有信息直接作答（P1-#3）
+                _pass_tools = [] if final_forced else tools
                 while True:
                     try:
                         if active_backend == "anthropic":
@@ -1253,7 +1289,7 @@ class AgentLoop:
                                 max_tokens=settings.anthropic_max_tokens,
                                 system=system_blocks,
                                 messages=messages,
-                                tools=tools,
+                                tools=_pass_tools,
                             )
                             async with response_stream as stream:
                                 async for event in stream:
@@ -1282,7 +1318,7 @@ class AgentLoop:
 
                         else:
                             # OpenAI 兼容接口流式调用
-                            openai_tools = get_tool_definitions()
+                            openai_tools = [] if final_forced else get_tool_definitions()
                             oai_messages = [{"role": "system", "content": system_blocks if isinstance(system_blocks, str) else system_blocks[0]["text"]}] + messages
                             response = await client.chat.completions.create(
                                 model=model_name,
@@ -1427,6 +1463,47 @@ class AgentLoop:
                     }
                     return
 
+                # 撞上限收尾（P1-#3）：模型还想调工具，但已接近步数上限。不执行这些工具，
+                # 改为把已产出的文本并入历史，注入「用已有信息收尾」提示，再给一轮无工具
+                # 采样产出最终答复——避免大任务直接烂尾、之前的工作白费。
+                if final_forced:
+                    # 收尾轮里模型仍执意调工具（少见）：不再纠缠，直接用已产出文本收尾。
+                    if full_text:
+                        turn_canonical.append({
+                            "role": "assistant", "content": full_text, "tool_calls": [],
+                        })
+                    else:
+                        closing = "已到执行步数上限。以上是目前已完成的部分；可补充说明后我接着做。"
+                        yield {"type": "text", "delta": "\n\n" + closing}
+                        turn_canonical.append({
+                            "role": "assistant", "content": closing, "tool_calls": [],
+                        })
+                    credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
+                    if charge_credits:
+                        await self._deduct_credits(user_id, credits_used, model_name)
+                    yield {
+                        "type": "done", "usage": total_usage, "credits_used": credits_used,
+                        "tool_calls_log": tool_calls_log, "canonical": turn_canonical,
+                    }
+                    return
+
+                if iteration >= self.max_iterations - 1:
+                    if full_text:
+                        messages.append({"role": "assistant", "content": full_text})
+                        turn_canonical.append({
+                            "role": "assistant", "content": full_text, "tool_calls": [],
+                        })
+                    wrap = (
+                        "（系统提示）已到本轮工具调用步数上限，不能再调用工具了。"
+                        "请基于你目前已经掌握的信息，直接给出尽可能完整、有用的最终答复："
+                        "总结已完成的部分和已得到的结论，对还没来得及核实/完成的部分如实说明，"
+                        "并给出后续可以怎么继续。不要再尝试调用任何工具。"
+                    )
+                    messages.append({"role": "user", "content": wrap})
+                    turn_canonical.append({"role": "user", "content": wrap})
+                    final_forced = True
+                    continue  # 收尾轮不减 iteration——靠 final_forced 单独保证只走一次
+
                 # 构建本回合 canonical assistant 条目（含工具调用），再由统一序列化器
                 # 转成 provider 格式追加到 messages——消除手工维护两套格式的漂移风险。
                 _canon_tool_calls = []
@@ -1452,10 +1529,16 @@ class AgentLoop:
                         serialized[0]["reasoning_content"] = reasoning_text
                     messages.extend(serialized)
 
-                # 执行工具并收集结果
+                # 执行工具并收集结果。
+                # P0-2：同一轮模型可能一次发起多个工具调用（如逐篇 read_file 多个文件）。
+                # 这些调用相互独立（模型在看不到彼此结果时同时发出），可并发执行，
+                # 把多文件读取/检索的墙钟时间从「之和」降到「最慢的一个」。
+                # 三段式：① 串行预处理（名字纠正/解析/发 tool_use 事件/内联处理 update_plan）
+                # ② 并发执行真正的工具 ③ 串行后处理（错误判定/截断/发 tool_result，保持顺序）。
                 tool_results = []
+                valid_tool_names = [t["function"]["name"] for t in get_tool_definitions()]
+                to_run = []  # [(tu, tool_args)]，待并发执行的真实工具
                 for tu in tool_uses:
-                    valid_tool_names = [t["function"]["name"] for t in get_tool_definitions()]
                     corrected_name = _resolve_tool_name(tu["name"], valid_tool_names)
                     if corrected_name:
                         tu["name"] = corrected_name
@@ -1491,8 +1574,8 @@ class AgentLoop:
                         })
                         continue
 
-                    # 记录本轮用过真正的数据工具（读/查/算），供完成前的取数自检判断。
-                    if tu["name"] in _DATA_TOOLS:
+                    # 记录本轮用过「非元工具」（读/查/算/下载/联网等），供完成前的取数自检判断。
+                    if tu["name"] not in _META_TOOLS:
                         data_tool_used = True
 
                     # 发送给前端的 input 做脱敏：去除代码、路径等内部细节
@@ -1516,22 +1599,37 @@ class AgentLoop:
                         "id": tu["id"],
                         "summary": tool_display_summary(tu["name"], tool_args),
                     }
+                    to_run.append((tu, tool_args))
 
-                    tool_result = await execute_tool(
-                        tool_name=tu["name"],
-                        arguments=tool_args,
-                        user_id=user_id,
-                        data_space_id=data_space_id,
-                    )
+                # ② 并发执行（单个失败不影响其它：异常就地转成错误字符串）
+                async def _run_one(tu, tool_args):
+                    try:
+                        return str(await execute_tool(
+                            tool_name=tu["name"],
+                            arguments=tool_args,
+                            user_id=user_id,
+                            data_space_id=data_space_id,
+                        ))
+                    except Exception as e:
+                        return f"工具执行错误: {str(e)}"
 
-                    result_str = str(tool_result)
-                    is_error = result_str.startswith((
-                        "工具执行错误",
-                        "SQL 错误",
-                        "代码执行错误",
-                        "查询执行错误",
-                    ))
+                run_results = []
+                if to_run:
+                    if len(to_run) == 1:
+                        run_results = [await _run_one(to_run[0][0], to_run[0][1])]
+                    else:
+                        # 限流并发：最多 _TOOL_CONCURRENCY 个工具同时执行，避免打满资源
+                        _sem = asyncio.Semaphore(_TOOL_CONCURRENCY)
+                        async def _run_bounded(tu, ta):
+                            async with _sem:
+                                return await _run_one(tu, ta)
+                        run_results = await asyncio.gather(
+                            *[_run_bounded(tu, ta) for tu, ta in to_run]
+                        )
 
+                # ③ 串行后处理：按发起顺序做错误判定/截断/日志/事件，语义与原先一致
+                for (tu, tool_args), result_str in zip(to_run, run_results):
+                    is_error = _is_tool_error(result_str)
                     if is_error:
                         consecutive_errors += 1
                     else:
@@ -1640,11 +1738,12 @@ class AgentLoop:
                     }
                 return
 
-        # 达到最大迭代次数
+        # 达到最大迭代次数（正常情况下已被上面的「收尾轮」拦截并给出最终答复；
+        # 走到这里属极端兜底）。
         credits_used = max(1, self._calculate_credits(total_usage, credit_multiplier)) if charge_credits else 0
         if charge_credits:
             await self._deduct_credits(user_id, credits_used, model_name)
-        yield {"type": "text", "delta": "\n\n[已达到最大执行步数，自动停止]"}
+        yield {"type": "text", "delta": "\n\n[已达到最大执行步数。以上是目前已完成的部分；可补充说明后让我接着做。]"}
         yield {"type": "done", "usage": total_usage, "credits_used": credits_used, "tool_calls_log": tool_calls_log, "canonical": turn_canonical}
 
     def _calculate_credits(self, usage: dict, multiplier: float = 1.0) -> int:
