@@ -23,6 +23,23 @@ from app.config import settings
 
 router = APIRouter()
 
+
+def _strip_nul(value):
+    """递归剥除字符串里的 NUL（\\x00）。
+
+    PostgreSQL 的 text/JSONB 不允许存 NUL，PDF/OCR 抽出的文本层常带 \\x00，
+    一旦混进 content / tool_calls / tool_results 就会让整条消息存库失败
+    （asyncpg UntranslatableCharacterError）。在存库前统一清掉，content 和
+    JSONB 字段都走同一套，保证任何来源的 NUL 都进不了库。"""
+    if isinstance(value, str):
+        return value.replace("\x00", "") if "\x00" in value else value
+    if isinstance(value, dict):
+        return {k: _strip_nul(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_strip_nul(v) for v in value]
+    return value
+
+
 _active_streams: dict[str, int] = defaultdict(int)
 _active_streams_global = 0
 # 进程内回退：Redis 不可用时用它兜底（单 worker 内有效）。
@@ -314,7 +331,7 @@ async def send_message(
         user_message = Message(
             conversation_id=conv_id,
             role="user",
-            content=data.content,
+            content=_strip_nul(data.content),
         )
         db.add(user_message)
         await db.flush()
@@ -438,10 +455,10 @@ async def send_message(
                         assistant_message = Message(
                             conversation_id=conv_id,
                             role="assistant",
-                            content=save_content or None,
-                            tool_calls=segments if len(segments) > 1 else None,
+                            content=_strip_nul(save_content) or None,
+                            tool_calls=_strip_nul(segments) if len(segments) > 1 else None,
                             # 完整 canonical 子序列（含工具 I/O），供后续轮次回放上下文
-                            tool_results={"canonical": turn_canonical} if turn_canonical else None,
+                            tool_results=_strip_nul({"canonical": turn_canonical}) if turn_canonical else None,
                             token_usage=last_event.get("usage") if last_event.get("type") == "done" else None,
                             credits_used=last_event.get("credits_used") if last_event.get("type") == "done" else None,
                         )

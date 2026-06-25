@@ -24,7 +24,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "search_data_space",
-                "description": "在当前数据空间中搜索与查询相关的文本内容片段（支持向量语义搜索）。适合文档、报告、说明文字、代码注释等非结构化内容；不要用它替代表格聚合计算。",
+                "description": "【读文件核心工具】在当前数据空间的大量文本里语义检索相关内容，定位某主题/问题在哪个文件、哪一段。适合在厚文档、多文档里先定位再精读。返回的是命中片段（碎片），只用于定位，不能当成已读全文——定位到后用 read_file（厚文档配 find 跳读）看完整上下文。不要用它替代表格聚合计算。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -39,13 +39,14 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "read_file",
-                "description": "读取数据空间中指定文件的原始内容或表格分页预览。适合查看文档全文、确认文件内容、读取非表格文件；表格统计分析优先用 pandas_query/sqlite_query。返回结果末尾会标注是否已读到文件结尾——逐篇讲解/总结整篇文档时，必须翻页读到出现“已读到文件结尾”再下结论，不要只读开头一页就概括全文。",
+                "description": "【读文件核心工具】读懂数据空间里的任意文件——文档、PDF、论文、讲义、Word、PPT、代码、图片(OCR)、表格、数据库。要基于上传内容讲解/总结/答疑/抽取信息时，这是主力工具。返回末尾会标注是否已读到文件结尾——逐篇讲解/总结整篇文档时，必须翻页读到出现“已读到文件结尾”再下结论，不要只读开头一页就概括全文。对很厚的文档（教科书、长报告），不要从头整本读：先用 search_data_space 语义定位到相关内容，再用本工具的 find 参数跳到该处精读，返回会给出所在页码和如何看下一处匹配。（表格的统计聚合用 pandas_query/sqlite_query，不用本工具。）",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "filename": {"type": "string", "description": "文件名"},
-                        "start_line": {"type": "integer", "description": "起始行号（从0开始）。文件未读完时，用上次返回的结尾行号继续读。", "default": 0},
-                        "max_lines": {"type": "integer", "description": "最大读取行数。默认 400；想一次读完较长文档可调大。", "default": 400},
+                        "find": {"type": "string", "description": "可选：在文件内按关键词/短语定位（大小写不敏感），跳到第一处匹配并返回其上下文窗口，而不是从头读。适合在厚文档里定位某个主题/章节。用 search_data_space 命中的原文短语做 find 效果最好。"},
+                        "start_line": {"type": "integer", "description": "起始行号（从0开始）。文件未读完时，用上次返回的结尾行号继续读；配合 find 时，从该行之后查找下一处匹配。", "default": 0},
+                        "max_lines": {"type": "integer", "description": "最大读取行数（find 模式下为匹配处上下文窗口大小）。默认 400；想一次读完较长文档可调大。", "default": 400},
                     },
                     "required": ["filename"],
                 },
@@ -54,8 +55,21 @@ def get_tool_definitions() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "list_files",
+                "description": "【读文件核心工具】列出当前数据空间里的全部文件（文件名、类型、大小），不限类型——PDF、Word、PPT、图片、代码、表格都会列出。需要知道“有哪些文件 / 有哪些论文 / 有哪些文档”、或要逐篇/逐个处理文件却不确定文件名时，先用它拿到准确文件名，不要猜文件名，也不要用 search_data_space 去凑。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ext": {"type": "string", "description": "可选：只列某一类扩展名（如 pdf、docx、csv），不传则列全部"},
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "inspect_data",
-                "description": "查看结构化数据文件(CSV/Excel/JSON)的 schema、列信息、样本数据、execute_python 可用 DataFrame 变量名和跨文件 join 建议。字段或变量名不确定时先用它。",
+                "description": "【表格分析】查看结构化数据文件(CSV/Excel/JSON)的 schema、列信息、样本数据、execute_python 可用 DataFrame 变量名和跨文件 join 建议。字段或变量名不确定时先用它。注意：只认表格，对 PDF/Word/文档无效——看文档用 read_file，列全部文件用 list_files。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -69,7 +83,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "pandas_query",
-                "description": "对单个 CSV/Excel/JSON 文件执行 pandas 查询。该文件已加载为 df 变量。适合单表探索、清洗、分组、趋势、统计。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 expression 里完成，并赋值给 result 或 print 输出。",
+                "description": "【表格分析】对单个 CSV/Excel/JSON 文件执行 pandas 查询。该文件已加载为 df 变量。适合单表探索、清洗、分组、趋势、统计。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 expression 里完成，并赋值给 result 或 print 输出。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -84,7 +98,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "sqlite_query",
-                "description": "对数据空间中的所有表格数据执行 SQL 查询。适合多表 JOIN、过滤、计数、GROUP BY、排序。表名通常为文件名（去扩展名，小写，下划线替换空格）；多工作表 Excel 会展开为 文件名__工作表名。只支持 SELECT/WITH 查询。",
+                "description": "【表格分析】对数据空间中的所有表格数据执行 SQL 查询（已自动把空间内所有表格加载进库，直接查即可，无需先导入）。适合多表 JOIN、过滤、计数、GROUP BY、排序。表名通常为文件名（去扩展名，小写，下划线替换空格）；多工作表 Excel 会展开为 文件名__工作表名。只支持 SELECT/WITH 查询。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -98,7 +112,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "execute_python",
-                "description": "执行 Python 代码进行复杂数据分析。适合多文件联合计算、复杂派生指标、循环、统计摘要。数据空间中的 CSV/Excel/JSON 已预加载为 DataFrame 变量，具体变量名见 schema 或 inspect_data 输出。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 code 里完成，并赋值给 result 或 print 输出。可用库：pandas(pd)、numpy(np)、json、math、statistics",
+                "description": "【表格分析】执行 Python 代码进行复杂数据分析。适合多文件联合计算、复杂派生指标、循环、统计摘要。数据空间中的 CSV/Excel/JSON 已预加载为 DataFrame 变量，具体变量名见 schema 或 inspect_data 输出。每次调用都是无状态沙箱，上一轮变量/新增列不会保留；多步分析必须在同一个 code 里完成，并赋值给 result 或 print 输出。可用库：pandas(pd)、numpy(np)、json、math、statistics",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -146,7 +160,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "nl2sql",
-                "description": "用自然语言描述你想查询的内容，自动生成 SQL 并执行。适合复杂的多表查询场景",
+                "description": "【少数场景】用自然语言描述查询内容，自动生成 SQL 并执行。仅当表结构复杂、自己写 SQL 没把握时用；表结构清楚时直接用 sqlite_query 更可控、能看到实际查询。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -173,23 +187,8 @@ def get_tool_definitions() -> list[dict]:
         {
             "type": "function",
             "function": {
-                "name": "db_import_csv",
-                "description": "将 CSV/TSV 文件导入为 SQL 表。导入后可用 sqlite_query 查询该表",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "filename": {"type": "string", "description": "CSV/TSV 文件名"},
-                        "table_name": {"type": "string", "description": "导入后的表名"},
-                    },
-                    "required": ["filename", "table_name"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "graph_search",
-                "description": "在知识图谱中搜索实体。返回匹配的节点及其连接度",
+                "description": "【少数场景】在知识图谱中搜索实体，返回匹配节点及连接度。仅当任务明确涉及实体关系网络时用；普通查表/读文档不要用。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -204,7 +203,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "graph_traverse",
-                "description": "从指定实体出发，遍历知识图谱中的关系路径。可发现多跳关系",
+                "description": "【少数场景】从指定实体出发，遍历知识图谱中的关系路径，可发现多跳关系。仅当任务明确涉及实体关系网络时用。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -219,7 +218,7 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "graph_extract_from_text",
-                "description": "从文本中用 LLM 抽取实体关系三元组并存入知识图谱",
+                "description": "【少数场景】从文本中用 LLM 抽取实体关系三元组并存入知识图谱（会触发额外 LLM 调用）。仅当明确要构建实体关系网络时用。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -521,7 +520,6 @@ _SUMMARY_BUILDERS = {
     "save_memory": lambda a: "正在记录要点",
     "nl2sql": lambda a: f"正在把问题转成查询：{str(a.get('question', '')).strip()[:40]}" if a.get("question") else "正在把问题转成查询",
     "kb_reindex_file": lambda a: f"正在更新文件索引：{a.get('filename', '')}".strip(),
-    "db_import_csv": lambda a: f"正在导入数据：{a.get('filename', '')}".strip(),
     "graph_search": lambda a: f"正在搜索知识图谱：{str(a.get('query', '')).strip()[:40]}" if a.get("query") else "正在搜索知识图谱",
     "graph_traverse": lambda a: f"正在遍历实体关系：{a.get('entity', '')}".strip(),
     "graph_extract_from_text": lambda a: "正在抽取知识三元组",
@@ -550,6 +548,7 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
         handlers = {
             "search_data_space": _tool_search,
             "read_file": _tool_read_file,
+            "list_files": _tool_list_files,
             "inspect_data": _tool_inspect_data,
             "pandas_query": _tool_pandas_query,
             "sqlite_query": _tool_sqlite_query,
@@ -558,7 +557,6 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any], user_id: uuid.
             "save_memory": _tool_save_memory,
             "nl2sql": _tool_nl2sql,
             "kb_reindex_file": _tool_kb_reindex,
-            "db_import_csv": _tool_db_import_csv,
             "graph_search": _tool_graph_search,
             "graph_traverse": _tool_graph_traverse,
             "graph_extract_from_text": _tool_graph_extract,
@@ -601,8 +599,17 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
         for r in results:
             meta = r.metadata
             filename = meta.get("filename", "?")
-            output.append(f"[{filename}] (得分: {r.score:.3f}, 来源: {r.source})\n{r.text[:300]}")
-        return "\n\n---\n\n".join(output)
+            # 片段放宽到整块（约 800 字）：300 字常把命中处的关键句切断，定位信号不足。
+            snippet = r.text[:800]
+            if len(r.text) > 800:
+                snippet += "…"
+            output.append(f"[{filename}] (得分: {r.score:.3f}, 来源: {r.source})\n{snippet}")
+        guide = (
+            "\n\n（以上是语义定位结果，只是文件里的相关片段。要看某条命中的完整上下文，"
+            "用 read_file(该文件, find=\"片段里的关键短语\") 跳到该处精读——返回会给出所在页码和如何看下一处；"
+            "不要为此从头整本读文件。）"
+        )
+        return "\n\n---\n\n".join(output) + guide
 
     # 回退到关键词搜索
     files = await _get_space_files(user_id, data_space_id)
@@ -625,6 +632,43 @@ async def _tool_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID 
     return "\n\n".join(keyword_results) if keyword_results else f"未找到与 '{query}' 相关的内容"
 
 
+async def _tool_list_files(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
+    """列出数据空间里的全部文件（不限类型）。
+
+    inspect_data 只认表格、search_data_space 只给片段，二者都无法回答「这里有哪些
+    文件 / 有哪些论文」。缺这个入口时模型只能猜文件名或靠 search 凑——本工具补齐
+    这条干净路径：拿到准确文件名后再 read_file。"""
+    if not data_space_id:
+        return "未选择数据空间，无法列出文件。"
+    files = await _get_space_files(user_id, data_space_id)
+    if not files:
+        return "当前数据空间为空，没有任何文件。"
+
+    ext_filter = (args.get("ext") or "").strip().lstrip(".").lower()
+    if ext_filter:
+        files = [f for f in files if (f.file_type or "").lower() == ext_filter]
+        if not files:
+            return f"数据空间里没有 .{ext_filter} 文件。"
+
+    def _fmt_size(n: int) -> str:
+        n = n or 0
+        if n > 1024 * 1024:
+            return f"{n / 1024 / 1024:.1f}MB"
+        return f"{n / 1024:.0f}KB"
+
+    from collections import Counter
+    type_counts = Counter((f.file_type or "?").lower() for f in files)
+    type_summary = "、".join(f"{cnt} 个 {ext}" for ext, cnt in type_counts.most_common())
+
+    files_sorted = sorted(files, key=lambda f: ((f.file_type or "").lower(), f.filename.lower()))
+    lines = [
+        f"{i+1}. {f.filename}  [{(f.file_type or '?').lower()}, {_fmt_size(f.file_size)}]"
+        for i, f in enumerate(files_sorted)
+    ]
+    header = f"数据空间共 {len(files)} 个文件（{type_summary}）："
+    return header + "\n" + "\n".join(lines)
+
+
 def _read_footer(start_line: int, shown: int, total: int) -> str:
     """文本/文档分页阅读的结尾信号：明确告诉模型读完没、还剩多少行。
 
@@ -640,10 +684,143 @@ def _read_footer(start_line: int, shown: int, total: int) -> str:
     )
 
 
+import re as _re_tools
+
+_PAGE_MARKER_RE = _re_tools.compile(r"---\s*第\s*(\d+)\s*页\s*---")
+
+
+def _page_at_line(lines: list[str], line_idx: int) -> int | None:
+    """从某行向前回溯最近的 `--- 第 N 页 ---` 标记，推断该行所在页码。
+
+    read_file 重建 PDF/PPTX 文本时会插入这种页标记（见 PDF/Word/PPT 分支）。
+    纯文本/无标记的文档回溯不到，返回 None（只报行号，不假造页码）。"""
+    for i in range(min(line_idx, len(lines) - 1), -1, -1):
+        m = _PAGE_MARKER_RE.search(lines[i])
+        if m:
+            try:
+                return int(m.group(1))
+            except ValueError:
+                return None
+    return None
+
+
+def _find_in_lines(lines: list[str], needle: str, from_line: int) -> list[int]:
+    """大小写不敏感地在 lines[from_line:] 里找 needle，返回命中行号（升序）。
+
+    PDF 经 fitz 抽取后，一个视觉句子常被切成多行，多词短语极少落在同一行，
+    所以单行整串匹配在 PDF 上几乎必然落空。这里用三级递进策略，匹配模型贴近
+    用户/search 的真实用法（"把这些词附近的地方找出来"），而非要求一字不差同行：
+
+    1) 单行整串：needle 原样落在某一行（最精确，纯文本/短词常命中）。
+    2) 跨行整串：把相邻几行拼起来仍含 needle（应对 PDF 把短语拦腰切断）。
+    3) 多词共现：needle 拆成词，找"这些词都出现在邻近窗口内"的起点
+       （应对 "Figure 3.2 integer registers" 这类词散落在不同行的情况）。
+    一旦某级有命中就返回该级结果，不再降级，保证更精确的优先。"""
+    start = max(from_line, 0)
+    low = [ln.lower() for ln in lines]
+    nlow = needle.lower().strip()
+    if not nlow:
+        return []
+
+    # 1) 单行整串
+    exact = [i for i in range(start, len(low)) if nlow in low[i]]
+    if exact:
+        return exact
+
+    # 2) 跨行整串：滑动拼接相邻 JOIN_SPAN 行（去掉行内多余空白后再找）
+    JOIN_SPAN = 3
+    import re as _re
+    def _norm(s: str) -> str:
+        return _re.sub(r"\s+", " ", s)
+    def _dedup_adjacent(idxs: list[int], gap: int) -> list[int]:
+        """合并相邻命中：间距 <= gap 视为同一处，只保留起点。
+        跨行/共现匹配里同一段文字会在连续多个起点命中，不去重会把一处误报成多处。"""
+        if not idxs:
+            return idxs
+        out = [idxs[0]]
+        for x in idxs[1:]:
+            if x - out[-1] > gap:
+                out.append(x)
+        return out
+    nnorm = _norm(nlow)
+    cross = []
+    for i in range(start, len(low)):
+        joined = _norm(" ".join(low[i:i + JOIN_SPAN]))
+        if nnorm in joined:
+            cross.append(i)
+    if cross:
+        return _dedup_adjacent(cross, JOIN_SPAN)
+
+    # 3) 多词共现：所有词都落在 [i, i+CO_SPAN) 窗口内，返回窗口起点
+    words = [w for w in _re.split(r"\s+", nnorm) if len(w) >= 2]
+    if len(words) >= 2:
+        CO_SPAN = 6
+        co = []
+        n = len(low)
+        for i in range(start, n):
+            window_text = " ".join(low[i:min(i + CO_SPAN, n)])
+            if all(w in window_text for w in words):
+                co.append(i)
+        if co:
+            return _dedup_adjacent(co, CO_SPAN)
+
+    return []
+
+
+def _render_find(filename: str, label: str, lines: list[str], needle: str,
+                 from_line: int, window: int) -> str:
+    """find 模式的统一渲染：定位关键词 → 返回命中处上下文窗口 + 页码 + 下一处导航。
+
+    定位用「文本锚定」而非脆弱的字符偏移：search 索引基于拍平文本的 char 偏移，
+    与 read_file 重建的带页标记排布对不上，直接拿偏移跳会错位，所以这里在
+    read_file 自己的行表示里现找 needle，稳。"""
+    total = len(lines)
+    hits = _find_in_lines(lines, needle, from_line)
+    if not hits:
+        scope = "" if from_line <= 0 else f"（从第 {from_line+1} 行起）"
+        return (
+            f"文件: {filename} ({label}, 共 {total} 行)\n---\n"
+            f"在文件内{scope}未找到 “{needle}”。提示：PDF 文本常被切成多行，"
+            f"过长或拼凑的短语（如把图号和标题连在一起）很难命中。"
+            f"改用更短、更可能原样出现的关键词重试——优先用单个专有名词/术语"
+            f"（如 “integer registers”、“%rax”、“Figure 3.2” 三者分别试），"
+            f"而不是一长串。仍找不到就不带 find 从该位置翻页通读。"
+        )
+    hit = hits[0]
+    # 命中行居中开窗，受 window 约束
+    half = max(window // 2, 1)
+    win_start = max(hit - half, 0)
+    win_end = min(win_start + window, total)
+    selected = lines[win_start:win_end]
+    page = _page_at_line(lines, hit)
+    page_str = f"，约在第 {page} 页" if page is not None else ""
+    head = (
+        f"文件: {filename} ({label}, 共 {total} 行)\n"
+        f"定位 “{needle}”：命中第 {hit+1} 行{page_str}，"
+        f"显示上下文第 {win_start+1}-{win_end} 行\n---\n"
+    )
+    body = "\n".join(selected)
+    # 导航 footer：还有多少处匹配、怎么看下一处、怎么扩展上下文
+    later = [h for h in hits if h > hit]
+    if later:
+        nav = (
+            f"\n---\n[本文件内 “{needle}” 共匹配 {len(hits)} 处，这是第 1 处（第 {hit+1} 行{page_str}）。"
+            f"看下一处：read_file(filename, find=\"{needle}\", start_line={hit+1})；"
+            f"想要这一处更多上下文：read_file(filename, start_line={win_start}, max_lines=更大值)。]"
+        )
+    else:
+        nav = (
+            f"\n---\n[本文件内 “{needle}” 只匹配这 1 处（第 {hit+1} 行{page_str}）。"
+            f"想要更多上下文：read_file(filename, start_line={win_start}, max_lines=更大值)。]"
+        )
+    return head + body + nav
+
+
 async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     filename = args.get("filename", "")
     start_line = args.get("start_line", 0)
     max_lines = args.get("max_lines", 400)
+    find = (args.get("find") or "").strip()
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():
         return f"文件 '{filename}' 不存在或无权访问"
@@ -653,6 +830,11 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
     try:
         # 表格文件：用 pandas 加载后输出为可读文本
         if ext in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"):
+            if find:
+                return (
+                    f"文件 '{filename}' 是表格文件，find 关键词定位用于文档/文本。"
+                    "要在表格里按条件找记录，请用 pandas_query / sqlite_query（WHERE/字符串包含），更准更全。"
+                )
             if ext in ("xlsx", "xls"):
                 from app.services.file_loader import load_excel_sheets
                 sheets = load_excel_sheets(file_path)
@@ -695,9 +877,13 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
                     ocr_text = await _get_profile_ocr_text(filename, user_id, data_space_id)
                     if ocr_text:
                         lines = ocr_text.split("\n")
+                        if find:
+                            return _render_find(filename, "PDF/OCR", lines, find, start_line, max_lines)
                         selected = lines[start_line:start_line + max_lines]
                         return f"文件: {filename} (PDF/OCR, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
                 lines = content.split("\n")
+                if find:
+                    return _render_find(filename, "PDF", lines, find, start_line, max_lines)
                 selected = lines[start_line:start_line + max_lines]
                 return f"文件: {filename} (PDF, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             except ImportError:
@@ -709,6 +895,8 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
             kind = "视频/逐帧OCR" if ext in ("mp4", "mov", "avi", "mkv", "webm") else "图片/OCR"
             if ocr_text:
                 lines = ocr_text.split("\n")
+                if find:
+                    return _render_find(filename, kind, lines, find, start_line, max_lines)
                 selected = lines[start_line:start_line + max_lines]
                 return f"文件: {filename} ({kind}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             return f"'{filename}' 暂无可提取的文本（OCR 未配置或仍在处理中）"
@@ -720,8 +908,10 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
                 from app.services.document_text import extract_document_text
                 content = extract_document_text(file_path, ext)
                 lines = content.split("\n")
-                selected = lines[start_line:start_line + max_lines]
                 label = "PowerPoint" if ext == "pptx" else "Word"
+                if find:
+                    return _render_find(filename, label, lines, find, start_line, max_lines)
+                selected = lines[start_line:start_line + max_lines]
                 return f"文件: {filename} ({label}, {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
             except ImportError:
                 pass
@@ -755,6 +945,8 @@ async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UU
         encoding = _detect_encoding(file_path)
         content = file_path.read_text(encoding=encoding, errors="ignore")
         lines = content.split("\n")
+        if find:
+            return _render_find(filename, "文本", lines, find, start_line, max_lines)
         selected = lines[start_line:start_line + max_lines]
         return f"文件: {filename} (共 {len(lines)} 行，显示第 {start_line+1}-{start_line+len(selected)} 行)\n---\n" + "\n".join(selected) + _read_footer(start_line, len(selected), len(lines))
     except Exception as e:
@@ -821,7 +1013,25 @@ async def _tool_inspect_data(args: dict, user_id: uuid.UUID, data_space_id: uuid
 
     tabular = [f for f in files if f.file_type in ("csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat")]
     if not tabular:
-        return "数据空间中没有表格文件"
+        # 没有表格文件不等于「没有文件」。数据空间里常是 PDF/Word/PPT 等文档（论文、
+        # 报告、讲义），inspect_data 不解析它们，但要明确告诉模型这些文件存在、叫什么，
+        # 引导去 list_files/read_file，而不是回个死胡同让模型去猜文件名。
+        non_tabular = [f for f in files if f not in tabular]
+        if not non_tabular:
+            return "当前数据空间为空，没有任何文件。"
+        from collections import Counter
+        type_counts = Counter((f.file_type or "?").lower() for f in non_tabular)
+        type_summary = "、".join(f"{cnt} 个 {ext}" for ext, cnt in type_counts.most_common())
+        names = "\n".join(
+            f"  - {f.filename} [{(f.file_type or '?').lower()}]"
+            for f in sorted(non_tabular, key=lambda x: x.filename.lower())
+        )
+        return (
+            f"数据空间里没有可做表格分析的结构化文件，但有 {len(non_tabular)} 个其它文件"
+            f"（{type_summary}）：\n{names}\n"
+            "这些是文档/非表格文件，inspect_data 不解析它们。要查看或讲解其内容，"
+            "用 read_file 逐个读取（必要时翻页读到「全文已读完」）；想要完整文件清单用 list_files。"
+        )
 
     output = []
     all_columns: dict[str, dict[str, set]] = {}
@@ -1249,23 +1459,6 @@ async def _tool_kb_reindex(args: dict, user_id: uuid.UUID, data_space_id: uuid.U
     if "error" in result:
         return result["error"]
     return f"已重新索引 '{filename}'，生成 {result['chunks_indexed']} 个文本块"
-
-
-async def _tool_db_import_csv(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    """将 CSV 导入为 SQL 表"""
-    if not data_space_id:
-        return "未选择数据空间"
-    filename = args.get("filename", "")
-    table_name = args.get("table_name", "")
-    if not filename or not table_name:
-        return "请指定文件名和表名"
-
-    from app.services.ingest import IngestService
-    svc = IngestService(user_id, data_space_id)
-    result = await svc.db_import_csv(filename, table_name)
-    if "error" in result:
-        return result["error"]
-    return f"已将 '{filename}' 导入为表 '{result['table_name']}'（{result['row_count']} 行, {result['column_count']} 列）。现在可以用 sqlite_query 查询该表。"
 
 
 async def _tool_graph_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
