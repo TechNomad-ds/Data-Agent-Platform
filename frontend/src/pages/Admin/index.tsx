@@ -432,7 +432,7 @@ export default function Admin() {
                 <Row gutter={[16, 16]}>
                   <Col xs={12} sm={8} md={6}>
                     <Card size="small" style={statCardStyle}>
-                      <Statistic title="数据空间" value={stats.total_spaces} prefix={<DatabaseOutlined />} />
+                      <Statistic title="项目" value={stats.total_spaces} prefix={<DatabaseOutlined />} />
                     </Card>
                   </Col>
                   <Col xs={12} sm={8} md={6}>
@@ -858,7 +858,7 @@ export default function Admin() {
             </Descriptions>
 
             <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col xs={12} sm={6}><Card size="small"><Statistic title="数据空间" value={userDetail.spaces?.length || 0} valueStyle={{ fontSize: 20 }} /></Card></Col>
+              <Col xs={12} sm={6}><Card size="small"><Statistic title="项目" value={userDetail.spaces?.length || 0} valueStyle={{ fontSize: 20 }} /></Card></Col>
               <Col xs={12} sm={6}><Card size="small"><Statistic title="文件" value={userDetail.file_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
               <Col xs={12} sm={6}><Card size="small"><Statistic title="对话" value={userDetail.conversation_count} valueStyle={{ fontSize: 20 }} /></Card></Col>
               <Col xs={12} sm={6}><Card size="small"><Statistic title="余额" value={userDetail.credit_balance} valueStyle={{ fontSize: 20 }} /></Card></Col>
@@ -866,7 +866,7 @@ export default function Admin() {
 
             {userDetail.spaces?.length > 0 && (
               <>
-                <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>数据空间</Text>
+                <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>项目</Text>
                 {userDetail.spaces.map((s: any) => (
                   <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${colors.border}` }}>
                     <DatabaseOutlined style={{ color: colors.primary, fontSize: 12 }} />

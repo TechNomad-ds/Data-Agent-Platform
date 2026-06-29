@@ -70,7 +70,7 @@ export default function Onboarding({ onComplete }: Props) {
             <Logo size={36} withText={false} />
           </div>
           <Title level={4} style={{ marginBottom: 4 }}>
-            {step === 0 ? '创建你的数据空间' : '上传数据文件'}
+            {step === 0 ? '创建你的项目' : '上传数据文件'}
           </Title>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
             {step === 0 ? '给你的数据分析起个名字，方便管理' : '上传后即可开始和 AI 对话分析'}
@@ -123,7 +123,7 @@ export default function Onboarding({ onComplete }: Props) {
               onClick={handleCreateSpace} loading={creating}
               style={{ borderRadius: radius.md, height: 44 }}
             >
-              创建数据空间
+              创建项目
             </Button>
           </div>
         )}

@@ -1,28 +1,18 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Input, Button, Typography, Tooltip, Dropdown, Modal, message } from 'antd'
+import { Input, Button, Typography, Dropdown, Modal, message } from 'antd'
 import {
   PlusOutlined,
   SearchOutlined,
-  DatabaseOutlined,
   MessageOutlined,
-  LogoutOutlined,
-  SettingOutlined,
   MoreOutlined,
   EditOutlined,
   DeleteOutlined,
-  WalletOutlined,
-  CrownOutlined,
   FolderOutlined,
   DownOutlined,
   AppstoreOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { chatApi, Conversation } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
-import { useAuthStore } from '@/stores/authStore'
-import { MainView } from '@/components/Layout/MainLayout'
-import Logo from '@/components/Layout/Logo'
 import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
@@ -31,19 +21,12 @@ interface Props {
   currentConvId: string | undefined
   onNewChat: () => void
   onSelectConversation: (id: string) => void
+  /** 打开数据管理（用于"管理项目"入口） */
   onOpenDataManager: () => void
-  onOpenSettings: () => void
-  onOpenCredits: () => void
-  onOpenAdmin: () => void
-  currentView: MainView
-  /** 当前活跃的数据空间（工作区）。undefined = 通用，不绑定空间 */
+  /** 当前活跃的项目。undefined = 通用，不绑定项目 */
   selectedSpaceId: string | undefined
-  /** 切换活跃工作区 */
+  /** 切换活跃项目 */
   onSelectSpace: (id: string | undefined) => void
-  /** 桌面端折叠为窄栏 */
-  collapsed?: boolean
-  /** 折叠 / 展开切换 */
-  onToggleCollapse?: () => void
   /** 在移动端抽屉内渲染：填满容器宽高，操作按钮常显（适配触屏） */
   inDrawer?: boolean
 }
@@ -55,19 +38,13 @@ interface GroupedConversations {
   latestUpdate: number
 }
 
-export default function Sidebar({
+export default function ConversationPanel({
   currentConvId,
   onNewChat,
   onSelectConversation,
   onOpenDataManager,
-  onOpenSettings,
-  onOpenCredits,
-  onOpenAdmin,
-  currentView,
   selectedSpaceId,
   onSelectSpace,
-  collapsed = false,
-  onToggleCollapse,
   inDrawer = false,
 }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -76,7 +53,6 @@ export default function Sidebar({
   const [renameId, setRenameId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const { user, logout } = useAuthStore()
 
   useEffect(() => {
     loadConversations()
@@ -172,7 +148,7 @@ export default function Sidebar({
       )
       result.push({
         spaceId,
-        spaceName: space?.name || '未知空间',
+        spaceName: space?.name || '未知项目',
         conversations: sorted,
         latestUpdate: sorted.length
           ? new Date(sorted[0].updated_at).getTime()
@@ -183,7 +159,7 @@ export default function Sidebar({
     return result
   }, [conversations, spaces, searchText])
 
-  // 工作区切换：选定空间后只展示该空间的会话（context 已由切换器表明，
+  // 项目切换：选定空间后只展示该空间的会话（context 已由切换器表明，
   // 故隐藏组头）；未选定时展示全部并按空间分组（保留总览能力）。
   const visibleGroups = useMemo(() => {
     if (!selectedSpaceId) return grouped
@@ -193,7 +169,7 @@ export default function Sidebar({
 
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
 
-  // 工作区切换器菜单：通用 + 各数据空间 + 管理入口
+  // 项目切换器菜单：通用 + 各项目 + 管理入口
   const workspaceMenuItems = [
     {
       key: '__general__',
@@ -201,9 +177,7 @@ export default function Sidebar({
       icon: <MessageOutlined />,
       onClick: () => onSelectSpace(undefined),
     },
-    ...(spaces.length
-      ? [{ type: 'divider' as const }]
-      : []),
+    ...(spaces.length ? [{ type: 'divider' as const }] : []),
     ...spaces.map((s) => ({
       key: s.id,
       label: s.name,
@@ -213,120 +187,16 @@ export default function Sidebar({
     { type: 'divider' as const },
     {
       key: '__manage__',
-      label: '管理数据空间',
+      label: '管理项目',
       icon: <AppstoreOutlined />,
       onClick: onOpenDataManager,
     },
   ]
 
-  // 账户菜单：仅保留设置与退出（数据管理/额度/后台为侧栏常驻导航，不收纳）
-  const accountMenuItems = [
-    {
-      key: 'settings',
-      label: '设置',
-      icon: <SettingOutlined />,
-      onClick: onOpenSettings,
-    },
-    { type: 'divider' as const },
-    {
-      key: 'logout',
-      label: '退出登录',
-      icon: <LogoutOutlined />,
-      danger: true,
-      onClick: logout,
-    },
-  ]
-
-  const userInitial = (user?.username || 'U')[0].toUpperCase()
-
-  // 折叠态：仅桌面端窄栏。展示展开/新建/工作区/头像四个核心动作。
-  if (collapsed && !inDrawer) {
-    return (
-      <div
-        style={{
-          width: 56,
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 6,
-          padding: '12px 0',
-          background: colors.bgSubtle,
-          borderRight: `1px solid ${colors.border}`,
-          flexShrink: 0,
-        }}
-      >
-        <Tooltip title="展开侧栏" placement="right">
-          <Button type="text" icon={<MenuUnfoldOutlined />} onClick={onToggleCollapse} />
-        </Tooltip>
-        <Tooltip title="新对话" placement="right">
-          <Button type="text" icon={<PlusOutlined />} onClick={onNewChat} />
-        </Tooltip>
-        <Dropdown menu={{ items: workspaceMenuItems }} trigger={['click']} placement="bottomLeft">
-          <Tooltip title={activeSpace ? activeSpace.name : '通用对话'} placement="right">
-            <Button
-              type="text"
-              icon={activeSpace
-                ? <FolderOutlined style={{ color: colors.primary }} />
-                : <MessageOutlined />}
-            />
-          </Tooltip>
-        </Dropdown>
-        <div style={{ margin: '6px 0', width: 24, borderTop: `1px solid ${colors.border}` }} />
-        <Tooltip title="数据管理" placement="right">
-          <Button
-            type="text"
-            icon={<DatabaseOutlined />}
-            onClick={onOpenDataManager}
-            style={{ color: currentView === 'data' ? colors.primary : undefined }}
-          />
-        </Tooltip>
-        <Tooltip title="额度与 API" placement="right">
-          <Button
-            type="text"
-            icon={<WalletOutlined />}
-            onClick={onOpenCredits}
-            style={{ color: currentView === 'credits' ? colors.primary : undefined }}
-          />
-        </Tooltip>
-        {user?.role === 'admin' && (
-          <Tooltip title="管理后台" placement="right">
-            <Button
-              type="text"
-              icon={<CrownOutlined />}
-              onClick={onOpenAdmin}
-              style={{ color: currentView === 'admin' ? colors.primary : undefined }}
-            />
-          </Tooltip>
-        )}
-        <div style={{ flex: 1 }} />
-        <Dropdown menu={{ items: accountMenuItems }} trigger={['click']} placement="topLeft">
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: '50%',
-              background: colors.userAvatar,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              color: '#fff',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {userInitial}
-          </div>
-        </Dropdown>
-      </div>
-    )
-  }
-
   return (
     <div
       style={{
-        width: inDrawer ? '100%' : 272,
+        width: inDrawer ? '100%' : 264,
         height: inDrawer ? '100%' : '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -335,31 +205,9 @@ export default function Sidebar({
         flexShrink: 0,
       }}
     >
-      {/* Header */}
-      <div style={{ padding: '16px 12px 12px' }}>
-        <div
-          style={{
-            marginBottom: 14,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Logo size={24} />
-          {!inDrawer && (
-            <Tooltip title="收起侧栏" placement="right">
-              <Button
-                type="text"
-                size="small"
-                icon={<MenuFoldOutlined />}
-                onClick={onToggleCollapse}
-                style={{ color: colors.textMuted }}
-              />
-            </Tooltip>
-          )}
-        </div>
-
-        {/* 工作区（数据空间）切换器 — 信息架构第一层级，对齐 Codex 的 project 概念 */}
+      {/* Header：项目切换器 + 新对话 + 搜索 */}
+      <div style={{ padding: inDrawer ? '8px 12px 12px' : '16px 12px 12px' }}>
+        {/* 项目切换器 — 对话页一级上下文，切换后下方历史随之过滤 */}
         <Dropdown
           menu={{ items: workspaceMenuItems }}
           trigger={['click']}
@@ -373,7 +221,7 @@ export default function Sidebar({
               {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="workspace-switcher-label">工作区</div>
+              <div className="workspace-switcher-label">项目</div>
               <div className="workspace-switcher-name">
                 {activeSpace ? activeSpace.name : '通用对话'}
               </div>
@@ -413,35 +261,6 @@ export default function Sidebar({
             fontSize: 13,
           }}
         />
-      </div>
-
-      <div style={{ margin: '4px 12px 8px', borderTop: `1px solid ${colors.border}` }} />
-
-      {/* Navigation — 数据管理 / 额度 / 后台 常驻导航 */}
-      <div style={{ padding: '0 12px 8px' }}>
-        <div
-          className={`sidebar-item${currentView === 'data' ? ' active' : ''}`}
-          onClick={onOpenDataManager}
-        >
-          <DatabaseOutlined style={{ fontSize: 14 }} />
-          <span style={{ flex: 1 }}>数据管理</span>
-        </div>
-        <div
-          className={`sidebar-item${currentView === 'credits' ? ' active' : ''}`}
-          onClick={onOpenCredits}
-        >
-          <WalletOutlined style={{ fontSize: 14 }} />
-          <span style={{ flex: 1 }}>额度与 API</span>
-        </div>
-        {user?.role === 'admin' && (
-          <div
-            className={`sidebar-item${currentView === 'admin' ? ' active' : ''}`}
-            onClick={onOpenAdmin}
-          >
-            <CrownOutlined style={{ fontSize: 14 }} />
-            <span style={{ flex: 1 }}>管理后台</span>
-          </div>
-        )}
       </div>
 
       <div style={{ margin: '0 12px 8px', borderTop: `1px solid ${colors.border}` }} />
@@ -523,16 +342,11 @@ export default function Sidebar({
                       if (!active) e.currentTarget.style.background = '#ececf1'
                     }}
                     onMouseLeave={(e) => {
-                      if (!active)
-                        e.currentTarget.style.background = 'transparent'
+                      if (!active) e.currentTarget.style.background = 'transparent'
                     }}
                   >
                     <MessageOutlined
-                      style={{
-                        fontSize: 12,
-                        color: colors.textMuted,
-                        flexShrink: 0,
-                      }}
+                      style={{ fontSize: 12, color: colors.textMuted, flexShrink: 0 }}
                     />
                     {isRenaming ? (
                       <Input
@@ -551,9 +365,7 @@ export default function Sidebar({
                         style={{
                           flex: 1,
                           fontSize: 13,
-                          color: active
-                            ? colors.textPrimary
-                            : colors.textSecondary,
+                          color: active ? colors.textPrimary : colors.textSecondary,
                           fontWeight: active ? 500 : 400,
                         }}
                       >
@@ -606,6 +418,7 @@ export default function Sidebar({
                   </div>
                 )
               })}
+
               {hasMore && (
                 <div
                   onClick={() => {
@@ -634,55 +447,6 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Footer — 账户菜单收纳次要导航（设置/额度/后台/退出） */}
-      <Dropdown
-        menu={{
-          items: accountMenuItems,
-          selectable: true,
-          selectedKeys: [currentView],
-        }}
-        trigger={['click']}
-        placement="topLeft"
-      >
-        <div
-          className="sidebar-account"
-          style={{
-            padding: '10px 12px',
-            margin: 8,
-            borderRadius: 10,
-            borderTop: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            cursor: 'pointer',
-          }}
-        >
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: '50%',
-              background: colors.userAvatar,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              color: '#fff',
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-          >
-            {userInitial}
-          </div>
-          <Text
-            style={{ flex: 1, fontSize: 13, color: colors.textSecondary }}
-            ellipsis
-          >
-            {user?.username || '用户'}
-          </Text>
-          <MoreOutlined style={{ fontSize: 16, color: colors.textMuted }} />
-        </div>
-      </Dropdown>
     </div>
   )
 }

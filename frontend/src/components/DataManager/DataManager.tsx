@@ -174,13 +174,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
       setNewSpaceDesc('')
       setCreateModalOpen(false)
       loadSpaces()
-      message.success('数据空间已创建')
+      message.success('项目已创建')
     } catch { message.error('创建失败') }
     finally { setCreating(false) }
   }
 
   const handleUpload = async (file: File) => {
-    if (!selectedSpaceId) { message.warning('请先选择数据空间'); return false }
+    if (!selectedSpaceId) { message.warning('请先选择项目'); return false }
     if (file.size > 200 * 1024 * 1024) {
       message.error(`文件 ${file.name} 超过 200MB 限制`)
       return false
@@ -284,10 +284,10 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           </div>
 
           <Title level={2} style={{ marginBottom: 8, letterSpacing: -0.5 }}>
-            创建你的第一个数据空间
+            创建你的第一个项目
           </Title>
           <Text style={{ fontSize: 16, color: colors.textSecondary, display: 'block', marginBottom: 40, lineHeight: 1.7 }}>
-            数据空间是你的数据容器。把相关文件放在一起，AI 就能帮你全面分析。
+            项目是你的文件容器。把相关文件（表格、PDF、文档等）放在一起，AI 就能帮你全面分析。
             比如"销售分析"、"客户调研"、"财务报表"等。
           </Text>
 
@@ -322,7 +322,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
             onClick={() => setCreateModalOpen(true)}
             style={{ height: 50, padding: '0 40px', fontSize: 16, fontWeight: 500, borderRadius: 14 }}
           >
-            创建数据空间
+            创建项目
           </Button>
 
           {renderCreateModal()}
@@ -350,7 +350,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
               <div>
                 <Title level={3} style={{ marginBottom: 2, letterSpacing: -0.4 }}>数据管理</Title>
                 <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                  管理你的数据空间和文件
+                  管理你的项目和文件
                 </Text>
               </div>
             </div>
@@ -359,7 +359,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
               onClick={() => setCreateModalOpen(true)}
               style={{ height: 42, borderRadius: 12, fontWeight: 600, boxShadow: shadow.soft, paddingInline: 18 }}
             >
-              新建数据空间
+              新建项目
             </Button>
           </div>
 
@@ -367,7 +367,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           {spaces.length > 4 && (
             <Input
               prefix={<SearchOutlined style={{ color: colors.textMuted }} />}
-              placeholder="搜索数据空间..."
+              placeholder="搜索项目..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               allowClear
@@ -486,7 +486,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
           <AppstoreOutlined style={{ color: colors.primary }} />
           <span style={{ fontSize: 15, fontWeight: 600, color: colors.textPrimary }}>
-            {currentSpace?.name || '数据空间'}
+            {currentSpace?.name || '项目'}
           </span>
           <Tag color="blue" style={{ margin: 0, fontSize: 11 }}>{files.length} 个文件</Tag>
         </div>
@@ -496,13 +496,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
               开始分析
             </Button>
           )}
-          <Tooltip title="删除数据空间">
+          <Tooltip title="删除项目">
             <Button
               type="text"
               icon={<DeleteOutlined />}
               onClick={() => {
                 Modal.confirm({
-                  title: '删除数据空间',
+                  title: '删除项目',
                   icon: <ExclamationCircleOutlined />,
                   content: `确定删除「${currentSpace?.name}」？空间内的所有文件和分析数据都会被清除，此操作不可撤销。`,
                   okText: '删除',
@@ -900,13 +900,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           }}>
             <FolderOutlined />
           </div>
-          <Title level={4} style={{ textAlign: 'center', marginBottom: 4 }}>创建数据空间</Title>
+          <Title level={4} style={{ textAlign: 'center', marginBottom: 4 }}>创建项目</Title>
           <Text style={{ display: 'block', textAlign: 'center', color: colors.textMuted, marginBottom: 24, fontSize: 13 }}>
-            一个数据空间对应一组相关数据，创建后可上传文件开始分析
+            一个项目对应一组相关文件，创建后可上传文件开始分析
           </Text>
 
           <div style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>空间名称</Text>
+            <Text style={{ fontSize: 13, fontWeight: 500, display: 'block', marginBottom: 6 }}>项目名称</Text>
             <Input
               size="large"
               placeholder="例如：Q4 销售分析、客户满意度调研..."

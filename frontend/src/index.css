@@ -283,7 +283,12 @@ body {
   font-weight: 500;
 }
 
-/* Workspace switcher — 工作区切换器（对齐 Codex 的 project 选择器） */
+/* Nav rail item — 窄导航栏图标项 */
+.nav-rail-item:hover {
+  background: #ececf1 !important;
+}
+
+/* Workspace switcher — 项目切换器（对齐 Codex 的 project 选择器） */
 .workspace-switcher {
   display: flex;
   align-items: center;
@@ -373,7 +378,7 @@ body {
   }
 }
 
-/* 数据空间绑定选择器（聊天框下方，显眼且精致） */
+/* 项目绑定选择器（聊天框下方，显眼且精致） */
 .space-bind-select .ant-select-selector {
   border-radius: 999px !important;
   border: 1px solid #e4e4e7 !important;

@@ -193,7 +193,7 @@ function LegalContent() {
       <Title level={4}>七、学术研究</Title>
       <Paragraph>只有在您主动勾选授权后，您的交互数据才会在匿名化处理后用于产品改进与学术研究。您可以在个人资料中调整该授权。</Paragraph>
       <Title level={4}>八、数据删除与账户注销</Title>
-      <Paragraph>您可随时删除数据空间、文件或对话记录，删除操作不可撤销。账户注销后，所有关联数据将被永久清除。</Paragraph>
+      <Paragraph>您可随时删除项目、文件或对话记录，删除操作不可撤销。账户注销后，所有关联数据将被永久清除。</Paragraph>
       <Title level={4}>九、协议修订</Title>
       <Paragraph>本平台保留修订本协议的权利，修订后将在平台公布。继续使用即视为同意修订内容。涉及重大变更时，我们将以显著方式另行通知。</Paragraph>
     </div>

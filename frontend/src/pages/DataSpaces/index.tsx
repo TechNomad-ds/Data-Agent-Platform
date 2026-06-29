@@ -27,7 +27,7 @@ export default function DataSpaces() {
   const handleCreate = async (values: { name: string; description?: string }) => {
     try {
       await dataSpacesApi.create(values)
-      message.success('数据空间创建成功')
+      message.success('项目创建成功')
       setModalOpen(false)
       form.resetFields()
       loadSpaces()
@@ -56,7 +56,7 @@ export default function DataSpaces() {
 
     try {
       await dataSpacesApi.update(editingSpace.id, values)
-      message.success('数据空间已更新')
+      message.success('项目已更新')
       setModalOpen(false)
       setEditingSpace(null)
       form.resetFields()
@@ -84,11 +84,11 @@ export default function DataSpaces() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <Title level={4} style={{ marginBottom: 4 }}>数据空间</Title>
-          <Text type="secondary">将文件组织到数据空间中，Agent 将基于选定的数据空间进行分析</Text>
+          <Title level={4} style={{ marginBottom: 4 }}>项目</Title>
+          <Text type="secondary">将文件组织到项目中，Agent 将基于选定的项目进行分析</Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          创建数据空间
+          创建项目
         </Button>
       </div>
 
@@ -96,10 +96,10 @@ export default function DataSpaces() {
         <Card>
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="还没有数据空间"
+            description="还没有项目"
           >
             <Button type="primary" onClick={openCreateModal}>
-              创建第一个数据空间
+              创建第一个项目
             </Button>
           </Empty>
         </Card>
@@ -134,7 +134,7 @@ export default function DataSpaces() {
       )}
 
       <Modal
-        title={editingSpace ? '编辑数据空间' : '创建数据空间'}
+        title={editingSpace ? '编辑项目' : '创建项目'}
         open={modalOpen}
         onCancel={() => { setModalOpen(false); setEditingSpace(null); form.resetFields() }}
         onOk={() => form.submit()}
@@ -144,7 +144,7 @@ export default function DataSpaces() {
             <Input placeholder="例如：销售数据分析" />
           </Form.Item>
           <Form.Item name="description" label="描述">
-            <Input.TextArea placeholder="简要描述这个数据空间的用途" rows={3} />
+            <Input.TextArea placeholder="简要描述这个项目的用途" rows={3} />
           </Form.Item>
         </Form>
       </Modal>

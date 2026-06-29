@@ -32,7 +32,7 @@ const FALLBACK_MODELS: ModelOption[] = [
 ]
 
 const DEFAULT_SUGGESTIONS = [
-  '帮我看看数据空间里有什么文件',
+  '帮我看看项目里有什么文件',
   '帮我概述一下数据的整体情况',
   '帮我做一个关键指标的统计摘要',
   '数据中有哪些值得关注的趋势或规律？',
@@ -108,12 +108,12 @@ export default function ChatView({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [inputFocused, setInputFocused] = useState(false)
   const [loadingConversation, setLoadingConversation] = useState(false)
-  // 聊天附件（#8）：拖拽或按钮上传的文件，上传到当前绑定的数据空间后以 chip 展示
+  // 聊天附件（#8）：拖拽或按钮上传的文件，上传到当前绑定的项目后以 chip 展示
   const [attachments, setAttachments] = useState<{ id: string; name: string; type: string }[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // #12 多数据空间：本轮活跃空间集合（含主空间）。主空间 = selectedSpaceId（与外层同步）。
+  // #12 多项目：本轮活跃空间集合（含主空间）。主空间 = selectedSpaceId（与外层同步）。
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -286,12 +286,12 @@ export default function ChatView({
     [appendStreamDelta, appendThinkingDelta, addToolEvent, updatePlan, setMessages, setCurrentConversation, onConversationDeleted]
   )
 
-  // 上传聊天附件到当前绑定的数据空间（#8）。需要先绑定数据空间。
+  // 上传聊天附件到当前绑定的项目（#8）。需要先绑定项目。
   const uploadAttachments = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return
       if (!selectedSpaceId) {
-        message.warning('请先在下方绑定一个数据空间，再添加文件')
+        message.warning('请先在下方绑定一个项目，再添加文件')
         return
       }
       setUploadingFiles(true)
@@ -512,11 +512,11 @@ export default function ChatView({
     []
   )
 
-  // #7 把当前对话沉淀为数据空间里的 Markdown 文件
+  // #7 把当前对话沉淀为项目里的 Markdown 文件
   const handlePersistToSpace = useCallback(async () => {
     if (!conversationId) return
     if (!selectedSpaceId) {
-      message.warning('请先绑定一个数据空间，再沉淀对话')
+      message.warning('请先绑定一个项目，再沉淀对话')
       return
     }
     try {
@@ -554,7 +554,7 @@ export default function ChatView({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* 活跃数据空间已由侧栏顶部的工作区切换器表明，这里不再重复展示徽标。 */}
+          {/* 活跃项目已由侧栏顶部的项目切换器表明，这里不再重复展示徽标。 */}
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
@@ -571,7 +571,7 @@ export default function ChatView({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {conversationId && selectedSpaceId && (
-            <Tooltip title="把这段对话沉淀为数据空间里的文档，便于以后检索引用">
+            <Tooltip title="把这段对话沉淀为项目里的文档，便于以后检索引用">
               <Button
                 type="text"
                 icon={<SaveOutlined />}
@@ -630,7 +630,7 @@ export default function ChatView({
               >
                 {selectedSpaceId
                   ? '基于你的数据，试试下面这些方向'
-                  : '选择数据空间后可分析数据，也可以直接提问'}
+                  : '选择项目后可分析数据，也可以直接提问'}
               </Text>
 
               {suggestions.length > 0 ? (
@@ -860,7 +860,7 @@ export default function ChatView({
                 pointerEvents: 'none',
               }}
             >
-              松开以添加文件{selectedSpaceId ? '到当前数据空间' : '（请先绑定数据空间）'}
+              松开以添加文件{selectedSpaceId ? '到当前项目' : '（请先绑定项目）'}
             </div>
           )}
           {/* 附件 chips */}
@@ -911,7 +911,7 @@ export default function ChatView({
               if (fileInputRef.current) fileInputRef.current.value = ''
             }}
           />
-          <Tooltip title={selectedSpaceId ? '添加文件' : '请先绑定数据空间'}>
+          <Tooltip title={selectedSpaceId ? '添加文件' : '请先绑定项目'}>
             <Button
               type="text"
               icon={<PaperClipOutlined />}
@@ -933,8 +933,8 @@ export default function ChatView({
                   ? '向 DataMind 提问…'
                   : '向 DataMind 提问…  Enter 发送，Shift+Enter 换行'
                 : isMobile
-                  ? '直接提问，或先选数据空间…'
-                  : '选择数据空间后可分析数据，或直接提问…'
+                  ? '直接提问，或先选项目…'
+                  : '选择项目后可分析数据，或直接提问…'
             }
             autoSize={{ minRows: 1, maxRows: 6 }}
             onKeyDown={(e) => {
@@ -1009,7 +1009,7 @@ export default function ChatView({
           )}
           </div>
         </div>
-        {/* 数据空间绑定条：放在输入框正下方，显眼且高端（用户反馈左上角太不显眼） */}
+        {/* 项目绑定条：放在输入框正下方，显眼且高端（用户反馈左上角太不显眼） */}
         <div
           style={{
             maxWidth: READING_WIDTH,
@@ -1034,7 +1034,7 @@ export default function ChatView({
               placeholder={
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <DatabaseOutlined style={{ fontSize: 13 }} />
-                  绑定数据空间（可多选，基于你的数据回答）
+                  绑定项目（可多选，基于你的数据回答）
                 </span>
               }
               popupMatchSelectWidth={false}

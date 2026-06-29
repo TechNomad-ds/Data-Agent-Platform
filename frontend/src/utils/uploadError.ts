@@ -30,7 +30,7 @@ export function uploadErrorMessage(err: any, fileName?: string): string {
     return `${prefix}登录状态已失效，请重新登录后再试`
   }
   if (status === 404) {
-    return `${prefix}数据空间不存在或已被删除`
+    return `${prefix}项目不存在或已被删除`
   }
 
   // 后端明确给出的原因（如"不支持的文件类型""超过大小限制"）

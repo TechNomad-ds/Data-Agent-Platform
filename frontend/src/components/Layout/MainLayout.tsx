@@ -5,7 +5,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { dataSpacesApi } from '@/api/dataSpaces'
 import { chatApi } from '@/api/chat'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import Sidebar from '@/components/Sidebar/Sidebar'
+import NavRail from '@/components/Sidebar/NavRail'
+import ConversationPanel from '@/components/Sidebar/ConversationPanel'
 import ChatView from '@/components/Chat/ChatView'
 import DataManager from '@/components/DataManager/DataManager'
 import SettingsPage from '@/pages/Settings'
@@ -25,7 +26,6 @@ export default function MainLayout() {
   const [checkingSpaces, setCheckingSpaces] = useState(true)
   const [showGuide, setShowGuide] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isMobile = useIsMobile()
   const { user, fetchUser } = useAuthStore()
 
@@ -85,13 +85,13 @@ export default function MainLayout() {
   }, [])
 
   const handleSpaceChange = useCallback((id: string | undefined) => {
-    // #13 对话中切换数据空间：直接切换当前对话所用空间，保留同一对话与记忆，
+    // #13 对话中切换项目：直接切换当前对话所用空间，保留同一对话与记忆，
     // 不再新建对话。后端在收到带 data_space_id 的消息时会更新会话绑定。
     setSelectedSpaceId(id)
   }, [])
 
-  // 侧栏工作区切换器：切换活跃空间并回到聊天视图、开启该空间下的新对话，
-  // 让"先选工作区，再进会话"成为主路径（对齐 Codex 的 project 概念）。
+  // 侧栏项目切换器：切换活跃空间并回到聊天视图、开启该空间下的新对话，
+  // 让"先选项目，再进会话"成为主路径（对齐 Codex 的 project 概念）。
   const handleSelectSpace = useCallback((id: string | undefined) => {
     setSelectedSpaceId(id)
     setCurrentConvId(undefined)
@@ -134,20 +134,27 @@ export default function MainLayout() {
     []
   )
 
-  const sidebar = (
-    <Sidebar
+  const navRail = (
+    <NavRail
+      currentView={currentView}
+      onOpenChat={withDrawerClose(handleNewChat)}
+      onOpenDataManager={withDrawerClose(handleOpenDataManager)}
+      onOpenCredits={withDrawerClose(handleOpenCredits)}
+      onOpenAdmin={withDrawerClose(handleOpenAdmin)}
+      onOpenSettings={withDrawerClose(handleOpenSettings)}
+      inDrawer={isMobile}
+    />
+  )
+
+  // 对话历史面板：仅对话视图展示（其余视图为全宽内容页）
+  const conversationPanel = (
+    <ConversationPanel
       currentConvId={currentConvId}
       onNewChat={withDrawerClose(handleNewChat)}
       onSelectConversation={withDrawerClose(handleSelectConversation)}
       onOpenDataManager={withDrawerClose(handleOpenDataManager)}
-      onOpenSettings={withDrawerClose(handleOpenSettings)}
-      onOpenCredits={withDrawerClose(handleOpenCredits)}
-      onOpenAdmin={withDrawerClose(handleOpenAdmin)}
-      currentView={currentView}
       selectedSpaceId={selectedSpaceId}
       onSelectSpace={withDrawerClose(handleSelectSpace)}
-      collapsed={sidebarCollapsed}
-      onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
       inDrawer={isMobile}
     />
   )
@@ -224,12 +231,18 @@ export default function MainLayout() {
             styles={{ body: { padding: 0 } }}
             closable={false}
           >
-            {sidebar}
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: colors.bgSubtle }}>
+              {navRail}
+              <div style={{ borderTop: `1px solid ${colors.border}`, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                {conversationPanel}
+              </div>
+            </div>
           </Drawer>
         </div>
       ) : (
         <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
-          {sidebar}
+          {navRail}
+          {currentView === 'chat' && conversationPanel}
           <div style={{ flex: 1, overflow: 'hidden' }}>{mainContent}</div>
         </div>
       )}
@@ -247,12 +260,12 @@ export default function MainLayout() {
           <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 16 }}>开始使用 DataMind</div>
           <div style={{ textAlign: 'left', fontSize: 14, color: '#475569', lineHeight: 2.2 }}>
-            <div><strong>① 数据管理</strong> — 左侧进入数据管理，创建数据空间并上传文件</div>
-            <div><strong>② 新建对话</strong> — 点击"新对话"，在顶部选择数据空间和模型</div>
+            <div><strong>① 数据管理</strong> — 左侧进入数据管理，创建项目并上传文件</div>
+            <div><strong>② 新建对话</strong> — 点击"新对话"，在顶部选择项目和模型</div>
             <div><strong>③ 开始提问</strong> — 用自然语言问关于你数据的任何问题</div>
           </div>
           <div style={{ marginTop: 16, fontSize: 12, color: '#94a3b8' }}>
-            模型随时可切换，历史对话会按数据空间分组显示在左侧
+            模型随时可切换，历史对话会按项目分组显示在左侧
           </div>
         </div>
       </Modal>

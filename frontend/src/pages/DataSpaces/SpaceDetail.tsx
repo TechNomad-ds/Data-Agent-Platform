@@ -33,7 +33,7 @@ export default function SpaceDetail({ space, onBack }: Props) {
       setFiles(res.data.files)
       // index_status removed
     } catch {
-      message.error('加载数据空间详情失败')
+      message.error('加载项目详情失败')
     } finally {
       setLoading(false)
     }
