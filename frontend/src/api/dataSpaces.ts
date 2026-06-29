@@ -50,4 +50,16 @@ export const dataSpacesApi = {
       // 交由 nginx(client_body_timeout) 与后端兜底
       timeout: 0,
     }),
+  // 对话临时文件区（聊天框上传，不进正式项目）
+  uploadToConversation: (conversationId: string, formData: FormData) =>
+    api.post(`/data-spaces/conversation/${conversationId}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+    }),
+  listConversationFiles: (conversationId: string) =>
+    api.get<FileInSpace[]>(`/data-spaces/conversation/${conversationId}/files`),
+  promoteConversationFile: (conversationId: string, fileId: string, dataSpaceId: string) =>
+    api.post(`/data-spaces/conversation/${conversationId}/files/${fileId}/promote`, { data_space_id: dataSpaceId }),
+  deleteConversationFile: (conversationId: string, fileId: string) =>
+    api.delete(`/data-spaces/conversation/${conversationId}/files/${fileId}`),
 }

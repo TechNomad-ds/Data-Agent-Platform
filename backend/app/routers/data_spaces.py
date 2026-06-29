@@ -26,6 +26,32 @@ from app.routers.files import ALLOWED_EXTENSIONS, MAX_FILE_SIZE, get_file_type, 
 
 router = APIRouter()
 
+# ---- 对话临时文件区（聊天框上传） ----
+# 每个对话可有一个隐藏的 data_space（conversation_id 非空）承载聊天框上传的文件。
+# 这些文件不进正式项目，仅在该对话内被 agent 看到；用户可“加入项目”转正或“删除”。
+from app.models.conversation import Conversation as _Conversation  # noqa: E402
+
+
+async def _get_or_create_temp_space(conversation_id: uuid.UUID, user: User, db: AsyncSession) -> DataSpace:
+    """取得（或惰性创建）某对话的临时文件区 data_space。"""
+    row = await db.execute(
+        select(DataSpace).where(DataSpace.conversation_id == conversation_id)
+    )
+    space = row.scalar_one_or_none()
+    if space:
+        return space
+    # 名称需满足 (user_id, name) 唯一约束，用对话 id 保证唯一且不与用户项目重名
+    space = DataSpace(
+        user_id=user.id,
+        conversation_id=conversation_id,
+        name=f"__conv_{conversation_id}__",
+        description="对话临时文件区",
+    )
+    db.add(space)
+    await db.flush()
+    return space
+
+
 
 @router.post("", response_model=DataSpaceResponse, status_code=201)
 async def create_data_space(
@@ -38,10 +64,13 @@ async def create_data_space(
     if not name:
         raise HTTPException(status_code=400, detail="数据空间名称不能为空")
 
-    # 检查数量上限（管理员不限）
+    # 检查数量上限（管理员不限）。只统计正式项目，不含对话临时文件区。
     if current_user.role != "admin":
         count_result = await db.execute(
-            select(func.count()).select_from(DataSpace).where(DataSpace.user_id == current_user.id)
+            select(func.count()).select_from(DataSpace).where(
+                DataSpace.user_id == current_user.id,
+                DataSpace.conversation_id.is_(None),
+            )
         )
         if (count_result.scalar() or 0) >= settings.max_spaces_per_user:
             raise HTTPException(status_code=400, detail=f"数据空间数量已达上限({settings.max_spaces_per_user}个)")
@@ -80,7 +109,10 @@ async def list_data_spaces(
     )
     result = await db.execute(
         select(DataSpace, file_count_subq.label("file_count"))
-        .where(DataSpace.user_id == current_user.id)
+        .where(
+            DataSpace.user_id == current_user.id,
+            DataSpace.conversation_id.is_(None),  # 排除对话临时文件区，只列正式项目
+        )
         .order_by(DataSpace.updated_at.desc())
     )
 
@@ -785,3 +817,182 @@ async def preview_file_data(
         "page_size": page_size,
         "filename": file.filename,
     }
+
+
+# PLACEHOLDER_CONV_FILE_ENDPOINTS
+
+
+@router.post("/conversation/{conversation_id}/upload", response_model=list[FileResponse], status_code=201)
+async def upload_files_to_conversation(
+    conversation_id: uuid.UUID,
+    files: list[UploadFile] = FastAPIFile(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """把聊天框上传的文件放进该对话的临时文件区（不进正式项目）。
+
+    临时区是一个隐藏 data_space（conversation_id 非空），惰性创建。
+    复用 upload_files_to_space 的落盘 + 索引逻辑，使临时文件也能被 agent 检索。
+    """
+    conv_row = await db.execute(
+        select(_Conversation).where(
+            _Conversation.id == conversation_id,
+            _Conversation.user_id == current_user.id,
+        )
+    )
+    if not conv_row.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    temp_space = await _get_or_create_temp_space(conversation_id, current_user, db)
+    await db.commit()
+    return await upload_files_to_space(
+        space_id=temp_space.id, files=files, current_user=current_user, db=db
+    )
+
+
+@router.get("/conversation/{conversation_id}/files", response_model=list[FileInSpace])
+async def list_conversation_files(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """列出某对话临时区里的文件（重开对话时恢复 chip 用）。无临时区则返回空列表。"""
+    conv_row = await db.execute(
+        select(_Conversation).where(
+            _Conversation.id == conversation_id,
+            _Conversation.user_id == current_user.id,
+        )
+    )
+    if not conv_row.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    space_row = await db.execute(
+        select(DataSpace.id).where(DataSpace.conversation_id == conversation_id)
+    )
+    temp_space_id = space_row.scalar_one_or_none()
+    if not temp_space_id:
+        return []
+
+    file_result = await db.execute(
+        select(File, DataSpaceFile.added_at)
+        .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
+        .where(DataSpaceFile.data_space_id == temp_space_id)
+        .order_by(DataSpaceFile.added_at.desc())
+    )
+    return [
+        FileInSpace(
+            file_id=f.id, filename=f.filename,
+            file_type=f.file_type, file_size=f.file_size, added_at=added_at,
+        )
+        for f, added_at in file_result.all()
+    ]
+
+
+# PLACEHOLDER_PROMOTE_DELETE
+
+
+@router.post("/conversation/{conversation_id}/files/{file_id}/promote")
+async def promote_conversation_file(
+    conversation_id: uuid.UUID,
+    file_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """把临时文件「加入项目」：从对话临时区转入指定正式项目，并在项目里重建索引。
+
+    body: { data_space_id: str }  目标项目 id（必填，且必须是正式项目）。
+    """
+    target_raw = body.get("data_space_id")
+    if not target_raw:
+        raise HTTPException(status_code=400, detail="请指定要加入的项目")
+    try:
+        target_space_id = uuid.UUID(str(target_raw))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="项目 ID 无效")
+
+    temp_row = await db.execute(
+        select(DataSpace).where(
+            DataSpace.conversation_id == conversation_id,
+            DataSpace.user_id == current_user.id,
+        )
+    )
+    temp_space = temp_row.scalar_one_or_none()
+    if not temp_space:
+        raise HTTPException(status_code=404, detail="该对话没有临时文件")
+
+    target_row = await db.execute(
+        select(DataSpace).where(
+            DataSpace.id == target_space_id,
+            DataSpace.user_id == current_user.id,
+            DataSpace.conversation_id.is_(None),
+        )
+    )
+    if not target_row.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="目标项目不存在")
+
+    link_row = await db.execute(
+        select(DataSpaceFile).where(
+            DataSpaceFile.data_space_id == temp_space.id,
+            DataSpaceFile.file_id == file_id,
+        )
+    )
+    link = link_row.scalar_one_or_none()
+    if not link:
+        raise HTTPException(status_code=404, detail="文件不在该对话的临时区中")
+
+    exists_row = await db.execute(
+        select(DataSpaceFile).where(
+            DataSpaceFile.data_space_id == target_space_id,
+            DataSpaceFile.file_id == file_id,
+        )
+    )
+    if exists_row.scalar_one_or_none():
+        await db.delete(link)
+    else:
+        link.data_space_id = target_space_id
+    await db.commit()
+
+    import asyncio, logging
+    _logger = logging.getLogger("data_spaces")
+
+    async def _reindex():
+        try:
+            from app.services.preprocessing import preprocess_file_limited
+            await preprocess_file_limited(file_id, target_space_id)
+        except Exception as e:
+            _logger.error(f"加入项目后重建索引失败 {file_id}: {e}", exc_info=True)
+
+    asyncio.create_task(_reindex())
+    return {"ok": True, "file_id": str(file_id), "data_space_id": str(target_space_id)}
+
+
+@router.delete("/conversation/{conversation_id}/files/{file_id}", status_code=204)
+async def delete_conversation_file(
+    conversation_id: uuid.UUID,
+    file_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """从对话临时区删除一个文件（agent 不再看到它）。"""
+    temp_row = await db.execute(
+        select(DataSpace).where(
+            DataSpace.conversation_id == conversation_id,
+            DataSpace.user_id == current_user.id,
+        )
+    )
+    temp_space = temp_row.scalar_one_or_none()
+    if not temp_space:
+        raise HTTPException(status_code=404, detail="该对话没有临时文件")
+
+    link_row = await db.execute(
+        select(DataSpaceFile).where(
+            DataSpaceFile.data_space_id == temp_space.id,
+            DataSpaceFile.file_id == file_id,
+        )
+    )
+    link = link_row.scalar_one_or_none()
+    if link:
+        await db.delete(link)
+        await db.commit()
+

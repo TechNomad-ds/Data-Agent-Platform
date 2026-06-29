@@ -378,31 +378,77 @@ body {
   }
 }
 
-/* 项目绑定选择器（聊天框下方，显眼且精致） */
-.space-bind-select .ant-select-selector {
-  border-radius: 999px !important;
-  border: 1px solid #e4e4e7 !important;
-  background: #ffffff !important;
-  min-height: 36px !important;
-  padding: 0 14px !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-  transition: border-color 0.15s, box-shadow 0.15s;
+/* 上下文条：当前对话的项目状态（顶栏左侧的只读胶囊） */
+.ctx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #ececf1;
+  background: #f7f7f8;
+  user-select: none;
 }
-/* 多选模式有 tag 时放开圆角，避免胶囊形挤压 tag */
-.space-bind-select.ant-select-multiple .ant-select-selector {
-  border-radius: 14px !important;
+.ctx-pill-readonly {
+  cursor: default;
 }
-.space-bind-select:hover .ant-select-selector {
-  border-color: #c7c7cf !important;
+.ctx-pill-icon {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
 }
-.space-bind-select.ant-select-focused .ant-select-selector {
-  border-color: #4f46e5 !important;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
+.ctx-pill-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1f2328;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.space-bind-select .ant-select-selection-item,
-.space-bind-select .ant-select-selection-placeholder {
-  line-height: 34px !important;
-  font-size: 13px;
+.ctx-pill-sub {
+  font-size: 11.5px;
+  color: #8e8ea0;
+  flex-shrink: 0;
+}
+
+/* 上下文带：项目条与模型选择器之间的细分隔 */
+.ctx-divider {
+  width: 1px;
+  height: 20px;
+  background: #ececf1;
+  flex-shrink: 0;
+}
+
+/* 模型选择器：带「模型」小标签 + 浅底，使其看起来是一个设置而非次要操作 */
+.ctx-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  border-radius: 999px;
+  background: #f7f7f8;
+  border: 1px solid #ececf1;
+  transition: border-color 0.12s, background 0.12s;
+}
+.ctx-model:hover {
+  border-color: #d9d9e3;
+  background: #fcfcfd;
+}
+.ctx-model-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8e8ea0;
+  flex-shrink: 0;
+}
+.ctx-model .ant-select {
+  font-weight: 600;
+}
+.ctx-model .ant-select-selection-item {
+  color: #1f2328;
 }
 
 /* 数据管理：上传拖拽区 hover */

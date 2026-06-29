@@ -84,14 +84,8 @@ export default function MainLayout() {
     }
   }, [])
 
-  const handleSpaceChange = useCallback((id: string | undefined) => {
-    // #13 对话中切换项目：直接切换当前对话所用空间，保留同一对话与记忆，
-    // 不再新建对话。后端在收到带 data_space_id 的消息时会更新会话绑定。
-    setSelectedSpaceId(id)
-  }, [])
-
-  // 侧栏项目切换器：切换活跃空间并回到聊天视图、开启该空间下的新对话，
-  // 让"先选项目，再进会话"成为主路径（对齐 Codex 的 project 概念）。
+  // 项目切换的唯一入口（左侧项目栏）：切换活跃项目 → 回到聊天视图、开启该项目下的新对话，
+  // 并让中间栏只展示该项目的历史。"先选项目，再进会话"是主路径（项目=文件夹心智）。
   const handleSelectSpace = useCallback((id: string | undefined) => {
     setSelectedSpaceId(id)
     setCurrentConvId(undefined)
@@ -166,7 +160,6 @@ export default function MainLayout() {
         conversationId={currentConvId}
         onConversationCreated={handleConversationCreated}
         onConversationDeleted={handleNewChat}
-        onSpaceChange={handleSpaceChange}
       />
     ) : currentView === 'data' ? (
       <DataManager

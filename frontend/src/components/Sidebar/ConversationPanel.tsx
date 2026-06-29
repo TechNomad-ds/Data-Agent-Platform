@@ -134,7 +134,7 @@ export default function ConversationPanel({
       )
       result.push({
         spaceId: '__general__',
-        spaceName: '通用对话',
+        spaceName: '普通对话',
         conversations: sorted,
         latestUpdate: new Date(sorted[0].updated_at).getTime(),
       })
@@ -169,18 +169,29 @@ export default function ConversationPanel({
 
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
 
-  // 项目切换器菜单：通用 + 各项目 + 管理入口
+  // 项目切换器菜单：通用 + 各项目（带文件数）+ 管理入口。
+  // 这是全局唯一切换项目的入口（对话页顶栏只读展示，不再切换）。
   const workspaceMenuItems = [
     {
       key: '__general__',
-      label: '通用对话',
+      label: (
+        <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.3, padding: '1px 0' }}>
+          <span>普通对话</span>
+          <span style={{ fontSize: 11, color: colors.textMuted }}>不分析你的文件，直接和 AI 聊</span>
+        </span>
+      ),
       icon: <MessageOutlined />,
       onClick: () => onSelectSpace(undefined),
     },
     ...(spaces.length ? [{ type: 'divider' as const }] : []),
     ...spaces.map((s) => ({
       key: s.id,
-      label: s.name,
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+          <span style={{ fontSize: 11, color: colors.textMuted, flexShrink: 0 }}>{s.file_count} 个文件</span>
+        </span>
+      ),
       icon: <FolderOutlined />,
       onClick: () => onSelectSpace(s.id),
     })),
@@ -221,9 +232,11 @@ export default function ConversationPanel({
               {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="workspace-switcher-label">项目</div>
+              <div className="workspace-switcher-label">
+                {activeSpace ? `项目 · ${activeSpace.file_count} 个文件` : '项目'}
+              </div>
               <div className="workspace-switcher-name">
-                {activeSpace ? activeSpace.name : '通用对话'}
+                {activeSpace ? activeSpace.name : '普通对话'}
               </div>
             </div>
             <DownOutlined style={{ fontSize: 10, color: colors.textMuted }} />

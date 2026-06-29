@@ -13,10 +13,10 @@ from app.models.data_space import DataSpace, DataSpaceFile
 router = APIRouter()
 
 DEFAULT_SUGGESTIONS = [
-    "帮我看看数据空间里有什么文件",
-    "帮我概述一下数据的整体情况",
-    "帮我做一个关键指标的统计摘要",
-    "数据中有哪些值得关注的趋势或规律？",
+    "帮我看看项目里有什么文件",
+    "帮我概述一下这些文件的整体情况",
+    "帮我做一个关键内容的摘要",
+    "这些资料里有哪些值得关注的重点？",
 ]
 
 
@@ -32,7 +32,7 @@ async def get_suggestions(
     )
     space = result.scalar_one_or_none()
     if not space:
-        raise HTTPException(status_code=404, detail="数据空间不存在")
+        raise HTTPException(status_code=404, detail="项目不存在")
 
     # 只统计文件数量用于 summary，不依赖画像
     file_count_result = await db.execute(

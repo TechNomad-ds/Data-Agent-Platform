@@ -1,14 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Input, Button, Select, Typography, Spin, message, Tooltip } from 'antd'
+import { Input, Button, Select, Typography, Spin, message, Tooltip, Dropdown } from 'antd'
 import {
   SendOutlined,
   StopOutlined,
-  DatabaseOutlined,
   ArrowDownOutlined,
   PaperClipOutlined,
   FileOutlined,
-  CloseOutlined,
   SaveOutlined,
+  FolderOutlined,
+  MessageOutlined,
+  RobotOutlined,
+  DownOutlined,
+  FolderAddOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { chatApi, Message, SSEEvent } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
@@ -31,11 +35,20 @@ const FALLBACK_MODELS: ModelOption[] = [
   { id: 'deepseek-v4-flash', display_name: 'DeepSeek V4 Flash', model_name: 'deepseek-v4-flash', provider: 'deepseek', source: 'platform', credit_multiplier: 1.0 },
 ]
 
-const DEFAULT_SUGGESTIONS = [
+// 普通对话（未选项目）：通用问答/写作类，不假设有文件可分析
+const GENERAL_SUGGESTIONS = [
+  '帮我把一段话润色得更专业',
+  '用通俗的语言解释一个概念',
+  '帮我列一个任务的执行步骤',
+  '帮我起草一封邮件',
+]
+
+// 项目对话的兜底建议（后端没返回时用）：围绕项目里的文件
+const PROJECT_SUGGESTIONS = [
   '帮我看看项目里有什么文件',
-  '帮我概述一下数据的整体情况',
-  '帮我做一个关键指标的统计摘要',
-  '数据中有哪些值得关注的趋势或规律？',
+  '帮我概述一下这些文件的整体情况',
+  '帮我做一个关键内容的摘要',
+  '这些资料里有哪些值得关注的重点？',
 ]
 
 const READING_WIDTH = 760
@@ -45,7 +58,6 @@ interface Props {
   conversationId: string | undefined
   onConversationCreated: (id: string) => void
   onConversationDeleted?: () => void
-  onSpaceChange: (id: string | undefined) => void
 }
 
 // AI 大头像 — 用于空状态
@@ -80,7 +92,6 @@ export default function ChatView({
   conversationId,
   onConversationCreated,
   onConversationDeleted,
-  onSpaceChange,
 }: Props) {
   const {
     setCurrentConversation,
@@ -119,6 +130,10 @@ export default function ChatView({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   // 输入法（拼音等）组字状态：组字中按回车是确认候选词，不应触发发送
   const isComposingRef = useRef(false)
+  // 同步发送锁：isStreaming 是异步 state，快速连点（如连点两条建议）时两次点击
+  // 都可能在 setIsStreaming 生效前通过守卫，导致两路 SSE 流写进同一缓冲区交织成乱码。
+  // 这个 ref 在 sendMessage 入口同步置位、finally 释放，杜绝并发发送。
+  const sendingRef = useRef(false)
   // 用户是否贴在底部（决定流式时是否自动跟随滚动）
   const stickToBottomRef = useRef(true)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
@@ -146,6 +161,7 @@ export default function ChatView({
     } else {
       setCurrentConversation(null)
       setMessages([])
+      setAttachments([])  // 新对话：清空上一对话残留的临时文件 chip
     }
   }, [conversationId])
 
@@ -187,7 +203,7 @@ export default function ChatView({
       loadSpaces()
       loadSuggestions()
     } else {
-      setSuggestions(DEFAULT_SUGGESTIONS)
+      setSuggestions(GENERAL_SUGGESTIONS)
     }
   }, [selectedSpaceId])
 
@@ -231,15 +247,32 @@ export default function ChatView({
       setSelectedModel(res.data.model_id)
     } catch {}
     finally { setLoadingConversation(false) }
+    loadConversationFiles(id)
+  }
+
+  // 加载本对话临时区里的文件，恢复输入框上方的 chip（重开对话时）
+  const loadConversationFiles = async (id: string) => {
+    try {
+      const res = await dataSpacesApi.listConversationFiles(id)
+      setAttachments(
+        (res.data || []).map((f) => ({
+          id: f.file_id,
+          name: f.filename,
+          type: f.file_type || '',
+        }))
+      )
+    } catch {
+      setAttachments([])
+    }
   }
 
   const loadSuggestions = async () => {
     try {
       const res = await api.get(`/data-spaces/${selectedSpaceId}/suggestions`)
       const items = res.data.suggestions || []
-      setSuggestions(items.length > 0 ? items : DEFAULT_SUGGESTIONS)
+      setSuggestions(items.length > 0 ? items : PROJECT_SUGGESTIONS)
     } catch {
-      setSuggestions(DEFAULT_SUGGESTIONS)
+      setSuggestions(PROJECT_SUGGESTIONS)
     }
   }
 
@@ -286,35 +319,77 @@ export default function ChatView({
     [appendStreamDelta, appendThinkingDelta, addToolEvent, updatePlan, setMessages, setCurrentConversation, onConversationDeleted]
   )
 
-  // 上传聊天附件到当前绑定的项目（#8）。需要先绑定项目。
+  // 确保存在一个对话（聊天框上传需要 conversationId 来归属临时文件区）。
+  // 新对话在首次上传时惰性创建，沿用当前项目与模型。
+  const ensureConversation = useCallback(async (): Promise<string | undefined> => {
+    if (conversationId) return conversationId
+    if (!selectedModel) { message.warning('请先选择模型'); return undefined }
+    try {
+      const res = await chatApi.createConversation({
+        data_space_id: selectedSpaceId,
+        model_id: selectedModel,
+      })
+      setCurrentConversation(res.data)
+      justCreatedConvRef.current = res.data.id
+      onConversationCreated(res.data.id)
+      return res.data.id
+    } catch {
+      message.error('创建对话失败')
+      return undefined
+    }
+  }, [conversationId, selectedModel, selectedSpaceId, setCurrentConversation, onConversationCreated])
+
+  // 聊天框上传：文件进入「本次对话的临时文件区」，不进正式项目。
+  // 普通对话也可用；agent 发消息时会自动把临时区并入检索范围。
   const uploadAttachments = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return
-      if (!selectedSpaceId) {
-        message.warning('请先在下方绑定一个项目，再添加文件')
-        return
-      }
+      const convId = await ensureConversation()
+      if (!convId) return
       setUploadingFiles(true)
       try {
         const formData = new FormData()
         files.forEach((f) => formData.append('files', f))
-        const res = await dataSpacesApi.uploadFiles(selectedSpaceId, formData)
+        const res = await dataSpacesApi.uploadToConversation(convId, formData)
         const uploaded = (res.data || []).map((f: any) => ({
           id: f.id,
           name: f.filename || f.original_filename || '文件',
           type: f.file_type || '',
         }))
         setAttachments((prev) => [...prev, ...uploaded])
-        message.success(`已添加 ${uploaded.length} 个文件，可以就它们提问`)
-        loadSpaces()
-      } catch {
-        message.error('文件上传失败')
+        message.success(`已添加 ${uploaded.length} 个文件，仅本次对话可见`)
+      } catch (err: any) {
+        message.error(err?.response?.data?.detail || '文件上传失败')
       } finally {
         setUploadingFiles(false)
       }
     },
-    [selectedSpaceId]
+    [ensureConversation]
   )
+
+  // chip 操作：把临时文件「加入项目」（转入正式项目，长期保留+建索引）
+  const handlePromoteAttachment = useCallback(async (fileId: string, targetSpaceId: string) => {
+    if (!conversationId) return
+    try {
+      await dataSpacesApi.promoteConversationFile(conversationId, fileId, targetSpaceId)
+      setAttachments((prev) => prev.filter((x) => x.id !== fileId))
+      message.success('已加入项目，可在数据管理中查看')
+      loadSpaces()
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || '加入项目失败')
+    }
+  }, [conversationId])
+
+  // chip 操作：从本对话临时区删除该文件（agent 不再看到）
+  const handleRemoveAttachment = useCallback(async (fileId: string) => {
+    setAttachments((prev) => prev.filter((x) => x.id !== fileId))
+    if (!conversationId) return
+    try {
+      await dataSpacesApi.deleteConversationFile(conversationId, fileId)
+    } catch {
+      // 删除失败不阻断：前端已移除 chip，后端残留不影响主流程
+    }
+  }, [conversationId])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -327,7 +402,7 @@ export default function ChatView({
   )
 
   const handleSendWithContent = async (content: string) => {
-    if (!content.trim() || isStreaming) return
+    if (!content.trim() || isStreaming || sendingRef.current) return
     if (!selectedModel) { message.warning('请先选择模型'); return }
     let convId = conversationId
     if (!convId) {
@@ -343,7 +418,7 @@ export default function ChatView({
   }
 
   const handleSend = async () => {
-    if (!inputValue.trim() || isStreaming) return
+    if (!inputValue.trim() || isStreaming || sendingRef.current) return
     if (!selectedModel) {
       message.warning('请先选择模型')
       return
@@ -377,6 +452,9 @@ export default function ChatView({
   }
 
   const sendMessage = async (convId: string, content: string, skipAddUserMsg = false) => {
+    // 同步并发锁：已有发送在途则直接忽略本次（防止快速连点导致两路流交织）
+    if (sendingRef.current) return
+    sendingRef.current = true
     // 发送/重新生成时回到底部并恢复跟随
     stickToBottomRef.current = true
     setShowScrollToBottom(false)
@@ -469,6 +547,7 @@ export default function ChatView({
       activeStreamConvIdRef.current = null
       setAbortController(null)
       resetStream()
+      sendingRef.current = false
     }
   }
 
@@ -523,14 +602,18 @@ export default function ChatView({
       const res = await chatApi.persistToSpace(conversationId, { data_space_id: selectedSpaceId })
       message.success(`已沉淀为「${res.data.filename}」，正在建索引`)
       loadSpaces()
-    } catch {
-      message.error('沉淀失败')
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || '沉淀失败，请稍后重试')
     }
   }, [conversationId, selectedSpaceId])
 
   const showStreaming = isStreaming && streamingConversationId === conversationId
   const showEmpty = messages.length === 0 && !showStreaming
   const inputDisabled = isStreaming
+
+  // 当前主项目对象（用于状态条展示项目名 + 文件数）
+  const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
+  const activeModel = models.find((m) => m.id === selectedModel)
 
   return (
     <div
@@ -553,21 +636,44 @@ export default function ChatView({
           minHeight: 56,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* 活跃项目已由侧栏顶部的项目切换器表明，这里不再重复展示徽标。 */}
-          <Select
-            value={selectedModel || undefined}
-            onChange={setSelectedModel}
-            placeholder="模型"
-            style={{ minWidth: isMobile ? 110 : 160, maxWidth: isMobile ? 160 : 320 }}
-            variant="borderless"
-            popupMatchSelectWidth={false}
-            optionLabelProp="label"
-            options={models.map((m) => ({
-              label: m.display_name,
-              value: m.id,
-            }))}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          {/* 项目状态条（只读）：告诉用户这条对话用的是哪个项目的数据。
+              切换项目的唯一入口在左侧项目栏，这里不再提供切换，避免双控件混淆。 */}
+          <Tooltip title={activeSpace ? '这条对话基于该项目的文件回答，如需切换项目请在左侧项目栏操作' : '普通对话不分析你的文件，如需分析文件请在左侧选择项目'}>
+            <div className="ctx-pill ctx-pill-readonly">
+              <span className="ctx-pill-icon" style={{ color: activeSpace ? colors.primary : colors.textMuted }}>
+                {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
+              </span>
+              <span className="ctx-pill-text">
+                {activeSpace ? activeSpace.name : '普通对话'}
+              </span>
+              {activeSpace && (
+                <span className="ctx-pill-sub">{activeSpace.file_count} 个文件</span>
+              )}
+            </div>
+          </Tooltip>
+          {/* 模型选择器：与项目条并列，组成「这次对话的上下文」带。显式标注，避免被当成次要操作。 */}
+          <div className="ctx-divider" />
+          <Tooltip title="选择回答这次对话所用的 AI 模型，可随时切换">
+            <div className="ctx-model">
+              <span className="ctx-model-label">模型</span>
+              <Select
+                value={selectedModel || undefined}
+                onChange={setSelectedModel}
+                placeholder="选择模型"
+                variant="borderless"
+                style={{ minWidth: isMobile ? 120 : 168, maxWidth: isMobile ? 160 : 300 }}
+                popupMatchSelectWidth={false}
+                optionLabelProp="label"
+                suffixIcon={<DownOutlined style={{ fontSize: 11, color: colors.textMuted }} />}
+                prefix={<RobotOutlined style={{ color: colors.primary, fontSize: 14 }} />}
+                options={models.map((m) => ({
+                  label: m.display_name,
+                  value: m.id,
+                }))}
+              />
+            </div>
+          </Tooltip>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {conversationId && selectedSpaceId && (
@@ -618,20 +724,46 @@ export default function ChatView({
                   letterSpacing: -0.4,
                 }}
               >
-                有什么可以帮你分析的？
+                {activeSpace ? `正在「${activeSpace.name}」中对话` : '有什么可以帮你的？'}
               </Text>
               <Text
                 style={{
                   fontSize: 15,
                   color: colors.textMuted,
                   display: 'block',
-                  marginBottom: 36,
+                  marginBottom: 12,
                 }}
               >
-                {selectedSpaceId
-                  ? '基于你的数据，试试下面这些方向'
-                  : '选择项目后可分析数据，也可以直接提问'}
+                {activeSpace
+                  ? `我可以分析这个项目里的 ${activeSpace.file_count} 个文件`
+                  : '普通对话：直接提问、写作、答疑都可以'}
               </Text>
+              {/* 上下文提示：明确告诉用户「用哪个项目的数据 + 哪个模型」，并给出切换出口 */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
+                  marginBottom: 32,
+                  fontSize: 12.5,
+                  color: colors.textMuted,
+                }}
+              >
+                {!activeSpace && (
+                  <span>
+                    想分析文件？在左侧
+                    <FolderOutlined style={{ margin: '0 3px', color: colors.primary }} />
+                    选择一个项目
+                  </span>
+                )}
+                {activeModel && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <RobotOutlined /> 当前模型：{activeModel.display_name}
+                  </span>
+                )}
+              </div>
 
               {suggestions.length > 0 ? (
                 <div
@@ -860,43 +992,76 @@ export default function ChatView({
                 pointerEvents: 'none',
               }}
             >
-              松开以添加文件{selectedSpaceId ? '到当前项目' : '（请先绑定项目）'}
+              松开以添加文件（仅本次对话可见）
             </div>
           )}
           {/* 附件 chips */}
           {(attachments.length > 0 || uploadingFiles) && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 4 }}>
-              {attachments.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '4px 8px 4px 10px',
-                    background: colors.bgSubtle,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    color: colors.textPrimary,
-                    maxWidth: 220,
-                  }}
-                >
-                  <FileOutlined style={{ color: colors.primary, fontSize: 13 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {a.name}
-                  </span>
-                  <CloseOutlined
-                    onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
-                    style={{ fontSize: 10, color: colors.textMuted, cursor: 'pointer' }}
-                  />
-                </div>
-              ))}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, paddingLeft: 2 }}>
+                本次对话的文件（仅此对话可见，不在项目中）
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingRight: 4 }}>
+              {attachments.map((a) => {
+                // 「加入项目」目标：有当前项目则直接加入它；否则列出所有项目供选择
+                const promoteChildren = selectedSpaceId
+                  ? [{
+                      key: `p_${selectedSpaceId}`,
+                      label: `加入「${activeSpace?.name || '当前项目'}」`,
+                      icon: <FolderAddOutlined />,
+                      onClick: () => handlePromoteAttachment(a.id, selectedSpaceId),
+                    }]
+                  : spaces.length > 0
+                    ? spaces.map((s) => ({
+                        key: `p_${s.id}`,
+                        label: `加入「${s.name}」`,
+                        icon: <FolderAddOutlined />,
+                        onClick: () => handlePromoteAttachment(a.id, s.id),
+                      }))
+                    : [{ key: 'none', label: '暂无项目，请先在数据管理创建', disabled: true }]
+                const menuItems = [
+                  ...promoteChildren,
+                  { type: 'divider' as const },
+                  {
+                    key: 'remove',
+                    label: '删除',
+                    icon: <DeleteOutlined />,
+                    danger: true,
+                    onClick: () => handleRemoveAttachment(a.id),
+                  },
+                ]
+                return (
+                  <Dropdown key={a.id} trigger={['click']} menu={{ items: menuItems }}>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 6px 4px 10px',
+                        background: colors.bgSubtle,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 8,
+                        fontSize: 12.5,
+                        color: colors.textPrimary,
+                        maxWidth: 240,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <FileOutlined style={{ color: colors.primary, fontSize: 13 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {a.name}
+                      </span>
+                      <DownOutlined style={{ fontSize: 9, color: colors.textMuted }} />
+                    </div>
+                  </Dropdown>
+                )
+              })}
               {uploadingFiles && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 12.5, color: colors.textMuted }}>
                   <Spin size="small" /> 上传中…
                 </div>
               )}
+              </div>
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
@@ -911,7 +1076,7 @@ export default function ChatView({
               if (fileInputRef.current) fileInputRef.current.value = ''
             }}
           />
-          <Tooltip title={selectedSpaceId ? '添加文件' : '请先绑定项目'}>
+          <Tooltip title="上传文件（仅本次对话可见，可在文件上选择加入项目）">
             <Button
               type="text"
               icon={<PaperClipOutlined />}
@@ -1009,51 +1174,12 @@ export default function ChatView({
           )}
           </div>
         </div>
-        {/* 项目绑定条：放在输入框正下方，显眼且高端（用户反馈左上角太不显眼） */}
-        <div
-          style={{
-            maxWidth: READING_WIDTH,
-            margin: '10px auto 0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-          }}
-        >
-          {(() => (
-            <Select
-              mode="multiple"
-              value={selectedSpaceIds.filter((id) => spaces.some((s) => s.id === id))}
-              onChange={(ids: string[]) => {
-                setSelectedSpaceIds(ids)
-                // 主空间 = 第一个；同步给外层（与 #13 单空间路径兼容）
-                onSpaceChange(ids[0])
-              }}
-              allowClear
-              maxTagCount="responsive"
-              placeholder={
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <DatabaseOutlined style={{ fontSize: 13 }} />
-                  绑定项目（可多选，基于你的数据回答）
-                </span>
-              }
-              popupMatchSelectWidth={false}
-              suffixIcon={<DatabaseOutlined style={{ color: selectedSpaceId ? colors.primary : colors.textMuted }} />}
-              style={{ minWidth: 280, maxWidth: 560 }}
-              className="space-bind-select"
-              options={spaces.map((s) => ({
-                label: s.name,
-                value: s.id,
-              }))}
-            />
-          ))()}
-        </div>
         <div
           style={{
             textAlign: 'center',
             fontSize: 11,
             color: colors.textMuted,
-            marginTop: 8,
+            marginTop: 12,
           }}
         >
           AI 生成的内容仅供参考，请核实关键数据后再使用

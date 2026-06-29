@@ -294,8 +294,8 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           {/* 三步流程 */}
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, marginBottom: 40, justifyContent: 'center' }}>
             {[
-              { icon: <FolderOutlined />, label: '创建空间', desc: '给分析起个名字' },
-              { icon: <CloudUploadOutlined />, label: '上传数据', desc: '拖拽文件上传' },
+              { icon: <FolderOutlined />, label: '创建项目', desc: '给分析起个名字' },
+              { icon: <CloudUploadOutlined />, label: '上传文件', desc: '拖拽文件上传' },
               { icon: <MessageOutlined />, label: '对话分析', desc: '用自然语言提问' },
             ].map((step, i) => (
               <div key={i} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
@@ -480,7 +480,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           onClick={() => { onSpaceChange(undefined); setFiles([]); setSelectedFileId(undefined); setPreview(null) }}
           style={{ color: colors.textSecondary }}
         >
-          全部空间
+          全部项目
         </Button>
         <span style={{ color: colors.border, fontSize: 16 }}>/</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
@@ -504,7 +504,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                 Modal.confirm({
                   title: '删除项目',
                   icon: <ExclamationCircleOutlined />,
-                  content: `确定删除「${currentSpace?.name}」？空间内的所有文件和分析数据都会被清除，此操作不可撤销。`,
+                  content: `确定删除「${currentSpace?.name}」？项目内的所有文件和分析数据都会被清除，此操作不可撤销。`,
                   okText: '删除',
                   okButtonProps: { danger: true },
                   cancelText: '取消',
@@ -935,7 +935,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
             disabled={!newSpaceName.trim()}
             style={{ height: 46, borderRadius: 12, fontWeight: 500 }}
           >
-            创建空间
+            创建项目
           </Button>
         </div>
       </Modal>

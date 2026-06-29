@@ -294,6 +294,19 @@ DATA_MODE_GUIDANCE = """# 处理上传文件的工作规范
 - 嵌套 JSON 已自动展平成标准 DataFrame，直接按业务列名取数。"""
 
 
+# 普通对话规范：当前对话既没有项目、也没有聊天上传的临时文件时使用。
+# 此时不存在任何可读的文件/数据空间，模型应作为通用助手回答，绝不假设有文件可看、
+# 不提"数据空间"、不调 list_files / read_file / search_data_space / inspect_data 等
+# 文件与数据工具（它们此刻无文件可操作，调用只会返回空）。
+GENERAL_MODE_GUIDANCE = """# 当前是普通对话（未挂载任何项目或文件）
+
+- 这是一次普通对话：用户没有选择项目，也没有上传文件，因此**当前没有任何文件或数据可供读取分析**。
+- 像一个通用 AI 助手那样直接回答：概念解释、方法建议、写作润色、起草文案、代码/思路讨论、学习答疑、闲聊等。
+- **不要假设存在文件或数据空间**，不要说"让我看看数据空间/项目里有什么"，不要调用 list_files / read_file / search_data_space / inspect_data / pandas_query / sqlite_query 等文件与数据工具——此刻它们没有任何文件可操作。
+- 如果用户的需求确实需要分析他的文件或数据，友好地提示：可以在左侧选择一个项目，或直接把文件拖到输入框上传，然后你就能基于这些内容来帮他。
+- 多步骤的纯思考/写作任务仍可用 update_plan 列计划；但单轮问答、解释、闲聊不必用。"""
+
+
 
 class AgentLoop:
     """支持 Anthropic / OpenAI 双后端的 ReAct Agent 循环"""
@@ -1136,11 +1149,12 @@ class AgentLoop:
                 yield {"type": "error", "message": "额度不足。每日免费额度会在次日自动发放，你也可以在「额度中心」查看详情，或在「设置」中配置自己的 API Key 免费使用。"}
                 return
 
-        # 构建系统提示。数据工作规范（DATA_MODE_GUIDANCE）始终注入，让模型在任意一轮
-        # 都知道两种模式如何切换、且 prompt 缓存稳定命中。关键词只决定「要不要顺手多预取
-        # 一层 schema / knowledge 细节」这一性能优化，不再当行为开关：判错顶多多带/少带
-        # 一点上下文，模型仍能用 inspect_data / read_file 等工具按需补齐。
-        data_mode_guidance = DATA_MODE_GUIDANCE
+        # 构建系统提示。有项目或聊天上传的临时文件时，注入数据工作规范（DATA_MODE_GUIDANCE）；
+        # 普通对话（_all_spaces 为空：既没项目也没临时文件）则换成通用助手规范，避免模型
+        # 假设存在文件、张口就"看看数据空间里有什么"。判定用本轮活跃空间集合是否为空，
+        # 临时文件已通过 extra_space_ids 计入 _all_spaces。
+        has_any_space = len(_all_spaces) > 0
+        data_mode_guidance = DATA_MODE_GUIDANCE if has_any_space else GENERAL_MODE_GUIDANCE
         prefetch_data_detail = self._should_include_data_context(user_message, data_space_id)
         if prefetch_data_detail:
             data_space_info = await self._get_data_space_info(data_space_id, user_id)

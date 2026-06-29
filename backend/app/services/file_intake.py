@@ -55,6 +55,9 @@ async def register_file_to_space(
             mime_type=None,
         )
         db.add(record)
+        # 必须先 flush 把 File 落库，再插关联行：否则 SQLAlchemy 可能把
+        # data_space_files 的 INSERT 排到 files 之前，触发外键违例（沉淀/下载登记失败的根因）。
+        await db.flush()
         db.add(DataSpaceFile(data_space_id=data_space_id, file_id=file_id))
         await db.commit()
 

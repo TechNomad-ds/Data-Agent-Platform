@@ -378,9 +378,19 @@ async def send_message(
 
         await db.commit()
 
+        # 对话临时文件区：聊天框上传的文件落在一个隐藏的、归属本对话的 data_space。
+        # 把它并入本轮检索范围，使 agent 同时看到「项目文件 + 本次上传的临时文件」；
+        # 普通对话（无主项目）时，活跃集合就只有这个临时区。
+        temp_space_row = await db.execute(
+            select(DataSpace.id).where(DataSpace.conversation_id == conv_id)
+        )
+        temp_space_id = temp_space_row.scalar_one_or_none()
+
         # 提前捕获需要在生成器中使用的值（db session 关闭后无法访问 ORM 对象属性）
         conv_data_space_id = conv.data_space_id
         conv_extra_space_ids = [str(s) for s in extra_space_ids]
+        if temp_space_id and str(temp_space_id) not in conv_extra_space_ids and temp_space_id != conv_data_space_id:
+            conv_extra_space_ids.append(str(temp_space_id))
         conv_model_id = conv.model_id
         message_content = data.content
     except Exception:
