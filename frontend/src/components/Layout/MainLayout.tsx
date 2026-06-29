@@ -25,6 +25,7 @@ export default function MainLayout() {
   const [checkingSpaces, setCheckingSpaces] = useState(true)
   const [showGuide, setShowGuide] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isMobile = useIsMobile()
   const { user, fetchUser } = useAuthStore()
 
@@ -89,6 +90,14 @@ export default function MainLayout() {
     setSelectedSpaceId(id)
   }, [])
 
+  // 侧栏工作区切换器：切换活跃空间并回到聊天视图、开启该空间下的新对话，
+  // 让"先选工作区，再进会话"成为主路径（对齐 Codex 的 project 概念）。
+  const handleSelectSpace = useCallback((id: string | undefined) => {
+    setSelectedSpaceId(id)
+    setCurrentConvId(undefined)
+    setCurrentView('chat')
+  }, [])
+
   const handleOpenDataManager = useCallback(() => {
     setSelectedSpaceId(undefined)
     setCurrentView('data')
@@ -135,6 +144,10 @@ export default function MainLayout() {
       onOpenCredits={withDrawerClose(handleOpenCredits)}
       onOpenAdmin={withDrawerClose(handleOpenAdmin)}
       currentView={currentView}
+      selectedSpaceId={selectedSpaceId}
+      onSelectSpace={withDrawerClose(handleSelectSpace)}
+      collapsed={sidebarCollapsed}
+      onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
       inDrawer={isMobile}
     />
   )

@@ -65,4 +65,31 @@ export const shadow = {
   md: '0 2px 8px rgba(15, 23, 42, 0.06)',
   lg: '0 8px 24px rgba(15, 23, 42, 0.08)',
   focus: '0 0 0 3px rgba(79, 70, 229, 0.15)',
+  // 现代明丽：柔和的彩色投影，用于卡片 hover / 主操作区，制造轻盈的浮起感
+  soft: '0 4px 16px rgba(79, 70, 229, 0.08)',
+  softLg: '0 12px 32px rgba(79, 70, 229, 0.12)',
+  card: '0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03)',
+  cardHover: '0 10px 28px rgba(15, 23, 42, 0.10)',
 }
+
+// 柔渐变：现代明丽风的核心装饰手段（克制、低饱和，不俗气）
+export const gradient = {
+  // 品牌主渐变 — 用于主图标块/强调区
+  brand: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+  brandSoft: 'linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)',
+  // 页面/区域柔背景
+  pageWash: 'linear-gradient(180deg, #fbfbfd 0%, #ffffff 140px)',
+  uploadIdle: 'linear-gradient(135deg, #f7f8ff 0%, #fdf7ff 100%)',
+  uploadHover: 'linear-gradient(135deg, #eef1ff 0%, #f8edff 100%)',
+}
+
+// 文件类型的柔和配色：{ color 文本/图标主色, bg 浅底, grad 柔渐变底 }
+// 用于文件图标块，比纯色块更精致。
+export function fileTypePalette(hex: string) {
+  return {
+    color: hex,
+    bg: `${hex}14`,
+    grad: `linear-gradient(135deg, ${hex}1f 0%, ${hex}0d 100%)`,
+  }
+}
+

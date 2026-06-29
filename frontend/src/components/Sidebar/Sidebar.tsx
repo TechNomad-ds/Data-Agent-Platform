@@ -13,6 +13,10 @@ import {
   WalletOutlined,
   CrownOutlined,
   FolderOutlined,
+  DownOutlined,
+  AppstoreOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { chatApi, Conversation } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
@@ -32,6 +36,14 @@ interface Props {
   onOpenCredits: () => void
   onOpenAdmin: () => void
   currentView: MainView
+  /** 当前活跃的数据空间（工作区）。undefined = 通用，不绑定空间 */
+  selectedSpaceId: string | undefined
+  /** 切换活跃工作区 */
+  onSelectSpace: (id: string | undefined) => void
+  /** 桌面端折叠为窄栏 */
+  collapsed?: boolean
+  /** 折叠 / 展开切换 */
+  onToggleCollapse?: () => void
   /** 在移动端抽屉内渲染：填满容器宽高，操作按钮常显（适配触屏） */
   inDrawer?: boolean
 }
@@ -52,6 +64,10 @@ export default function Sidebar({
   onOpenCredits,
   onOpenAdmin,
   currentView,
+  selectedSpaceId,
+  onSelectSpace,
+  collapsed = false,
+  onToggleCollapse,
   inDrawer = false,
 }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -167,6 +183,146 @@ export default function Sidebar({
     return result
   }, [conversations, spaces, searchText])
 
+  // 工作区切换：选定空间后只展示该空间的会话（context 已由切换器表明，
+  // 故隐藏组头）；未选定时展示全部并按空间分组（保留总览能力）。
+  const visibleGroups = useMemo(() => {
+    if (!selectedSpaceId) return grouped
+    return grouped.filter((g) => g.spaceId === selectedSpaceId)
+  }, [grouped, selectedSpaceId])
+  const flatMode = !!selectedSpaceId
+
+  const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
+
+  // 工作区切换器菜单：通用 + 各数据空间 + 管理入口
+  const workspaceMenuItems = [
+    {
+      key: '__general__',
+      label: '通用对话',
+      icon: <MessageOutlined />,
+      onClick: () => onSelectSpace(undefined),
+    },
+    ...(spaces.length
+      ? [{ type: 'divider' as const }]
+      : []),
+    ...spaces.map((s) => ({
+      key: s.id,
+      label: s.name,
+      icon: <FolderOutlined />,
+      onClick: () => onSelectSpace(s.id),
+    })),
+    { type: 'divider' as const },
+    {
+      key: '__manage__',
+      label: '管理数据空间',
+      icon: <AppstoreOutlined />,
+      onClick: onOpenDataManager,
+    },
+  ]
+
+  // 账户菜单：仅保留设置与退出（数据管理/额度/后台为侧栏常驻导航，不收纳）
+  const accountMenuItems = [
+    {
+      key: 'settings',
+      label: '设置',
+      icon: <SettingOutlined />,
+      onClick: onOpenSettings,
+    },
+    { type: 'divider' as const },
+    {
+      key: 'logout',
+      label: '退出登录',
+      icon: <LogoutOutlined />,
+      danger: true,
+      onClick: logout,
+    },
+  ]
+
+  const userInitial = (user?.username || 'U')[0].toUpperCase()
+
+  // 折叠态：仅桌面端窄栏。展示展开/新建/工作区/头像四个核心动作。
+  if (collapsed && !inDrawer) {
+    return (
+      <div
+        style={{
+          width: 56,
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+          padding: '12px 0',
+          background: colors.bgSubtle,
+          borderRight: `1px solid ${colors.border}`,
+          flexShrink: 0,
+        }}
+      >
+        <Tooltip title="展开侧栏" placement="right">
+          <Button type="text" icon={<MenuUnfoldOutlined />} onClick={onToggleCollapse} />
+        </Tooltip>
+        <Tooltip title="新对话" placement="right">
+          <Button type="text" icon={<PlusOutlined />} onClick={onNewChat} />
+        </Tooltip>
+        <Dropdown menu={{ items: workspaceMenuItems }} trigger={['click']} placement="bottomLeft">
+          <Tooltip title={activeSpace ? activeSpace.name : '通用对话'} placement="right">
+            <Button
+              type="text"
+              icon={activeSpace
+                ? <FolderOutlined style={{ color: colors.primary }} />
+                : <MessageOutlined />}
+            />
+          </Tooltip>
+        </Dropdown>
+        <div style={{ margin: '6px 0', width: 24, borderTop: `1px solid ${colors.border}` }} />
+        <Tooltip title="数据管理" placement="right">
+          <Button
+            type="text"
+            icon={<DatabaseOutlined />}
+            onClick={onOpenDataManager}
+            style={{ color: currentView === 'data' ? colors.primary : undefined }}
+          />
+        </Tooltip>
+        <Tooltip title="额度与 API" placement="right">
+          <Button
+            type="text"
+            icon={<WalletOutlined />}
+            onClick={onOpenCredits}
+            style={{ color: currentView === 'credits' ? colors.primary : undefined }}
+          />
+        </Tooltip>
+        {user?.role === 'admin' && (
+          <Tooltip title="管理后台" placement="right">
+            <Button
+              type="text"
+              icon={<CrownOutlined />}
+              onClick={onOpenAdmin}
+              style={{ color: currentView === 'admin' ? colors.primary : undefined }}
+            />
+          </Tooltip>
+        )}
+        <div style={{ flex: 1 }} />
+        <Dropdown menu={{ items: accountMenuItems }} trigger={['click']} placement="topLeft">
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
+              background: colors.userAvatar,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              color: '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {userInitial}
+          </div>
+        </Dropdown>
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -181,9 +337,50 @@ export default function Sidebar({
     >
       {/* Header */}
       <div style={{ padding: '16px 12px 12px' }}>
-        <div style={{ marginBottom: 16 }}>
+        <div
+          style={{
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <Logo size={24} />
+          {!inDrawer && (
+            <Tooltip title="收起侧栏" placement="right">
+              <Button
+                type="text"
+                size="small"
+                icon={<MenuFoldOutlined />}
+                onClick={onToggleCollapse}
+                style={{ color: colors.textMuted }}
+              />
+            </Tooltip>
+          )}
         </div>
+
+        {/* 工作区（数据空间）切换器 — 信息架构第一层级，对齐 Codex 的 project 概念 */}
+        <Dropdown
+          menu={{ items: workspaceMenuItems }}
+          trigger={['click']}
+          placement="bottomLeft"
+        >
+          <div className="workspace-switcher">
+            <span
+              className="workspace-switcher-icon"
+              style={{ color: activeSpace ? colors.primary : colors.textMuted }}
+            >
+              {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="workspace-switcher-label">工作区</div>
+              <div className="workspace-switcher-name">
+                {activeSpace ? activeSpace.name : '通用对话'}
+              </div>
+            </div>
+            <DownOutlined style={{ fontSize: 10, color: colors.textMuted }} />
+          </div>
+        </Dropdown>
 
         <Button
           icon={<PlusOutlined />}
@@ -218,7 +415,9 @@ export default function Sidebar({
         />
       </div>
 
-      {/* Navigation */}
+      <div style={{ margin: '4px 12px 8px', borderTop: `1px solid ${colors.border}` }} />
+
+      {/* Navigation — 数据管理 / 额度 / 后台 常驻导航 */}
       <div style={{ padding: '0 12px 8px' }}>
         <div
           className={`sidebar-item${currentView === 'data' ? ' active' : ''}`}
@@ -249,7 +448,7 @@ export default function Sidebar({
 
       {/* Conversation history */}
       <div style={{ flex: 1, overflow: 'auto', padding: '0 12px 8px' }}>
-        {grouped.length === 0 ? (
+        {visibleGroups.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -261,13 +460,14 @@ export default function Sidebar({
             {searchText ? '没有匹配的对话' : '暂无对话记录'}
           </div>
         ) : (
-          grouped.map((group) => {
+          visibleGroups.map((group) => {
             const COLLAPSED_LIMIT = 8
             const isExpanded = expandedGroups.has(group.spaceId)
             const displayConvs = isExpanded ? group.conversations : group.conversations.slice(0, COLLAPSED_LIMIT)
             const hasMore = group.conversations.length > COLLAPSED_LIMIT
             return (
             <div key={group.spaceId} style={{ marginBottom: 16 }}>
+              {!flatMode && (
               <div
                 style={{
                   padding: '6px 10px',
@@ -278,9 +478,7 @@ export default function Sidebar({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 7,
-                  borderLeft: group.spaceId === '__general__'
-                    ? `2px solid ${colors.borderStrong}`
-                    : `2px solid ${colors.borderStrong}`,
+                  borderLeft: `2px solid ${colors.borderStrong}`,
                   marginBottom: 2,
                   borderRadius: '0 4px 4px 0',
                 }}
@@ -300,6 +498,7 @@ export default function Sidebar({
                   {group.spaceName}
                 </span>
               </div>
+              )}
 
               {displayConvs.map((conv) => {
                 const active = currentConvId === conv.id
@@ -435,63 +634,55 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Footer */}
-      <div
-        style={{
-          padding: '12px',
-          borderTop: `1px solid ${colors.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
+      {/* Footer — 账户菜单收纳次要导航（设置/额度/后台/退出） */}
+      <Dropdown
+        menu={{
+          items: accountMenuItems,
+          selectable: true,
+          selectedKeys: [currentView],
         }}
+        trigger={['click']}
+        placement="topLeft"
       >
         <div
+          className="sidebar-account"
           style={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: colors.userAvatar,
+            padding: '10px 12px',
+            margin: 8,
+            borderRadius: 10,
+            borderTop: 'none',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 12,
-            color: '#fff',
-            fontWeight: 600,
-            flexShrink: 0,
+            gap: 10,
+            cursor: 'pointer',
           }}
         >
-          {(user?.username || 'U')[0].toUpperCase()}
-        </div>
-        <Text
-          style={{ flex: 1, fontSize: 13, color: colors.textSecondary }}
-          ellipsis
-        >
-          {user?.username || '用户'}
-        </Text>
-        <Tooltip title="设置" placement="top">
-          <Button
-            type="text"
-            size="small"
-            icon={<SettingOutlined />}
-            onClick={onOpenSettings}
+          <div
             style={{
-              color:
-                currentView === 'settings'
-                  ? colors.primary
-                  : colors.textMuted,
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
+              background: colors.userAvatar,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              color: '#fff',
+              fontWeight: 600,
+              flexShrink: 0,
             }}
-          />
-        </Tooltip>
-        <Tooltip title="退出登录" placement="top">
-          <Button
-            type="text"
-            size="small"
-            icon={<LogoutOutlined />}
-            onClick={logout}
-            style={{ color: colors.textMuted }}
-          />
-        </Tooltip>
-      </div>
+          >
+            {userInitial}
+          </div>
+          <Text
+            style={{ flex: 1, fontSize: 13, color: colors.textSecondary }}
+            ellipsis
+          >
+            {user?.username || '用户'}
+          </Text>
+          <MoreOutlined style={{ fontSize: 16, color: colors.textMuted }} />
+        </div>
+      </Dropdown>
     </div>
   )
 }

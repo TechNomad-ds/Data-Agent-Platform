@@ -253,10 +253,12 @@ body {
 
 /* Generic hover lift */
 .hover-lift {
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, background 0.15s;
+  transition: transform 0.22s cubic-bezier(0.4,0,0.2,1), box-shadow 0.22s cubic-bezier(0.4,0,0.2,1), border-color 0.2s;
 }
 .hover-lift:hover {
-  transform: translateY(-1px);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.13) !important;
+  border-color: #d9d9e3 !important;
 }
 
 /* Sidebar item base */
@@ -279,6 +281,54 @@ body {
   background: #ececf1;
   color: #1f2328;
   font-weight: 500;
+}
+
+/* Workspace switcher — 工作区切换器（对齐 Codex 的 project 选择器） */
+.workspace-switcher {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid #ececf1;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  user-select: none;
+}
+.workspace-switcher:hover {
+  border-color: #d9d9e3;
+  background: #fcfcfd;
+}
+.workspace-switcher-icon {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.workspace-switcher-label {
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: #8e8ea0;
+  font-weight: 500;
+}
+.workspace-switcher-name {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #1f2328;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sidebar account row — 底部账户区（收纳次要导航） */
+.sidebar-account {
+  transition: background 0.12s;
+}
+.sidebar-account:hover {
+  background: #ececf1;
 }
 
 /* Streaming dot */
@@ -349,3 +399,43 @@ body {
   line-height: 34px !important;
   font-size: 13px;
 }
+
+/* 数据管理：上传拖拽区 hover */
+.ds-dragger:hover {
+  border-color: #6366f1 !important;
+}
+.ds-dragger:hover .ant-upload-drag-container {
+  transform: translateY(-1px);
+}
+/* 文件行操作按钮：默认淡，行 hover 时显现 */
+.ds-file-row .ds-row-action {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ds-file-row:hover .ds-row-action {
+  opacity: 0.55;
+}
+.ds-file-row .ds-row-action:hover {
+  opacity: 1 !important;
+}
+
+/* 数据管理：文件预览表格精致化 */
+.ds-preview .ant-table-wrapper {
+  border: 1px solid #ececf1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.ds-preview .ant-table-thead > tr > th {
+  background: #f7f8fc !important;
+  font-weight: 600 !important;
+  color: #4b5563 !important;
+  border-bottom: 1px solid #ececf1 !important;
+}
+.ds-preview .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f4f4f5 !important;
+}
+.ds-preview .ant-table-tbody > tr:hover > td {
+  background: #f9faff !important;
+}
+.ds-preview .ant-table-cell { font-size: 12.5px; }

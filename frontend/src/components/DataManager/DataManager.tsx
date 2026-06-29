@@ -11,13 +11,14 @@ import {
   CloudUploadOutlined, MessageOutlined, ArrowLeftOutlined,
   FolderOutlined, FileExcelOutlined, FilePdfOutlined,
   FileImageOutlined, CodeOutlined, SearchOutlined,
-  ClockCircleOutlined, AppstoreOutlined,
+  ClockCircleOutlined, AppstoreOutlined, DownloadOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import { dataSpacesApi, DataSpace, FileInSpace } from '@/api/dataSpaces'
 import { uploadErrorMessage } from '@/utils/uploadError'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import api from '@/api/client'
-import { colors, shadow } from '@/styles/tokens'
+import { colors, shadow, gradient, fileTypePalette } from '@/styles/tokens'
 
 const { Text, Title } = Typography
 
@@ -333,20 +334,30 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   // 状态 3：有空间但未选中 — 空间卡片列表
   if (!selectedSpaceId) {
     return (
-      <div style={{ height: '100%', overflow: 'auto', background: colors.bg }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '20px 16px 48px' : '32px 32px 64px' }}>
+      <div style={{ height: '100%', overflow: 'auto', background: gradient.pageWash }}>
+        <div style={{ maxWidth: 1040, margin: '0 auto', padding: isMobile ? '20px 16px 48px' : '40px 32px 64px' }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: isMobile ? 24 : 36 }}>
-            <div>
-              <Title level={3} style={{ marginBottom: 4, letterSpacing: -0.3 }}>数据管理</Title>
-              <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                管理你的数据空间和文件
-              </Text>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: isMobile ? 24 : 32 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 13,
+                background: gradient.brand, color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 21, boxShadow: shadow.soft, flexShrink: 0,
+              }}>
+                <DatabaseOutlined />
+              </div>
+              <div>
+                <Title level={3} style={{ marginBottom: 2, letterSpacing: -0.4 }}>数据管理</Title>
+                <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+                  管理你的数据空间和文件
+                </Text>
+              </div>
             </div>
             <Button
               type="primary" icon={<PlusOutlined />}
               onClick={() => setCreateModalOpen(true)}
-              style={{ height: 40, borderRadius: 10, fontWeight: 500 }}
+              style={{ height: 42, borderRadius: 12, fontWeight: 600, boxShadow: shadow.soft, paddingInline: 18 }}
             >
               新建数据空间
             </Button>
@@ -360,15 +371,15 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               allowClear
-              style={{ marginBottom: 20, maxWidth: 320, borderRadius: 10 }}
+              style={{ marginBottom: 24, maxWidth: 340, borderRadius: 12, height: 40 }}
             />
           )}
 
           {/* Space cards */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: 16,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: 18,
           }}>
             {filteredSpaces.map(space => (
               <div
@@ -376,26 +387,31 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                 className="hover-lift"
                 onClick={() => onSpaceChange(space.id)}
                 style={{
-                  padding: '24px',
-                  borderRadius: 16,
+                  padding: '22px',
+                  borderRadius: 18,
                   border: `1px solid ${colors.border}`,
                   background: colors.surface,
                   cursor: 'pointer',
-                  boxShadow: shadow.sm,
-                  transition: 'all 0.2s',
+                  boxShadow: shadow.card,
+                  transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                {/* 顶部柔色条 */}
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: gradient.brand, opacity: 0.85 }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: 12,
-                    background: colors.primaryLight, color: colors.primary,
+                    width: 46, height: 46, borderRadius: 13,
+                    background: gradient.brandSoft, color: colors.primary,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20, flexShrink: 0,
+                    fontSize: 21, flexShrink: 0,
+                    border: `1px solid ${colors.primaryLight}`,
                   }}>
                     <AppstoreOutlined />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>
+                  <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: colors.textPrimary, marginBottom: 4, letterSpacing: -0.2 }}>
                       {space.name}
                     </div>
                     {space.description && (
@@ -406,21 +422,21 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13, color: colors.textMuted }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13, color: colors.textMuted, marginBottom: 18 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <FileTextOutlined style={{ fontSize: 12 }} />
                     {space.file_count} 个文件
                   </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <ClockCircleOutlined style={{ fontSize: 12 }} />
                     {formatDate(space.updated_at)}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <Button
                     size="small"
-                    style={{ flex: 1, borderRadius: 8, fontSize: 12 }}
+                    style={{ flex: 1, borderRadius: 9, fontSize: 12.5, height: 32 }}
                     onClick={(e) => { e.stopPropagation(); onSpaceChange(space.id) }}
                   >
                     管理文件
@@ -429,7 +445,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                     <Button
                       size="small" type="primary"
                       icon={<MessageOutlined />}
-                      style={{ flex: 1, borderRadius: 8, fontSize: 12 }}
+                      style={{ flex: 1, borderRadius: 9, fontSize: 12.5, height: 32 }}
                       onClick={(e) => { e.stopPropagation(); onSpaceChange(space.id); onStartChat?.() }}
                     >
                       开始分析
@@ -556,79 +572,101 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           overflow: 'hidden', flexShrink: 0,
         }}>
           {/* Upload area */}
-          <div style={{ padding: '16px 16px 0' }}>
+          <div style={{ padding: files.length === 0 ? '24px 24px 0' : '16px 16px 0' }}>
             <Upload.Dragger
+              className="ds-dragger"
               multiple showUploadList={false} beforeUpload={handleUpload}
               accept=".csv,.tsv,.xlsx,.xls,.json,.jsonl,.txt,.md,.pdf,.docx,.pptx,.ppt,.py,.sql,.zip,.parquet,.feather,.sqlite,.db,.sqlite3,.png,.jpg,.jpeg,.gif,.bmp,.webp,.html,.xml,.yaml,.yml,.log,.r,.ipynb,.dta,.sav,.sas7bdat"
               style={{
-                border: `2px dashed ${colors.border}`,
-                borderRadius: 14,
-                background: 'transparent',
-                padding: files.length === 0 ? '40px 16px' : '12px 16px',
+                border: `1.5px dashed ${colors.borderStrong}`,
+                borderRadius: 16,
+                background: files.length === 0 ? gradient.uploadIdle : colors.surfaceAlt,
+                padding: files.length === 0 ? '44px 20px' : '14px 16px',
                 transition: 'all 0.2s',
               }}
             >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <CloudUploadOutlined style={{ fontSize: files.length === 0 ? 28 : 16, color: colors.primary }} />
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: files.length === 0 ? 14 : 13, color: colors.textSecondary }}>
-                  {files.length === 0 ? '拖拽文件到这里，或点击选择文件' : '拖拽或点击上传更多文件'}
+            {files.length === 0 ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  width: 60, height: 60, borderRadius: 18, margin: '0 auto 16px',
+                  background: gradient.brand, color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, boxShadow: shadow.soft,
+                }}>
+                  <InboxOutlined />
                 </div>
-                {files.length === 0 && (
-                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
-                    支持 CSV、Excel、PDF、Word、JSON、代码文件等 20+ 种格式，单文件最大 200MB
-                  </div>
-                )}
+                <div style={{ fontSize: 15, fontWeight: 600, color: colors.textPrimary, marginBottom: 6 }}>
+                  拖拽文件到这里，或点击选择
+                </div>
+                <div style={{ fontSize: 12.5, color: colors.textMuted, lineHeight: 1.6, maxWidth: 340, margin: '0 auto' }}>
+                  支持 CSV、Excel、PDF、Word、JSON、代码文件等 20+ 种格式<br />单文件最大 200MB
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <CloudUploadOutlined style={{ fontSize: 17, color: colors.primary }} />
+                <div style={{ fontSize: 13, color: colors.textSecondary, fontWeight: 500 }}>
+                  拖拽或点击上传更多文件
+                </div>
+              </div>
+            )}
             </Upload.Dragger>
           </div>
 
           {/* File list */}
           {files.length > 0 ? (
-            <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
               {files.map(f => {
                 const config = getFileConfig(f.file_type)
+                const pal = fileTypePalette(config.color)
                 const isActive = selectedFileId === f.file_id
                 return (
                   <div
                     key={f.file_id}
                     onClick={() => setSelectedFileId(isActive ? undefined : f.file_id)}
+                    className="ds-file-row"
                     style={{
-                      padding: '12px 16px',
+                      padding: '11px 12px',
+                      marginBottom: 6,
+                      borderRadius: 12,
                       cursor: 'pointer',
-                      background: isActive ? colors.primaryLight : 'transparent',
-                      borderLeft: isActive ? `3px solid ${colors.primary}` : '3px solid transparent',
+                      background: isActive ? gradient.brandSoft : 'transparent',
+                      border: `1px solid ${isActive ? colors.primaryLight : 'transparent'}`,
+                      boxShadow: isActive ? shadow.soft : 'none',
                       display: 'flex', alignItems: 'center', gap: 12,
-                      transition: 'all 0.12s',
+                      transition: 'all 0.15s',
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = colors.bgSubtle }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
                   >
                     <div style={{
-                      width: 36, height: 36, borderRadius: 10,
-                      background: `${config.color}12`,
+                      width: 38, height: 38, borderRadius: 11,
+                      background: pal.grad,
                       color: config.color,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 16, flexShrink: 0,
+                      fontSize: 17, flexShrink: 0,
                     }}>
                       {config.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <Text ellipsis style={{ fontSize: 13, fontWeight: 500, display: 'block', color: colors.textPrimary }}>
+                      <Text ellipsis style={{ fontSize: 13.5, fontWeight: 500, display: 'block', color: colors.textPrimary }}>
                         {f.filename}
                       </Text>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                        <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0, borderRadius: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, letterSpacing: 0.3,
+                          color: config.color, background: pal.bg,
+                          padding: '1px 6px', borderRadius: 5,
+                        }}>
                           {f.file_type.toUpperCase()}
-                        </Tag>
-                        <Text style={{ fontSize: 11, color: colors.textMuted }}>{formatSize(f.file_size)}</Text>
+                        </span>
+                        <Text style={{ fontSize: 11.5, color: colors.textMuted }}>{formatSize(f.file_size)}</Text>
                       </div>
                     </div>
                     <Tooltip title="下载">
                       <Button
                         type="text" size="small"
-                        icon={<CloudUploadOutlined style={{ transform: 'rotate(180deg)' }} />}
+                        icon={<DownloadOutlined />}
                         onClick={async (e) => {
                           e.stopPropagation()
                           try {
@@ -641,9 +679,8 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                             URL.revokeObjectURL(url)
                           } catch { message.error('下载失败') }
                         }}
-                        style={{ opacity: 0.4, color: colors.textMuted }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                        className="ds-row-action"
+                        style={{ color: colors.textMuted }}
                       />
                     </Tooltip>
                     <Popconfirm
@@ -655,9 +692,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                         type="text" size="small" danger
                         icon={<DeleteOutlined />}
                         onClick={e => e.stopPropagation()}
-                        style={{ opacity: 0.4 }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
+                        className="ds-row-action"
                       />
                     </Popconfirm>
                   </div>
@@ -667,7 +702,14 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           ) : !uploading ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
               <div style={{ textAlign: 'center' }}>
-                <FolderOutlined style={{ fontSize: 48, color: colors.border, marginBottom: 16 }} />
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20, margin: '0 auto 18px',
+                  background: gradient.brandSoft, color: colors.primary,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 32, border: `1px solid ${colors.primaryLight}`,
+                }}>
+                  <FolderOutlined />
+                </div>
                 <Title level={5} style={{ color: colors.textSecondary, marginBottom: 4 }}>还没有文件</Title>
                 <Text style={{ color: colors.textMuted, fontSize: 13 }}>上传数据文件开始分析</Text>
               </div>
@@ -677,7 +719,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
 
         {/* Right: preview — 移动端仅在选中文件时显示 */}
         {files.length > 0 && (!isMobile || selectedFileId) && (
-          <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? 12 : 24 }}>
+          <div className="ds-preview" style={{ flex: 1, overflow: 'auto', padding: isMobile ? 12 : 24 }}>
             {isMobile && selectedFileId && (
               <Button
                 type="text"
@@ -691,7 +733,14 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
             )}
             {!selectedFileId ? (
               <div style={{ textAlign: 'center', paddingTop: 80 }}>
-                <FileTextOutlined style={{ fontSize: 48, color: colors.border, marginBottom: 16 }} />
+                <div style={{
+                  width: 72, height: 72, borderRadius: 20, margin: '0 auto 18px',
+                  background: gradient.brandSoft, color: colors.primary,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 32, border: `1px solid ${colors.primaryLight}`,
+                }}>
+                  <FileTextOutlined />
+                </div>
                 <Title level={5} style={{ color: colors.textSecondary }}>点击左侧文件查看预览</Title>
                 <Text style={{ color: colors.textMuted, fontSize: 13 }}>选择一个文件查看其数据内容</Text>
               </div>

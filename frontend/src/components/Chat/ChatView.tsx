@@ -554,28 +554,7 @@ export default function ChatView({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* 数据空间绑定入口已前移到输入框下方（更显眼）。这里仅在已绑定时显示一个
-              只读指示，不再放可交互的选择器，避免两处控件重复。 */}
-          {selectedSpaceId && (
-            <>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '4px 10px',
-                  borderRadius: 8,
-                  background: colors.bgSubtle,
-                }}
-              >
-                <DatabaseOutlined style={{ fontSize: 12, color: colors.primary }} />
-                <span style={{ fontSize: 13, color: colors.textPrimary, fontWeight: 500 }}>
-                  {spaces.find((s) => s.id === selectedSpaceId)?.name || '数据空间'}
-                </span>
-              </div>
-              <span style={{ color: colors.border }}>|</span>
-            </>
-          )}
+          {/* 活跃数据空间已由侧栏顶部的工作区切换器表明，这里不再重复展示徽标。 */}
           <Select
             value={selectedModel || undefined}
             onChange={setSelectedModel}
