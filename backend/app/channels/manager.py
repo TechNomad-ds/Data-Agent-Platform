@@ -181,6 +181,67 @@ class Dispatcher:
             text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
                  f"正在解析索引，稍后即可直接提问分析。", is_final=True))
 
+    async def _ingest_feishu_links(
+        self,
+        adapter: ChannelAdapter,
+        inbound: InboundMessage,
+        user_id: uuid.UUID,
+        space_id: Optional[uuid.UUID],
+    ) -> None:
+        """抓取消息里的飞书云文档链接并入库。飞书文档需飞书 token，与消息来自哪个渠道无关：
+        来自飞书渠道则复用在线 adapter；其他渠道（如微信）则用用户配置的飞书应用凭据临时构造抓取器。"""
+        chat_id = inbound.chat_id
+        if space_id is None:
+            await adapter.send(chat_id, OutboundMessage(
+                text="请先在网页端为该渠道设置「默认数据空间」，再分享文档。", is_final=True))
+            return
+        from app.services.feishu_doc import try_ingest_feishu_doc, FeishuDocError
+
+        transient = None
+        if inbound.channel == "feishu":
+            fetcher: Any = adapter  # 在线飞书 adapter，自带有效 token
+        else:
+            # 非飞书渠道发飞书链接：用用户自己的飞书应用凭据抓取（同一账号配的飞书 app）
+            from app.channels import store
+            result = await store.get_config(user_id, "feishu")
+            if result is None or not result[0].credentials_encrypted:
+                await adapter.send(chat_id, OutboundMessage(
+                    text="要解析飞书文档，请先在「远程连接」里配置并连接你的飞书应用。",
+                    is_final=True))
+                return
+            _cfg, creds = result  # get_config 返回的 creds 已解密
+            from app.channels.adapters.feishu import FeishuAdapter
+            try:
+                fetcher = FeishuAdapter(app_id=creds["app_id"], app_secret=creds["app_secret"])
+            except Exception as exc:
+                await adapter.send(chat_id, OutboundMessage(
+                    text=f"飞书凭据无效：{exc}", is_final=True))
+                return
+            transient = fetcher
+
+        try:
+            ingested = await try_ingest_feishu_doc(fetcher, inbound, user_id, space_id)
+        except FeishuDocError as exc:
+            await adapter.send(chat_id, OutboundMessage(text=f"文档拉取失败：{exc}", is_final=True))
+            return
+        except Exception as exc:
+            logger.exception("feishu doc ingest failed: %s", exc)
+            await adapter.send(chat_id, OutboundMessage(
+                text=f"文档拉取失败：{exc}\n（请确认该文档已授权给你的飞书应用、且应用已开通云文档读权限）",
+                is_final=True))
+            return
+        finally:
+            if transient is not None:
+                try:
+                    await transient._http.aclose()
+                except Exception:
+                    pass
+
+        names = "、".join(f["filename"] for f in ingested)
+        await adapter.send(chat_id, OutboundMessage(
+            text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
+                 f"正在解析索引，稍后即可直接提问分析。", is_final=True))
+
     async def dispatch(self, adapter: ChannelAdapter, inbound: InboundMessage) -> None:
         """分发一条入站消息。遇不可恢复错误 raise（禁 fallback 兜底）。
 
@@ -252,35 +313,11 @@ class Dispatcher:
             logger.info("default space updated: user=%s channel=%s space=%s", user_id, channel, new_space_id)
             return
 
-        # ── Step 3c: 飞书云文档链接 → 抓取并入库 ────────────────────────
-        if channel == "feishu":
-            from app.services.feishu_doc import extract_feishu_doc_links
-            if extract_feishu_doc_links(text):
-                if space_id is None:
-                    await adapter.send(chat_id, OutboundMessage(
-                        text="请先在网页端为飞书渠道设置「默认数据空间」，再分享文档。",
-                        is_final=True))
-                    return
-                from app.services.feishu_doc import try_ingest_feishu_doc, FeishuDocError
-                try:
-                    ingested = await try_ingest_feishu_doc(adapter, inbound, user_id, space_id)
-                except FeishuDocError as exc:
-                    await adapter.send(chat_id, OutboundMessage(
-                        text=f"文档拉取失败：{exc}", is_final=True))
-                    return
-                except Exception as exc:
-                    logger.exception("feishu doc ingest failed: %s", exc)
-                    await adapter.send(chat_id, OutboundMessage(
-                        text=f"文档拉取失败：{exc}\n（请确认飞书自建应用已开通云文档读权限，"
-                             f"并已把该文档授权给应用）",
-                        is_final=True))
-                    return
-                names = "、".join(f["filename"] for f in ingested)
-                await adapter.send(chat_id, OutboundMessage(
-                    text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
-                         f"正在解析索引，稍后即可直接提问分析。",
-                    is_final=True))
-                return
+        # ── Step 3c: 飞书云文档链接 → 抓取并入库（任意渠道，用用户配置的飞书凭据）──
+        from app.services.feishu_doc import extract_feishu_doc_links
+        if extract_feishu_doc_links(text):
+            await self._ingest_feishu_links(adapter, inbound, user_id, space_id)
+            return
 
         # ── Step 3b: 普通消息 → agent 处理 ──────────────────────────────
         conv_id = await self._convs.find_or_create(

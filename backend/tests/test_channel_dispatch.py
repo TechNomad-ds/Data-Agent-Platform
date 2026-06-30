@@ -589,6 +589,110 @@ def test_attachment_unsupported_channel_prompts_user():
     assert "暂不支持" in adapter.sent[-1]["text"]
 
 
+# ===========================================================================
+# 测试 7: 飞书文档链接（渠道无关——任意渠道发飞书链接都用用户的飞书凭据抓取）
+# ===========================================================================
+
+FEISHU_LINK = "看下这个文档 https://x.feishu.cn/wiki/ABC123 谢谢"
+
+
+def _patch_feishu_ingest(recorder):
+    """把 feishu_doc.try_ingest_feishu_doc 替换为记录器，返回 (orig, module)。"""
+    import app.services.feishu_doc as fd
+
+    async def fake(fetcher, inbound, user_id, space_id):
+        recorder["fetcher"] = fetcher
+        recorder["space_id"] = space_id
+        return [{"filename": "doc.md"}]
+
+    orig = fd.try_ingest_feishu_doc
+    fd.try_ingest_feishu_doc = fake
+    return orig, fd
+
+
+def test_feishu_link_on_feishu_channel_reuses_online_adapter():
+    """飞书渠道发飞书链接 → 复用在线 adapter 抓取 → 回告已导入，不走 agent。"""
+    user_id = uuid.uuid4()
+    space = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("feishu", "u1", user_id, space_id=space)
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = MockChannelAdapter()
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    rec: dict = {}
+    orig, fd = _patch_feishu_ingest(rec)
+    try:
+        asyncio.run(dispatcher.dispatch(adapter, _inbound(FEISHU_LINK, channel="feishu")))
+    finally:
+        fd.try_ingest_feishu_doc = orig
+
+    assert rec["fetcher"] is adapter          # 飞书渠道复用在线 adapter
+    assert "已导入" in adapter.sent[-1]["text"]
+    assert len(convs.saved) == 0              # 不走 agent
+
+
+def test_feishu_link_on_weixin_without_feishu_config_prompts():
+    """微信发飞书链接但用户没配飞书应用 → 提示去配置，不抓取不走 agent。"""
+    import app.channels.store as store_mod
+    user_id = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("weixin", "u1", user_id, space_id=uuid.uuid4())
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = MockChannelAdapter()
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    async def no_cfg(uid, ch):
+        return None
+
+    orig = store_mod.get_config
+    store_mod.get_config = no_cfg
+    try:
+        asyncio.run(dispatcher.dispatch(adapter, _inbound(FEISHU_LINK, channel="weixin")))
+    finally:
+        store_mod.get_config = orig
+
+    assert "飞书应用" in adapter.sent[-1]["text"]
+    assert len(convs.saved) == 0
+
+
+def test_feishu_link_on_weixin_with_config_fetches_via_user_feishu_creds():
+    """微信发飞书链接且用户已配飞书应用 → 用其飞书凭据临时构造抓取器(非微信 adapter 本身)入库。"""
+    import app.channels.store as store_mod
+    user_id = uuid.uuid4()
+    space = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("weixin", "u1", user_id, space_id=space)
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = MockChannelAdapter()
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    class _Cfg:
+        credentials_encrypted = b"enc"
+
+    async def has_cfg(uid, ch):
+        assert ch == "feishu"   # 取的是用户的飞书配置
+        return (_Cfg(), {"app_id": "cli_x", "app_secret": "sec"})
+
+    rec: dict = {}
+    orig_cfg = store_mod.get_config
+    store_mod.get_config = has_cfg
+    orig_ing, fd = _patch_feishu_ingest(rec)
+    try:
+        asyncio.run(dispatcher.dispatch(adapter, _inbound(FEISHU_LINK, channel="weixin")))
+    finally:
+        store_mod.get_config = orig_cfg
+        fd.try_ingest_feishu_doc = orig_ing
+
+    assert rec["fetcher"] is not adapter      # 用临时飞书抓取器，不是微信 adapter
+    assert rec["space_id"] == space
+    assert "已导入" in adapter.sent[-1]["text"]
+    assert len(convs.saved) == 0
+
+
 if __name__ == "__main__":
     # 也可直接 python3 tests/test_channel_dispatch.py 运行
     import sys
