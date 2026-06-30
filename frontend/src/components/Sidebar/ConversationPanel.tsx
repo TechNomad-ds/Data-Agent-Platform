@@ -385,9 +385,9 @@ export default function ConversationPanel({
                         {conv.channel && conv.channel !== 'web' && (
                           <span
                             style={{ marginRight: 4 }}
-                            title={`来自${conv.channel === 'weixin' ? '微信' : conv.channel === 'feishu' ? '飞书' : conv.channel === 'dingtalk' ? '钉钉' : conv.channel}`}
+                            title={`来自${conv.channel === 'weixin' ? '微信' : conv.channel === 'feishu' ? '飞书' : conv.channel}`}
                           >
-                            {conv.channel === 'weixin' ? '💬' : conv.channel === 'feishu' ? '🪶' : conv.channel === 'dingtalk' ? '📌' : '🔗'}
+                            {conv.channel === 'weixin' ? '💬' : conv.channel === 'feishu' ? '🪶' : '🔗'}
                           </span>
                         )}
                         {conv.title || '新对话'}

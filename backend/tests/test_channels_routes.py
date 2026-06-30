@@ -1,7 +1,7 @@
 """渠道路由纯逻辑单测（独立于 DB / 网络 / FastAPI）
 
 覆盖：
-  - 渠道名称映射（lark↔feishu / dingtalk / weixin）
+  - 渠道名称映射（lark↔feishu / weixin）
   - 请求/响应 Pydantic 模型验证
   - 待配对 registry 逻辑（过期过滤 / 归属隔离 / 注册）
   - SSE event 格式生成
@@ -31,7 +31,6 @@ from pydantic import BaseModel, ValidationError
 
 _TO_INTERNAL: dict[str, str] = {
     "lark": "feishu",
-    "dingtalk": "dingtalk",
     "weixin": "weixin",
 }
 _TO_FRONTEND: dict[str, str] = {v: k for k, v in _TO_INTERNAL.items()}
@@ -200,10 +199,6 @@ class TestChannelMapping:
     def test_feishu_maps_to_lark(self):
         assert _to_frontend("feishu") == "lark"
 
-    def test_dingtalk_roundtrip(self):
-        assert _to_internal("dingtalk") == "dingtalk"
-        assert _to_frontend("dingtalk") == "dingtalk"
-
     def test_weixin_roundtrip(self):
         assert _to_internal("weixin") == "weixin"
         assert _to_frontend("weixin") == "weixin"
@@ -217,8 +212,8 @@ class TestChannelMapping:
         assert _to_frontend("unknown_internal") == "unknown_internal"
 
     def test_known_channels_list(self):
-        assert set(KNOWN_CHANNELS) == {"lark", "dingtalk", "weixin"}
-        assert len(KNOWN_CHANNELS) == 3
+        assert set(KNOWN_CHANNELS) == {"lark", "weixin"}
+        assert len(KNOWN_CHANNELS) == 2
 
     def test_to_frontend_covers_all_known(self):
         for frontend in KNOWN_CHANNELS:
@@ -241,14 +236,14 @@ class TestChannelStatusOut:
 
     def test_with_bot_info(self):
         s = ChannelStatusOut(
-            id="dingtalk",
+            id="lark",
             enabled=True,
             connected=True,
             has_credentials=True,
-            bot_info={"robotCode": "dingbot01", "name": "TestBot"},
+            bot_info={"robotCode": "larkbot01", "name": "TestBot"},
         )
         assert s.bot_info is not None
-        assert s.bot_info["robotCode"] == "dingbot01"
+        assert s.bot_info["robotCode"] == "larkbot01"
 
     def test_requires_id(self):
         with pytest.raises(ValidationError):
@@ -267,7 +262,7 @@ class TestChannelStatusOut:
             for ch in KNOWN_CHANNELS
         ]
         raw = [s.model_dump() for s in statuses]
-        assert len(raw) == 3
+        assert len(raw) == 2
         assert all("id" in r for r in raw)
 
 
@@ -387,7 +382,7 @@ class TestPendingPairingRegistry:
         reg.register(
             code="C2",
             user_id="user-1",
-            channel="dingtalk",
+            channel="weixin",
             platform_user_id="staff001",
             expires_at=self._past(),
         )
@@ -445,16 +440,15 @@ class TestPendingPairingRegistry:
 
     def test_multiple_entries_different_channels(self):
         reg = PendingPairingRegistry()
-        for ch, pid, code in [("feishu", "ou_1", "K1"), ("dingtalk", "s_1", "K2"),
-                               ("weixin", "wx_1", "K3")]:
+        for ch, pid, code in [("feishu", "ou_1", "K1"), ("weixin", "wx_1", "K2")]:
             reg.register(
                 code=code, user_id="u", channel=ch,
                 platform_user_id=pid, expires_at=self._future(),
             )
         items = reg.list_for_user("u")
-        assert len(items) == 3
+        assert len(items) == 2
         platforms = {i["platform"] for i in items}
-        assert platforms == {"lark", "dingtalk", "weixin"}
+        assert platforms == {"lark", "weixin"}
 
 
 class TestSSEEventFormat:
@@ -569,7 +563,6 @@ class TestAsyncCompatibility:
 
         result = asyncio.run(run())
         assert "feishu" in result
-        assert "dingtalk" in result
         assert "weixin" in result
 
     def test_async_pending_registry(self):

@@ -19,7 +19,7 @@ import pytest
 # ─────────────────────────────────────────────────────────────────
 
 class ChannelStatus(BaseModel):
-    id: Literal['lark', 'dingtalk', 'weixin']
+    id: Literal['lark', 'weixin']
     enabled: bool
     connected: bool
     has_credentials: bool
@@ -27,7 +27,7 @@ class ChannelStatus(BaseModel):
 
 class PairingRequest(BaseModel):
     code: str
-    platform: Literal['lark', 'dingtalk', 'weixin']
+    platform: Literal['lark', 'weixin']
     platform_user_id: str
     platform_username: str
     expires_at: str  # ISO datetime string
@@ -35,7 +35,7 @@ class PairingRequest(BaseModel):
 
 class AuthorizedUser(BaseModel):
     id: str
-    platform: Literal['lark', 'dingtalk', 'weixin']
+    platform: Literal['lark', 'weixin']
     platform_user_id: str
     platform_username: str
     authorized_at: str  # ISO datetime string
@@ -81,11 +81,6 @@ class LarkCredentials(BaseModel):
     verification_token: Optional[str] = None
 
 
-class DingTalkCredentials(BaseModel):
-    client_id: str
-    client_secret: str
-
-
 class ApprovePairingBody(BaseModel):
     code: str
 
@@ -114,7 +109,7 @@ class TestChannelStatus:
         assert s.enabled is True
 
     def test_valid_all_channels(self):
-        for ch in ('lark', 'dingtalk', 'weixin'):
+        for ch in ('lark', 'weixin'):
             s = ChannelStatus(id=ch, enabled=False, connected=False, has_credentials=False)
             assert s.id == ch
 
@@ -154,12 +149,12 @@ class TestAuthorizedUser:
     def test_valid_user(self):
         u = AuthorizedUser(
             id='user-uuid-1',
-            platform='dingtalk',
-            platform_user_id='staffId001',
+            platform='lark',
+            platform_user_id='ou_001',
             platform_username='李四',
             authorized_at='2026-06-30T08:00:00Z',
         )
-        assert u.platform == 'dingtalk'
+        assert u.platform == 'lark'
 
     def test_json_parse(self):
         raw = json.dumps({
@@ -267,11 +262,6 @@ class TestRequestBodies:
         creds = LarkCredentials(**body.credentials)
         assert creds.encrypt_key == 'ek_z'
         assert creds.verification_token == 'vt_w'
-
-    def test_enable_dingtalk_body(self):
-        body = EnableChannelBody(credentials={'client_id': 'ding_id', 'client_secret': 'ding_sec'})
-        creds = DingTalkCredentials(**body.credentials)
-        assert creds.client_id == 'ding_id'
 
     def test_approve_pairing(self):
         body = ApprovePairingBody(code='CODE42')

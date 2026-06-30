@@ -38,11 +38,10 @@ router = APIRouter()
 
 _TO_INTERNAL: dict[str, str] = {
     "lark": "feishu",
-    "dingtalk": "dingtalk",
     "weixin": "weixin",
 }
 _TO_FRONTEND: dict[str, str] = {v: k for k, v in _TO_INTERNAL.items()}
-KNOWN_CHANNELS: list[str] = list(_TO_INTERNAL)  # ['lark', 'dingtalk', 'weixin']
+KNOWN_CHANNELS: list[str] = list(_TO_INTERNAL)  # ['lark', 'weixin']
 
 
 def _to_internal(channel: str) -> str:
@@ -90,7 +89,7 @@ def register_pending_pairing(
     *,
     code: str,
     user_id: str,
-    channel: str,              # 内部名：'feishu' / 'dingtalk' / 'weixin'
+    channel: str,              # 内部名：'feishu' / 'weixin'
     platform_user_id: str,
     platform_username: str = "",
     expires_at: datetime,
@@ -120,7 +119,7 @@ def register_pending_pairing(
 
 
 class ChannelStatusOut(BaseModel):
-    id: str                              # 前端渠道名 'lark'/'dingtalk'/'weixin'
+    id: str                              # 前端渠道名 'lark'/'weixin'
     enabled: bool
     connected: bool
     has_credentials: bool
@@ -447,7 +446,6 @@ async def test_channel(
     """用提供的凭据测试连接，返回 {ok, bot_username?, error?}。
 
     飞书：GET /bot/v3/info（需真实 app_id / app_secret 及网络）。
-    钉钉：POST /v1.0/oauth2/accessToken 取 token（凭据即校验）。
     微信：走扫码登录，无法 test_connection，返回 400。
     """
     internal = _to_internal(channel)
@@ -464,20 +462,6 @@ async def test_channel(
             adapter = FeishuAdapter(app_id=app_id, app_secret=app_secret)
             info = await adapter.test_connection()
             return TestChannelResponse(ok=True, bot_username=info.get("app_name") or None)
-
-        elif internal == "dingtalk":
-            from app.channels.adapters.dingtalk import DingTalkAdapter
-
-            client_id = body.credentials.get("client_id")
-            client_secret = body.credentials.get("client_secret")
-            if not client_id or not client_secret:
-                raise HTTPException(
-                    status_code=422, detail="钉钉凭据必须包含 client_id 和 client_secret"
-                )
-            adapter = DingTalkAdapter(client_id=client_id, client_secret=client_secret)
-            # 钉钉无 test_connection()；成功取 token 即凭据有效（需真实网络）
-            await adapter._get_token()
-            return TestChannelResponse(ok=True)
 
         else:
             # 微信走扫码登录，无法主动测连

@@ -3,7 +3,7 @@ import { getValidToken } from './client'
 
 // ── types ──────────────────────────────────────────────────────────────────
 
-export type ChannelId = 'lark' | 'dingtalk' | 'weixin'
+export type ChannelId = 'lark' | 'weixin'
 
 export interface ChannelStatus {
   id: ChannelId

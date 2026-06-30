@@ -8,7 +8,6 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { channelsApi, type ChannelStatus } from '@/api/channels'
 import { colors } from '@/styles/tokens'
 import LarkForm from './LarkForm'
-import DingTalkForm from './DingTalkForm'
 import WeixinForm from './WeixinForm'
 
 const { Title, Text } = Typography
@@ -16,7 +15,6 @@ const { Title, Text } = Typography
 // ── emoji logos (no static asset needed) ─────────────────────────────────
 const CHANNEL_META: Record<string, { label: string; emoji: string; desc: string }> = {
   lark: { label: '飞书', emoji: '🪶', desc: '自建应用 BYO — WSS 出站，免公网回调' },
-  dingtalk: { label: '钉钉', emoji: '📌', desc: '企业内部应用 BYO — WS Stream 出站' },
   weixin: { label: '微信', emoji: '💬', desc: '官方 iLink 协议，扫码登录个人微信' },
 }
 
@@ -127,15 +125,6 @@ export default function ChannelsPage() {
       ),
     },
     {
-      id: 'dingtalk',
-      form: (
-        <DingTalkForm
-          status={statuses['dingtalk'] ?? null}
-          onStatusChange={handleStatusChange}
-        />
-      ),
-    },
-    {
       id: 'weixin',
       form: (
         <WeixinForm
@@ -172,7 +161,7 @@ export default function ChannelsPage() {
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <Title level={3} style={{ marginBottom: 4 }}>渠道配置</Title>
         <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
-          接入飞书、钉钉、微信，让用户直接在 IM 里和 DataMind 对话。
+          接入飞书、微信，让用户直接在 IM 里和 DataMind 对话。
           采用出站长连接（BYO 凭据），无需公网回调地址。
         </Text>
 

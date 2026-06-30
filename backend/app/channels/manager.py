@@ -530,12 +530,6 @@ def _make_adapter(channel: str, creds: dict) -> Any:
             app_id=creds["app_id"],
             app_secret=creds["app_secret"],
         )
-    if channel == "dingtalk":
-        from app.channels.adapters.dingtalk import DingTalkAdapter
-        return DingTalkAdapter(
-            client_id=creds["client_id"],
-            client_secret=creds["client_secret"],
-        )
     if channel == "weixin":
         from app.channels.adapters.weixin import WeixinAdapter
         return WeixinAdapter(

@@ -28,7 +28,7 @@ class ChannelConfig(Base):
         nullable=False,
         index=True,
     )
-    # 渠道标识：'feishu' | 'dingtalk' | 'weixin'
+    # 渠道标识：'feishu' | 'weixin'
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # 凭据 JSON（明文示例：{"app_id":"…","app_secret":"…"}）用 Fernet 对称加密整体存储

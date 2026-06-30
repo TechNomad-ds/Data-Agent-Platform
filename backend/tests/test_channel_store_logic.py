@@ -50,7 +50,7 @@ def _decrypt_creds(encrypted: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class TestCredRoundtrip(unittest.TestCase):
-    """凭据加解密往返——飞书 / 钉钉 / 微信三套格式。"""
+    """凭据加解密往返——飞书 / 微信两套格式。"""
 
     def _roundtrip(self, creds: dict) -> None:
         encrypted = _encrypt_creds(creds)
@@ -72,9 +72,6 @@ class TestCredRoundtrip(unittest.TestCase):
             "encrypt_key": "optional-key",
             "verification_token": "optional-token",
         })
-
-    def test_dingtalk(self):
-        self._roundtrip({"client_id": "dingXXX", "client_secret": "ding-secret-456"})
 
     def test_weixin(self):
         self._roundtrip({"bot_token": "wx-bot-token-789", "account_id": "wxid_123456"})
