@@ -62,9 +62,9 @@ class Settings(BaseSettings):
     # 注意：这是「回放到后续轮次」的上限，不是当轮模型可见上限（当轮见完整结果，
     # 见 loop.py 的 100000 上限）。设太小会导致读文档/表格时，上一轮读到的内容
     # 在下一轮历史里被腰斩，模型误以为「表格被截断」反复重读（用户实测的 bug）。
-    # 取 24000 ≈ 一个 read_file 窗口（约 400 行）的完整体量，让一次读到的表格/章节
-    # 能完整留存到后续轮次；总历史体量仍由 context_token_budget + 压缩兜底约束。
-    context_tool_result_max_chars: int = 24000
+    # 取 40000 ≈ 一个 read_file 窗口（默认 2500 行）的完整体量，让一次读到的论文/长章节/表格
+    # 能较完整留存到后续轮次；总历史体量仍由 context_token_budget + 压缩兜底约束。
+    context_tool_result_max_chars: int = 40000
     # 触发 LLM 总结兜底（保留窗口本身仍超预算时）
     context_enable_summary_fallback: bool = True
 

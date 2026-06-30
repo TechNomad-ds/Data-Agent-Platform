@@ -67,7 +67,7 @@ export default function Login() {
                 欢迎使用 DataMind
               </Title>
               <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                登录以开始数据分析
+                登录以开始使用智能体
               </Text>
             </div>
 

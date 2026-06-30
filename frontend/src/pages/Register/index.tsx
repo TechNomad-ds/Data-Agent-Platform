@@ -13,6 +13,7 @@ const { Title, Text, Paragraph } = Typography
 export default function Register() {
   const [loading, setLoading] = useState(false)
   const [legalOpen, setLegalOpen] = useState(false)
+  const [form] = Form.useForm()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
 
@@ -23,12 +24,22 @@ export default function Register() {
         email: values.email,
         username: values.username,
         password: values.password,
-        research_consent: values.research_consent || false,
+        // 注册即视为同意（已纳入用户协议），不再单独勾选
+        research_consent: true,
       })
       message.success('注册成功，请登录')
       navigate('/login')
     } catch (err: any) {
-      message.error(err.response?.data?.detail || '注册失败')
+      const detail = err.response?.data?.detail || '注册失败'
+      // 把「邮箱/用户名已被占用」这类冲突精确标注到对应输入框下方（常驻红字），
+      // 而不是只弹一个会消失的顶部提示，方便用户一眼看到是哪个字段的问题。
+      if (detail.includes('邮箱')) {
+        form.setFields([{ name: 'email', errors: [detail] }])
+      } else if (detail.includes('用户名')) {
+        form.setFields([{ name: 'username', errors: [detail] }])
+      } else {
+        message.error(detail)
+      }
     } finally {
       setLoading(false)
     }
@@ -70,17 +81,18 @@ export default function Register() {
                 创建 DataMind 账号
               </Title>
               <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-                注册以开始数据分析
+                注册以开始使用智能体
               </Text>
             </div>
 
-            <Form layout="vertical" onFinish={onFinish} size="large">
+            <Form form={form} layout="vertical" onFinish={onFinish} size="large">
               <Form.Item
                 name="email"
                 rules={[
                   { required: true, message: '请输入邮箱' },
                   { type: 'email', message: '邮箱格式不正确' },
                 ]}
+                extra={<span style={{ fontSize: 12, color: colors.textMuted }}>每个邮箱只能注册一个账号</span>}
               >
                 <Input prefix={<MailOutlined style={{ color: colors.textMuted }} />} placeholder="邮箱" autoComplete="email" />
               </Form.Item>
@@ -90,6 +102,7 @@ export default function Register() {
                   { required: true, message: '请输入用户名' },
                   { min: 2, message: '用户名至少 2 个字符' },
                 ]}
+                extra={<span style={{ fontSize: 12, color: colors.textMuted }}>用户名需唯一，可用于登录</span>}
               >
                 <Input prefix={<UserOutlined style={{ color: colors.textMuted }} />} placeholder="用户名" autoComplete="username" />
               </Form.Item>
@@ -129,11 +142,6 @@ export default function Register() {
                   </a>
                 </Checkbox>
               </Form.Item>
-              <Form.Item name="research_consent" valuePropName="checked" style={{ marginTop: -8 }}>
-                <Checkbox>
-                  同意将匿名化后的交互数据用于产品改进与学术研究
-                </Checkbox>
-              </Form.Item>
               <Form.Item style={{ marginBottom: 16 }}>
                 <Button type="primary" htmlType="submit" loading={loading} block style={{ height: 44, fontWeight: 500 }}>
                   注册
@@ -171,7 +179,7 @@ function LegalContent() {
     <div style={{ fontSize: 13.5, lineHeight: 1.8, color: colors.textSecondary }}>
       <Title level={4}>一、服务说明</Title>
       <Paragraph>
-        DataMind Analyst（以下简称"本平台"）是一个基于人工智能的数据分析平台，提供数据上传、智能对话分析、可视化图表生成等服务。注册或使用本平台即表示您同意接受本协议的全部条款。
+        DataMind（以下简称"本平台"）是一个基于人工智能的智能体（Agent）平台，提供智能对话、内容创作、数据上传与分析、可视化图表生成等服务。注册或使用本平台即表示您同意接受本协议的全部条款。
       </Paragraph>
       <Title level={4}>二、账户与安全</Title>
       <Paragraph>
@@ -191,7 +199,7 @@ function LegalContent() {
       <Title level={4}>六、额度</Title>
       <Paragraph>平台为每位用户提供每日免费分析额度，也支持配置自有 API Key 使用，后者不消耗平台额度，费用由对应服务商收取。</Paragraph>
       <Title level={4}>七、学术研究</Title>
-      <Paragraph>只有在您主动勾选授权后，您的交互数据才会在匿名化处理后用于产品改进与学术研究。您可以在个人资料中调整该授权。</Paragraph>
+      <Paragraph>注册并使用本平台即表示您同意，您的交互数据在匿名化处理后可用于产品改进与学术研究。</Paragraph>
       <Title level={4}>八、数据删除与账户注销</Title>
       <Paragraph>您可随时删除项目、文件或对话记录，删除操作不可撤销。账户注销后，所有关联数据将被永久清除。</Paragraph>
       <Title level={4}>九、协议修订</Title>

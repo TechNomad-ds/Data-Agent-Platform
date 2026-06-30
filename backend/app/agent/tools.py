@@ -71,7 +71,7 @@ def get_tool_definitions() -> list[dict]:
                         "filename": {"type": "string", "description": "文件名"},
                         "find": {"type": "string", "description": "可选：在文件内按关键词/短语定位（大小写不敏感），跳到第一处匹配并返回其上下文窗口，而不是从头读。适合在厚文档里定位某个主题/章节。用 search_data_space 命中的原文短语做 find 效果最好。"},
                         "start_line": {"type": "integer", "description": "起始行号（从0开始）。文件未读完时，用上次返回的结尾行号继续读；配合 find 时，从该行之后查找下一处匹配。", "default": 0},
-                        "max_lines": {"type": "integer", "description": "最大读取行数（find 模式下为匹配处上下文窗口大小）。默认 800；表格/长章节想一次读完可调到更大（如 2000）。", "default": 800},
+                        "max_lines": {"type": "integer", "description": "最大读取行数（find 模式下为匹配处上下文窗口大小）。默认 2500，一次能读完大多数论文/长文档的主体；超长文档按返回末尾提示翻页续读。", "default": 2500},
                     },
                     "required": ["filename"],
                 },
@@ -760,8 +760,11 @@ def _read_footer(start_line: int, shown: int, total: int) -> str:
         return f"\n---\n[已读到文件结尾：共 {total} 行，本次第 {start_line+1}-{total} 行，全文已读完]"
     remaining = total - end
     return (
-        f"\n---\n[未读完：共 {total} 行，本次第 {start_line+1}-{end} 行，"
-        f"后面还有 {remaining} 行未读。如需讲解/总结整篇，请用 start_line={end} 继续读到出现“全文已读完”为止。]"
+        f"\n---\n[⚠️ 未读完：共 {total} 行，本次只读了第 {start_line+1}-{end} 行，"
+        f"后面还有 {remaining} 行未读。严禁仅凭已读部分就总结/讲解/下结论——"
+        f"摘要、引言往往只占开头，方法、实验、结论在后面。"
+        f"请立即用 read_file(start_line={end}) 继续读，直到出现“全文已读完”再作答。"
+        f"不要以“核心已覆盖/前面已够”为由跳过剩余内容。]"
     )
 
 
@@ -900,7 +903,7 @@ def _render_find(filename: str, label: str, lines: list[str], needle: str,
 async def _tool_read_file(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
     filename = args.get("filename", "")
     start_line = args.get("start_line", 0)
-    max_lines = args.get("max_lines", 800)
+    max_lines = args.get("max_lines", 2500)
     find = (args.get("find") or "").strip()
     file_path = await _get_file_path(filename, user_id, data_space_id)
     if not file_path or not file_path.exists():
