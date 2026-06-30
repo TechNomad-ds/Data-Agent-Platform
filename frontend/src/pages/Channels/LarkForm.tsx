@@ -1,0 +1,199 @@
+/**
+ * 飞书渠道配置表单
+ * 凭据：App ID + App Secret + 可选 Encrypt Key / Verification Token
+ * 操作：测试并连接 → 启用/禁用
+ */
+import { useState } from 'react'
+import {
+  Button, Collapse, Divider, Form, Input, Spin, Typography, message,
+} from 'antd'
+import {
+  ApiOutlined, CheckCircleOutlined, DisconnectOutlined,
+} from '@ant-design/icons'
+import { channelsApi, type ChannelStatus } from '@/api/channels'
+import ChannelSettingsRow from './ChannelSettingsRow'
+import PairingsPanel from './PairingsPanel'
+
+const { Text } = Typography
+
+interface Props {
+  status: ChannelStatus | null
+  onStatusChange: (s: ChannelStatus) => void
+}
+
+interface LarkCreds {
+  app_id: string
+  app_secret: string
+  encrypt_key?: string
+  verification_token?: string
+}
+
+export default function LarkForm({ status, onStatusChange }: Props) {
+  const [form] = Form.useForm<LarkCreds>()
+  const [testLoading, setTestLoading] = useState(false)
+  const [enableLoading, setEnableLoading] = useState(false)
+  const [tested, setTested] = useState(false)
+
+  const hasCredentials = status?.has_credentials ?? false
+  const enabled = status?.enabled ?? false
+  const connected = status?.connected ?? false
+  // lock credentials when there are authorized users (enforced via PairingsPanel presence)
+  const credLocked = hasCredentials && enabled
+
+  const getCredentials = (): Record<string, string> => {
+    const vals = form.getFieldsValue()
+    const creds: Record<string, string> = {
+      app_id: vals.app_id ?? '',
+      app_secret: vals.app_secret ?? '',
+    }
+    if (vals.encrypt_key) creds.encrypt_key = vals.encrypt_key
+    if (vals.verification_token) creds.verification_token = vals.verification_token
+    return creds
+  }
+
+  const handleTest = async () => {
+    try {
+      await form.validateFields(['app_id', 'app_secret'])
+    } catch {
+      return
+    }
+    setTestLoading(true)
+    setTested(false)
+    try {
+      const res = await channelsApi.test('lark', getCredentials())
+      if (res.data.ok) {
+        message.success('飞书连接测试成功')
+        setTested(true)
+      } else {
+        message.error(`测试失败：${res.data.detail ?? '未知错误'}`)
+      }
+    } catch (err: any) {
+      message.error(err.response?.data?.detail ?? '测试请求失败')
+    } finally {
+      setTestLoading(false)
+    }
+  }
+
+  const handleEnable = async () => {
+    try {
+      await form.validateFields(['app_id', 'app_secret'])
+    } catch {
+      return
+    }
+    setEnableLoading(true)
+    try {
+      await channelsApi.enable('lark', getCredentials())
+      message.success('飞书渠道已启用')
+      // reload status from parent via list
+      const res = await channelsApi.list()
+      const next = res.data.find((s) => s.id === 'lark')
+      if (next) onStatusChange(next)
+    } catch (err: any) {
+      message.error(err.response?.data?.detail ?? '启用失败')
+    } finally {
+      setEnableLoading(false)
+    }
+  }
+
+  const handleDisable = async () => {
+    setEnableLoading(true)
+    try {
+      await channelsApi.disable('lark')
+      message.success('飞书渠道已停用')
+      const res = await channelsApi.list()
+      const next = res.data.find((s) => s.id === 'lark')
+      if (next) onStatusChange(next)
+    } catch (err: any) {
+      message.error(err.response?.data?.detail ?? '停用失败')
+    } finally {
+      setEnableLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ padding: '4px 0' }}>
+      {/* ── 连接状态 ── */}
+      {connected ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <CheckCircleOutlined style={{ color: '#10a37f' }} />
+          <Text style={{ color: '#10a37f' }}>已连接</Text>
+          <Button size="small" danger icon={<DisconnectOutlined />} loading={enableLoading} onClick={handleDisable}>
+            断开
+          </Button>
+        </div>
+      ) : hasCredentials ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <DisconnectOutlined style={{ color: '#94a3b8' }} />
+          <Text type="secondary">未连接（凭据已保存）</Text>
+          <Button size="small" type="primary" loading={enableLoading} onClick={handleEnable}>
+            启用
+          </Button>
+        </div>
+      ) : null}
+
+      {/* ── 凭据表单 ── */}
+      <Form form={form} layout="vertical" size="small" disabled={credLocked}>
+        <Form.Item
+          label="App ID"
+          name="app_id"
+          rules={[{ required: true, message: '请输入 App ID' }]}
+        >
+          <Input placeholder="cli_xxxxxxxxxxxxxxxx" />
+        </Form.Item>
+        <Form.Item
+          label="App Secret"
+          name="app_secret"
+          rules={[{ required: true, message: '请输入 App Secret' }]}
+        >
+          <Input.Password placeholder="App Secret" />
+        </Form.Item>
+
+        {/* 可选配置折叠 */}
+        <Collapse
+          size="small"
+          ghost
+          items={[{
+            key: 'optional',
+            label: <Text type="secondary" style={{ fontSize: 12 }}>显示可选配置（Encrypt Key / Verification Token）</Text>,
+            children: (
+              <>
+                <Form.Item label="Encrypt Key（WS 模式可不填）" name="encrypt_key">
+                  <Input placeholder="可选" />
+                </Form.Item>
+                <Form.Item label="Verification Token（WS 模式可不填）" name="verification_token">
+                  <Input placeholder="可选" />
+                </Form.Item>
+              </>
+            ),
+          }]}
+        />
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <Button
+            icon={<ApiOutlined />}
+            loading={testLoading}
+            onClick={handleTest}
+            disabled={credLocked}
+          >
+            测试连接
+          </Button>
+          {tested && !enabled && (
+            <Button type="primary" loading={enableLoading} onClick={handleEnable}>
+              启用渠道
+            </Button>
+          )}
+          {enableLoading && <Spin size="small" />}
+        </div>
+      </Form>
+
+      <Divider style={{ margin: '16px 0 8px' }} />
+
+      {/* ── 渠道通用设置 ── */}
+      <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>渠道设置</Text>
+      <ChannelSettingsRow channelId="lark" />
+
+      {/* ── 配对 & 用户 ── */}
+      <PairingsPanel channelId="lark" />
+    </div>
+  )
+}

@@ -12,11 +12,12 @@ import DataManager from '@/components/DataManager/DataManager'
 import SettingsPage from '@/pages/Settings'
 import CreditsPage from '@/pages/Credits'
 import AdminPage from '@/pages/Admin'
+import ChannelsPage from '@/pages/Channels'
 import Onboarding from '@/components/Onboarding/Onboarding'
 import Logo from '@/components/Layout/Logo'
 import { colors } from '@/styles/tokens'
 
-export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin'
+export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin' | 'channels'
 
 export default function MainLayout() {
   const [currentView, setCurrentView] = useState<MainView>('chat')
@@ -109,6 +110,10 @@ export default function MainLayout() {
     setCurrentView('admin')
   }, [])
 
+  const handleOpenChannels = useCallback(() => {
+    setCurrentView('channels')
+  }, [])
+
   const handleConversationCreated = useCallback((id: string) => {
     setCurrentConvId(id)
   }, [])
@@ -136,6 +141,7 @@ export default function MainLayout() {
       onOpenCredits={withDrawerClose(handleOpenCredits)}
       onOpenAdmin={withDrawerClose(handleOpenAdmin)}
       onOpenSettings={withDrawerClose(handleOpenSettings)}
+      onOpenChannels={withDrawerClose(handleOpenChannels)}
       inDrawer={isMobile}
     />
   )
@@ -177,6 +183,12 @@ export default function MainLayout() {
       <div style={{ height: '100%', overflow: 'auto', background: '#f8fafc', padding: isMobile ? 16 : 32 }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <AdminPage />
+        </div>
+      </div>
+    ) : currentView === 'channels' ? (
+      <div style={{ height: '100%', overflow: 'auto', background: '#f8fafc', padding: isMobile ? 16 : 32 }}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <ChannelsPage />
         </div>
       </div>
     ) : (

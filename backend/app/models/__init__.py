@@ -9,6 +9,7 @@ from app.models.data_profile import DataProfile
 from app.models.memory import AgentMemory
 from app.models.user_api_key import UserApiKey
 from app.models.external_identity import ExternalIdentity
+from app.models.channel_config import ChannelConfig
 
 __all__ = [
     "User",
@@ -25,4 +26,5 @@ __all__ = [
     "AgentMemory",
     "UserApiKey",
     "ExternalIdentity",
+    "ChannelConfig",
 ]

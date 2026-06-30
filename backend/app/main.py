@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.database import Base, get_engine
-from app.routers import auth, files, data_spaces, chat, credits, feedback, admin, models, reports, suggestions, datasources, user_settings
+from app.routers import auth, files, data_spaces, chat, credits, feedback, admin, models, reports, suggestions, datasources, user_settings, channels
 
 
 @asynccontextmanager
@@ -135,6 +135,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["报告"])
 app.include_router(suggestions.router, prefix="/api/data-spaces", tags=["智能建议"])
 app.include_router(datasources.router, prefix="/api/datasources", tags=["外部数据源"])
 app.include_router(user_settings.router, prefix="/api/settings", tags=["用户设置"])
+app.include_router(channels.router, prefix="/api/channels", tags=["远程连接"])
 
 
 @app.get("/api/health")

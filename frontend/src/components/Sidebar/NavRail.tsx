@@ -6,6 +6,7 @@ import {
   CrownOutlined,
   SettingOutlined,
   LogoutOutlined,
+  ApiOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { MainView } from '@/components/Layout/MainLayout'
@@ -19,6 +20,7 @@ interface Props {
   onOpenCredits: () => void
   onOpenAdmin: () => void
   onOpenSettings: () => void
+  onOpenChannels: () => void
   /** 在移动端抽屉内：横向铺满成宽行，文字常显 */
   inDrawer?: boolean
 }
@@ -38,6 +40,7 @@ export default function NavRail({
   onOpenCredits,
   onOpenAdmin,
   onOpenSettings,
+  onOpenChannels,
   inDrawer = false,
 }: Props) {
   const { user, logout } = useAuthStore()
@@ -47,6 +50,7 @@ export default function NavRail({
   const entries: NavEntry[] = [
     { key: 'chat', label: '对话', icon: <MessageOutlined />, onClick: onOpenChat, show: true },
     { key: 'data', label: '数据管理', icon: <DatabaseOutlined />, onClick: onOpenDataManager, show: true },
+    { key: 'channels', label: '远程连接', icon: <ApiOutlined />, onClick: onOpenChannels, show: true },
     { key: 'credits', label: '额度与 API', icon: <WalletOutlined />, onClick: onOpenCredits, show: true },
     { key: 'admin', label: '管理后台', icon: <CrownOutlined />, onClick: onOpenAdmin, show: user?.role === 'admin' },
   ]

@@ -41,6 +41,35 @@ class InMemoryPairingStore:
         return (channel, uid)
 
 
+class RedisPairingStore:
+    """Redis 配对码存储（带 TTL）。跨进程共享：manager 进程出码、web worker 审批。
+
+    懒导入 redis_client，保持本模块顶层 import-light（隔离单测不拉 redis）。
+    """
+
+    _PREFIX = "pairing:code:"
+
+    async def put(self, code: str, channel: str, platform_user_id: str, ttl: float) -> None:
+        from app.core.redis_client import get_redis
+        r = await get_redis()
+        await r.set(self._PREFIX + code, f"{channel}|{platform_user_id}", ex=int(ttl))
+
+    async def take(self, code: str) -> Optional[tuple[str, str]]:
+        from app.core.redis_client import get_redis
+        r = await get_redis()
+        key = self._PREFIX + code
+        val = await r.get(key)
+        if val is None:
+            return None
+        await r.delete(key)  # 一次性消费
+        if isinstance(val, (bytes, bytearray)):
+            val = val.decode()
+        channel, sep, uid = val.partition("|")
+        if not sep or not uid:
+            return None
+        return (channel, uid)
+
+
 class PairingService:
     def __init__(
         self,
