@@ -21,6 +21,9 @@ class Conversation(Base):
     )
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     model_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 渠道接入：来源渠道 + 外部会话线程 id（把外部 IM/邮件会话映射到内部 conversation）
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, server_default="web")
+    channel_thread_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
