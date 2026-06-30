@@ -328,7 +328,9 @@ class WeixinAdapter:
         own_client = _client is None
         if own_client:
             import httpx
-            client = httpx.AsyncClient(timeout=httpx.Timeout(15.0))
+            # get_qrcode_status 是长轮询：服务端挂起约 30s 才返回 {"status":"wait"}，
+            # 读超时必须 > 30s，否则每次轮询都 ReadTimeout。
+            client = httpx.AsyncClient(timeout=httpx.Timeout(40.0, connect=10.0))
         else:
             client = _client
 
@@ -369,10 +371,17 @@ class WeixinAdapter:
                     resp.raise_for_status()
                     st = parse_login_status_response(resp.json())
                 except Exception as exc:
+                    import httpx
                     err_lower = str(exc).lower()
-                    if "timeout" in err_lower or "timed out" in err_lower:
-                        continue  # 正常长轮询超时，继续等
-                    yield LoginEvent(kind=LoginEventKind.ERROR, error=f"Status poll failed: {exc}")
+                    # 长轮询正常超时即继续等。注意 httpx 超时异常 str() 常为空，
+                    # 必须按异常类型判断，不能只靠字符串匹配（否则空消息会被误判为真错误）。
+                    if (
+                        isinstance(exc, httpx.TimeoutException)
+                        or "timeout" in err_lower
+                        or "timed out" in err_lower
+                    ):
+                        continue
+                    yield LoginEvent(kind=LoginEventKind.ERROR, error=f"Status poll failed: {exc!r}")
                     return
 
                 status = st.get("status") or "wait"

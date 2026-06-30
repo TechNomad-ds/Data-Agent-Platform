@@ -69,11 +69,12 @@ export type WeixinSSEEvent =
  * Opens the WeChat login SSE stream and calls `onEvent` for each parsed event.
  * Returns a cleanup function that aborts the request.
  *
- * Backend sends pre-rendered QR as base64 PNG data URL (no frontend QR lib needed).
- * SSE format expected:
- *   event: qr\ndata: {"qr_data_url":"data:image/png;base64,..."}\n\n
+ * Backend (ilink) sends the QR as a scan-target URL string in `qrcodeData`;
+ * the frontend encodes it into a QR image (see WeixinForm). 旧实现假设 base64 PNG，已纠正。
+ * SSE format:
+ *   event: qr\ndata: {"qrcodeData":"https://liteapp.weixin.qq.com/q/..."}\n\n
  *   event: scanned\ndata: {}\n\n
- *   event: done\ndata: {"account_id":"...","bot_token":"..."}\n\n
+ *   event: done\ndata: {"accountId":"...","botToken":"...","baseUrl":"..."}\n\n
  *   event: error\ndata: {"message":"..."}\n\n
  */
 export async function startWeixinLoginSSE(
@@ -112,11 +113,16 @@ export async function startWeixinLoginSSE(
           try {
             const parsed = JSON.parse(raw)
             if (currentEvent === 'qr') {
-              onEvent({ type: 'qr', qr_data_url: parsed.qr_data_url })
+              // 后端字段 qrcodeData = ilink 扫码 URL（需前端编码成二维码）；兼容旧 qr_data_url
+              onEvent({ type: 'qr', qr_data_url: parsed.qrcodeData ?? parsed.qr_data_url ?? '' })
             } else if (currentEvent === 'scanned') {
               onEvent({ type: 'scanned' })
             } else if (currentEvent === 'done') {
-              onEvent({ type: 'done', account_id: parsed.account_id, bot_token: parsed.bot_token })
+              onEvent({
+                type: 'done',
+                account_id: parsed.accountId ?? parsed.account_id ?? '',
+                bot_token: parsed.botToken ?? parsed.bot_token ?? '',
+              })
             } else if (currentEvent === 'error') {
               onEvent({ type: 'error', message: parsed.message ?? 'Unknown error' })
             }

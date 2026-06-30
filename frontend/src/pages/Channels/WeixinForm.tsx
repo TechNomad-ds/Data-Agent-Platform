@@ -1,7 +1,8 @@
 /**
  * 微信渠道配置表单
  * 登录：SSE 扫码状态机 idle → loading_qr → showing_qr → scanned → connected
- * 后端通过 SSE 发送 base64 PNG 二维码图片（不需要前端 QR 库）
+ * 后端（ilink）通过 SSE 下发的是扫码 URL 字符串（qrcodeData），前端用 qrcode.react 编码成二维码。
+ * 若未来后端改为下发 base64 PNG（data: 开头），则直接用 <img> 渲染。
  */
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -10,6 +11,7 @@ import {
 import {
   CheckCircleOutlined, DisconnectOutlined, QrcodeOutlined, ReloadOutlined,
 } from '@ant-design/icons'
+import { QRCodeSVG } from 'qrcode.react'
 import { channelsApi, startWeixinLoginSSE, type ChannelStatus } from '@/api/channels'
 import ChannelSettingsRow from './ChannelSettingsRow'
 import PairingsPanel from './PairingsPanel'
@@ -131,11 +133,17 @@ export default function WeixinForm({ status, onStatusChange }: Props) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
           {qrDataUrl ? (
-            <img
-              src={qrDataUrl}
-              alt="微信登录二维码"
-              style={{ width: 160, height: 160, border: '1px solid #ececf1', borderRadius: 8 }}
-            />
+            qrDataUrl.startsWith('data:') ? (
+              <img
+                src={qrDataUrl}
+                alt="微信登录二维码"
+                style={{ width: 160, height: 160, border: '1px solid #ececf1', borderRadius: 8 }}
+              />
+            ) : (
+              <div style={{ padding: 8, border: '1px solid #ececf1', borderRadius: 8, background: '#fff' }}>
+                <QRCodeSVG value={qrDataUrl} size={144} level="M" />
+              </div>
+            )
           ) : (
             <div style={{ width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #ececf1', borderRadius: 8 }}>
               <Spin size="small" />
