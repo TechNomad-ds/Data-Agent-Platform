@@ -12,7 +12,7 @@
 | 实现路径 | DataMind 内**同进程**，channel 层直接调 `AgentLoop.run()`（不经 同类引擎） |
 | 复用方式 | **复刻** 同类产品 channel(UI+BYO+出站连接)；同类引擎 当协议参考，不运行 |
 | 产品 | C 端个人；身份跨组织 |
-| P0 渠道 | 飞书 + 钉钉（+ 微信，待定，见 §7 风险） |
+| P0 渠道 | 飞书 + 钉钉 + 微信（微信走官方 iLink，见 §2/§7） |
 | 凭据模型 | **BYO**：用户自带各平台自建应用凭据（绕开 ISV / 企业主体） |
 | 身份 | 配对绑定到**已有 DataMind 账号**（不自动开户） |
 | 配对流程 | IM 发起出码 → 网页端登录态输码 → 绑到本人账号 |
@@ -40,8 +40,9 @@
 - 回复：无按钮→AI Card 三段(`/card/instances` 建 → `/deliver` 投 → `/card/streaming` 写)；有按钮→`/robot/oToMessages/batchSend`。
 - 测连：`POST /v1.0/im/robot/info`。
 
-### 微信 Weixin — iLink Bot，HTTP 长轮询 ⚠️
-- ⚠️ **企业微信 iLink Bot 体系(`ilinkai.weixin.qq.com`)= 自动化个人微信号，微信 ToS 灰区、有封号风险。非标准公众号/小程序。**
+### 微信 Weixin — 官方 iLink 协议，HTTP 长轮询
+- **`ilinkai.weixin.qq.com` 是腾讯官方协议**（2026-03 随官方「微信 ClawBot 插件」`@tencent-weixin/openclaw-weixin` 推出，有官方使用条款，专为合法把个人微信接给 AI Agent、终结旧的逆向封号灰区）。QR 登录个人微信、**无需企业主体、无封号风险**。
+- 注意：iLink 是"官方 relay、但非开放第三方平台"（无公开文档/控制台/自助注册）。我们直连其协议的姿态同 同类产品/Qwen Code（社区逆向协议 + SDK），走官方通道但非官方第三方接入计划。`context_token` 24h 窗口。
 - 凭据：扫码登录获得 `bot_token` + `account_id`（`get_bot_qrcode` → 2s 轮询 `get_qrcode_status` 到 confirmed）。
 - 连接：长轮询 `POST /ilink/bot/getupdates`(游标 `get_updates_buf`，timeout 40s)。
 - 入站：`from_user_id`(用户) / `context_token`(回复必带，需持久化) / `item_list`(type1 文本/type3 语音转文字)。
@@ -76,7 +77,7 @@
 ## 7. 风险与待决
 
 - **连接管理/扩展(最大工程代价)**：共享后端下每个已配置 app = 一条常驻出站连接(WS/轮询)。用户多 = N 条常驻连接，需**独立连接管理进程**(不能在 4 个 gunicorn worker 里各起，否则重复连/重复处理)。这是 BYO+长连接复刻 同类产品 的固有代价。
-- **微信合规**：iLink 自动化个人微信，封号风险 → 微信是否进 P0 待定（建议缓，先飞书+钉钉）。
+- **微信 iLink 平台姿态**：iLink 是官方协议但非开放第三方平台（无公开文档/控制台），我们直连其协议（社区逆向）同 同类产品/Qwen Code；功能可用、无封号风险，但腾讯未来若收紧或推出正式第三方接入，需跟进。非 P0 阻塞。
 - **BYO 设置门槛**：用户需有能建自建应用的飞书/钉钉组织（个人版能否建应用待用户确认）；适合技术型用户。
 
 ## 8. 不运行时复用 同类引擎（保留结论）
