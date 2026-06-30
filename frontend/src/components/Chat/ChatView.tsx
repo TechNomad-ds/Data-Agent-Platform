@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Input, Button, Select, Typography, Spin, message, Tooltip, Dropdown } from 'antd'
+import type { TextAreaRef } from 'antd/es/input/TextArea'
 import {
   SendOutlined,
   StopOutlined,
@@ -35,12 +36,13 @@ const FALLBACK_MODELS: ModelOption[] = [
   { id: 'deepseek-v4-flash', display_name: 'DeepSeek V4 Flash', model_name: 'deepseek-v4-flash', provider: 'deepseek', source: 'platform', credit_multiplier: 1.0 },
 ]
 
-// 普通对话（未选项目）：通用问答/写作类，不假设有文件可分析
+// 普通对话（未选项目）：通用问答/写作类，不假设有文件可分析。
+// 每条都是「点了即有用」的完整问题，不需要用户再补充上下文。
 const GENERAL_SUGGESTIONS = [
-  '帮我把一段话润色得更专业',
-  '用通俗的语言解释一个概念',
-  '帮我列一个任务的执行步骤',
-  '帮我起草一封邮件',
+  '用三个例子讲清楚什么是机器学习',
+  '帮我制定一份高效的每日时间管理计划',
+  '写一封向客户致歉并说明补偿方案的邮件',
+  '推荐几个适合入门的提升表达能力的方法',
 ]
 
 // 项目对话的兜底建议（后端没返回时用）：围绕项目里的文件
@@ -124,6 +126,10 @@ export default function ChatView({
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textAreaRef = useRef<TextAreaRef>(null)
+  // 拖拽进入/离开计数：拖过子元素时浏览器会连发 enter/leave，
+  // 用计数器判断是否真正离开根容器，避免高亮闪烁。
+  const dragDepthRef = useRef(0)
   // #12 多项目：本轮活跃空间集合（含主空间）。主空间 = selectedSpaceId（与外层同步）。
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -391,31 +397,34 @@ export default function ChatView({
     }
   }, [conversationId])
 
+  // 只在拖入的是文件时才高亮（拖文字/拖元素不算）
+  const isFileDrag = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types || []).includes('Files')
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current += 1
+    setDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!isFileDrag(e)) return
+    e.preventDefault()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragOver(false)
+  }, [])
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
+      dragDepthRef.current = 0
       setDragOver(false)
       const files = Array.from(e.dataTransfer.files || [])
       if (files.length) uploadAttachments(files)
     },
     [uploadAttachments]
   )
-
-  const handleSendWithContent = async (content: string) => {
-    if (!content.trim() || isStreaming || sendingRef.current) return
-    if (!selectedModel) { message.warning('请先选择模型'); return }
-    let convId = conversationId
-    if (!convId) {
-      try {
-        const res = await chatApi.createConversation({ data_space_id: selectedSpaceId, model_id: selectedModel })
-        setCurrentConversation(res.data)
-        justCreatedConvRef.current = res.data.id
-        onConversationCreated(res.data.id)
-        convId = res.data.id
-      } catch { message.error('创建对话失败'); return }
-    }
-    await sendMessage(convId, content)
-  }
 
   const handleSend = async () => {
     if (!inputValue.trim() || isStreaming || sendingRef.current) return
@@ -440,15 +449,11 @@ export default function ChatView({
         return
       }
     }
-    // 附件提示：把本轮新增的附件文件名告诉 agent，引导它围绕这些文件回答
-    const atts = attachments
-    let toSend = inputValue
-    if (atts.length > 0) {
-      const names = atts.map((a) => a.name).join('、')
-      toSend = `【本次附带文件：${names}】\n${inputValue}`
-    }
+    // 上传的文件后端会自动并入本对话的检索范围（临时空间），
+    // agent 通过 list_files / read_file / search_data_space 即可感知并分析，
+    // 无需在提示词里塞「【本次附带文件：…】」，保持用户消息干净、无感。
     setAttachments([])
-    await sendMessage(convId, toSend)
+    await sendMessage(convId, inputValue)
   }
 
   const sendMessage = async (convId: string, content: string, skipAddUserMsg = false) => {
@@ -617,13 +622,40 @@ export default function ChatView({
 
   return (
     <div
+      onDragEnter={handleDragEnter}
+      onDragOver={(e) => { if (isFileDrag(e)) e.preventDefault() }}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         background: colors.bg,
+        position: 'relative',
       }}
     >
+      {/* 拖拽上传遮罩：覆盖整个聊天区，拖文件到页面任意位置都能上传 */}
+      {dragOver && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 50,
+            background: 'rgba(79, 70, 229, 0.06)',
+            border: `2px dashed ${colors.primary}`,
+            borderRadius: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.primary,
+            fontSize: 16,
+            fontWeight: 500,
+            pointerEvents: 'none',
+          }}
+        >
+          松开以添加文件（仅本次对话可见）
+        </div>
+      )}
       {/* Top bar */}
       <div
         style={{
@@ -778,7 +810,18 @@ export default function ChatView({
                   {suggestions.slice(0, 4).map((q) => (
                     <div
                       key={q}
-                      onClick={() => { if (!isStreaming && selectedModel) { setInputValue(''); handleSendWithContent(q) } else { setInputValue(q) } }}
+                      onClick={() => {
+                        // 点击示例只预填入输入框，不直接发送，方便用户改完再发
+                        setInputValue(q)
+                        // 等 value 更新后聚焦并把光标移到末尾
+                        requestAnimationFrame(() => {
+                          const el = textAreaRef.current?.resizableTextArea?.textArea
+                          if (el) {
+                            el.focus()
+                            el.setSelectionRange(q.length, q.length)
+                          }
+                        })
+                      }}
                       style={{
                         padding: '15px 17px',
                         borderRadius: 12,
@@ -951,53 +994,18 @@ export default function ChatView({
           </Tooltip>
         )}
         <div
-          onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
-          onDragLeave={(e) => { e.preventDefault(); setDragOver(false) }}
-          onDrop={handleDrop}
           style={{
             maxWidth: READING_WIDTH,
             margin: '0 auto',
-            background: colors.surface,
-            borderRadius: 18,
-            border: `1px solid ${
-              dragOver ? colors.primary : inputFocused ? colors.borderStrong : colors.border
-            }`,
-            padding: '8px 8px 8px 16px',
             display: 'flex',
             flexDirection: 'column',
             gap: 8,
-            boxShadow: inputFocused
-              ? '0 4px 16px rgba(15, 23, 42, 0.06)'
-              : '0 1px 3px rgba(15, 23, 42, 0.04)',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
             position: 'relative',
           }}
         >
-          {/* 拖拽提示遮罩 */}
-          {dragOver && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: 18,
-                background: 'rgba(79, 70, 229, 0.06)',
-                border: `1.5px dashed ${colors.primary}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: colors.primary,
-                fontSize: 14,
-                fontWeight: 500,
-                zIndex: 3,
-                pointerEvents: 'none',
-              }}
-            >
-              松开以添加文件（仅本次对话可见）
-            </div>
-          )}
-          {/* 附件 chips */}
+          {/* 附件 chips — 置于输入框上方 */}
           {(attachments.length > 0 || uploadingFiles) && (
-            <div style={{ marginBottom: 6 }}>
+            <div>
               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, paddingLeft: 2 }}>
                 本次对话的文件（仅此对话可见，不在项目中）
               </div>
@@ -1064,7 +1072,23 @@ export default function ChatView({
               </div>
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 6,
+              background: colors.surface,
+              borderRadius: 18,
+              border: `1px solid ${
+                dragOver ? colors.primary : inputFocused ? colors.borderStrong : colors.border
+              }`,
+              padding: '8px 8px 8px 16px',
+              boxShadow: inputFocused
+                ? '0 4px 16px rgba(15, 23, 42, 0.06)'
+                : '0 1px 3px rgba(15, 23, 42, 0.04)',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+          >
           <input
             ref={fileInputRef}
             type="file"
@@ -1086,6 +1110,7 @@ export default function ChatView({
             />
           </Tooltip>
           <TextArea
+            ref={textAreaRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onFocus={() => setInputFocused(true)}

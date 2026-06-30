@@ -45,7 +45,8 @@ export const dataSpacesApi = {
     api.delete(`/data-spaces/${spaceId}/files/${fileId}`),
   uploadFiles: (spaceId: string, formData: FormData) =>
     api.post(`/data-spaces/${spaceId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      // 不要手动设 Content-Type：FormData 需要浏览器自动带上 multipart 的 boundary，
+      // 手动写 'multipart/form-data' 会丢掉 boundary，后端报 "Missing boundary in multipart" → 400。
       // 上传大文件/ZIP 可能远超全局 30s 超时，这里取消超时限制，
       // 交由 nginx(client_body_timeout) 与后端兜底
       timeout: 0,
@@ -53,7 +54,7 @@ export const dataSpacesApi = {
   // 对话临时文件区（聊天框上传，不进正式项目）
   uploadToConversation: (conversationId: string, formData: FormData) =>
     api.post(`/data-spaces/conversation/${conversationId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      // 同上：交给浏览器自动设置带 boundary 的 multipart Content-Type
       timeout: 0,
     }),
   listConversationFiles: (conversationId: string) =>
