@@ -305,10 +305,114 @@ def test_parse_message_event_success():
     assert msg.text == "帮我分析数据"
 
 
-def test_parse_message_event_non_text_returns_none():
-    """非 text 类型消息（图片/文件等）返回 None。"""
-    ev = _make_event(message_type="image", content_text=None)
+def test_parse_message_event_unsupported_type_returns_none():
+    """既非 text 也非 image/file 的类型（如 audio）返回 None。"""
+    ev = _make_event(message_type="audio", content_text=None)
     assert _parse_message_event(ev) is None
+
+
+def _make_media_event(message_type, content: dict, message_id="om_msg1",
+                      open_id="ou_abc123", chat_id="oc_chat999") -> dict:
+    return {
+        "sender": {"sender_id": {"open_id": open_id}},
+        "message": {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "message_type": message_type,
+            "content": json.dumps(content),
+        },
+    }
+
+
+def test_parse_message_event_image_attachment():
+    """图片消息 → InboundMessage 带一个 image 附件（locator=message_id）。"""
+    ev = _make_media_event("image", {"image_key": "img_v2_xyz"}, message_id="om_1")
+    msg = _parse_message_event(ev)
+    assert msg is not None and msg.text == ""
+    assert len(msg.attachments) == 1
+    att = msg.attachments[0]
+    assert att.kind == "image"
+    assert att.resource_key == "img_v2_xyz"
+    assert att.locator == "om_1"
+
+
+def test_parse_message_event_file_attachment_keeps_filename():
+    """文件消息 → file 附件，保留原文件名。"""
+    ev = _make_media_event("file", {"file_key": "file_v2_abc", "file_name": "报表.xlsx"})
+    msg = _parse_message_event(ev)
+    assert msg is not None
+    att = msg.attachments[0]
+    assert att.kind == "file"
+    assert att.resource_key == "file_v2_abc"
+    assert att.name == "报表.xlsx"
+
+
+def test_parse_message_event_attachment_missing_key_returns_none():
+    """图片/文件缺少 key → None。"""
+    assert _parse_message_event(_make_media_event("image", {})) is None
+    assert _parse_message_event(_make_media_event("file", {})) is None
+
+
+def test_parse_message_event_attachment_missing_message_id_returns_none():
+    """附件消息缺少 message_id（无法下载）→ None。"""
+    ev = _make_media_event("image", {"image_key": "k"}, message_id="")
+    assert _parse_message_event(ev) is None
+
+
+class _FakeBinResp:
+    def __init__(self, content=b"", headers=None, payload=None):
+        self.content = content
+        self.headers = headers or {"content-type": "application/octet-stream"}
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+class _FakeHttpGet:
+    def __init__(self, resp):
+        self._resp = resp
+        self.last_url = None
+
+    async def get(self, url, headers=None):
+        self.last_url = url
+        return self._resp
+
+
+def test_download_attachment_returns_bytes():
+    """download_attachment 拼对 URL（含 type=file）并返回二进制。"""
+    from app.channels.contracts import InboundAttachment
+    adapter = FeishuAdapter(app_id="x", app_secret="y")
+    adapter._http = _FakeHttpGet(_FakeBinResp(content=b"PDFDATA"))
+
+    async def fake_token():
+        return "tok"
+    adapter._get_token = fake_token
+
+    att = InboundAttachment(kind="file", name="r.pdf", resource_key="fk1", locator="om_9")
+    data = asyncio.run(adapter.download_attachment(att))
+    assert data == b"PDFDATA"
+    assert "/im/v1/messages/om_9/resources/fk1?type=file" in adapter._http.last_url
+
+
+def test_download_attachment_json_error_raises():
+    """资源接口返回 JSON（content-type application/json）= 出错 → raise。"""
+    from app.channels.contracts import InboundAttachment
+    adapter = FeishuAdapter(app_id="x", app_secret="y")
+    adapter._http = _FakeHttpGet(_FakeBinResp(
+        headers={"content-type": "application/json"},
+        payload={"code": 99991663, "msg": "no permission"}))
+
+    async def fake_token():
+        return "tok"
+    adapter._get_token = fake_token
+
+    att = InboundAttachment(kind="image", name="i.jpg", resource_key="ik1", locator="om_9")
+    with pytest.raises(RuntimeError, match="no permission"):
+        asyncio.run(adapter.download_attachment(att))
 
 
 def test_parse_message_event_missing_open_id_returns_none():

@@ -145,6 +145,42 @@ class Dispatcher:
         self._agent_factory = agent_factory
         self._bridge = bridge or AgentBridge()
 
+    async def _ingest_attachments(
+        self,
+        adapter: ChannelAdapter,
+        inbound: InboundMessage,
+        user_id: uuid.UUID,
+        space_id: Optional[uuid.UUID],
+    ) -> None:
+        """下载入站附件并入库到默认数据空间，统一回告用户。任意渠道共用。"""
+        chat_id = inbound.chat_id
+        if space_id is None:
+            await adapter.send(chat_id, OutboundMessage(
+                text="请先在网页端为该渠道设置「默认数据空间」，再发送文件/图片。",
+                is_final=True))
+            return
+        download = getattr(adapter, "download_attachment", None)
+        if download is None:
+            await adapter.send(chat_id, OutboundMessage(
+                text="当前渠道暂不支持接收文件/图片。", is_final=True))
+            return
+        try:
+            files = [
+                (att.name, await download(att))
+                for att in inbound.attachments
+            ]
+        except Exception as exc:
+            logger.exception("attachment download failed: channel=%s: %s", inbound.channel, exc)
+            await adapter.send(chat_id, OutboundMessage(
+                text=f"文件下载失败：{exc}", is_final=True))
+            return
+        from app.services.channel_ingest import ingest_files_to_space
+        ingested = await ingest_files_to_space(user_id, space_id, files)
+        names = "、".join(f["filename"] for f in ingested)
+        await adapter.send(chat_id, OutboundMessage(
+            text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
+                 f"正在解析索引，稍后即可直接提问分析。", is_final=True))
+
     async def dispatch(self, adapter: ChannelAdapter, inbound: InboundMessage) -> None:
         """分发一条入站消息。遇不可恢复错误 raise（禁 fallback 兜底）。
 
@@ -175,6 +211,11 @@ class Dispatcher:
         cfg = await self._identity.get_channel_config(user_id, channel)
         space_id = cfg.default_data_space_id if cfg else None
         model_id = (cfg.default_model if cfg else None) or _FALLBACK_MODEL
+
+        # ── Step 3·附件: 文件/图片 → 抓取并入库（任意渠道，统一路径）────────
+        if inbound.attachments:
+            await self._ingest_attachments(adapter, inbound, user_id, space_id)
+            return
 
         # ── Step 3a: 命令处理 ────────────────────────────────────────────
         if text == "/new":

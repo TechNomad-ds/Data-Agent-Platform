@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
-from app.channels.contracts import InboundMessage, OutboundMessage
+from app.channels.contracts import InboundAttachment, InboundMessage, OutboundMessage
 
 
 class MockChannelAdapter:
@@ -18,6 +18,8 @@ class MockChannelAdapter:
     def __init__(self) -> None:
         self.sent: list[dict[str, Any]] = []  # 记录每次 send/edit
         self._counter = 0
+        self.attachment_store: dict[str, bytes] = {}  # resource_key -> bytes
+        self.downloaded: list[str] = []               # 记录下载过的 resource_key
 
     def verify(self, headers: dict[str, str], body: bytes) -> bool:
         return True
@@ -45,3 +47,7 @@ class MockChannelAdapter:
     async def edit(self, chat_id: str, message_id: str, msg: OutboundMessage) -> None:
         self.sent.append({"op": "edit", "chat_id": chat_id, "message_id": message_id,
                           "text": msg.text, "is_final": msg.is_final})
+
+    async def download_attachment(self, att: InboundAttachment) -> bytes:
+        self.downloaded.append(att.resource_key)
+        return self.attachment_store.get(att.resource_key, b"mock-bytes")

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -28,6 +29,8 @@ from enum import Enum
 from typing import Any, AsyncGenerator, Callable, Optional
 
 from app.channels.contracts import InboundMessage, OutboundMessage
+
+logger = logging.getLogger("channels.weixin")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -127,6 +130,12 @@ def parse_raw_message(raw: dict[str, Any]) -> Optional[InboundMessage]:
         return None
     text = extract_text(raw.get("item_list") or [])
     if not text:
+        # 非文本消息（图片/文件等）：iLink 媒体 item 结构待确认。记录 item 类型与字段名
+        # （不打印内容，避免日志膨胀/泄露），确认格式后即可接入统一附件入库路径。
+        item_list = raw.get("item_list") or []
+        if item_list:
+            shapes = [{"type": it.get("type"), "keys": sorted(it.keys())} for it in item_list]
+            logger.info("weixin 暂不支持的非文本消息 shapes=%s", shapes)
         return None
     return InboundMessage(
         channel="weixin",

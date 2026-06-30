@@ -18,8 +18,6 @@ import re
 import uuid
 from typing import Any
 
-from app.services.file_intake import register_file_to_space, user_space_dir
-
 FEISHU_OPEN_API = "https://open.feishu.cn/open-apis"
 
 # 匹配 feishu.cn / larksuite.com 的云文档链接 → (doc_type, token)
@@ -170,18 +168,9 @@ async def try_ingest_feishu_doc(
     links = extract_feishu_doc_links(getattr(inbound, "text", "") or "")
     if not links:
         return []
-    ingested: list[dict] = []
+    from app.services.channel_ingest import ingest_files_to_space
+
+    files: list[tuple[str, bytes]] = []
     for doc_type, token in links:
-        files = await fetch_feishu_doc(adapter, doc_type, token)
-        for filename, content in files:
-            target_dir = user_space_dir(user_id, uuid.uuid4())
-            path = target_dir / filename
-            path.write_bytes(content)
-            res = await register_file_to_space(
-                user_id=user_id,
-                data_space_id=space_id,
-                src_path=path,
-                filename=filename,
-            )
-            ingested.append(res)
-    return ingested
+        files.extend(await fetch_feishu_doc(adapter, doc_type, token))
+    return await ingest_files_to_space(user_id, space_id, files)

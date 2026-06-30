@@ -14,7 +14,7 @@ import asyncio
 import uuid
 from typing import Any, AsyncGenerator, Callable, Optional
 
-from app.channels.contracts import InboundMessage, OutboundMessage
+from app.channels.contracts import InboundAttachment, InboundMessage, OutboundMessage
 from app.channels.pairing import InMemoryPairingStore, PairingService
 from app.channels.bridge import AgentBridge
 from app.channels.adapters.mock import MockChannelAdapter
@@ -494,6 +494,99 @@ def test_no_config_falls_back_to_default_model():
     # agent 应以 fallback 模型被调用
     assert "gpt-4o-mini" in agent_obj.last_call["model_id"]
     assert agent_obj.last_call["data_space_id"] is None
+
+
+# ===========================================================================
+# 测试 6: 附件入库（文件/图片，任意渠道统一路径）
+# ===========================================================================
+
+def _patch_ingest(recorder):
+    """把 channel_ingest.ingest_files_to_space 替换为记录器，返回 (orig, module)。"""
+    import app.services.channel_ingest as ing
+
+    async def fake(user_id, space_id, files):
+        recorder["user_id"] = user_id
+        recorder["space_id"] = space_id
+        recorder["files"] = files
+        return [{"filename": n} for n, _ in files]
+
+    orig = ing.ingest_files_to_space
+    ing.ingest_files_to_space = fake
+    return orig, ing
+
+
+def _attach_inbound(atts, channel="mock", uid="u1", chat="c1") -> InboundMessage:
+    return InboundMessage(channel=channel, platform_user_id=uid, chat_id=chat,
+                          text="", attachments=atts)
+
+
+def test_attachment_downloads_and_ingests():
+    """带附件消息 → adapter.download_attachment 拉取 → ingest 收到 (name,bytes) → 回告已导入。"""
+    user_id = uuid.uuid4()
+    space_id = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("mock", "u1", user_id, space_id=space_id)
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = MockChannelAdapter()
+    adapter.attachment_store["k1"] = b"FILEBYTES"
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    rec: dict = {}
+    orig, ing = _patch_ingest(rec)
+    try:
+        att = InboundAttachment(kind="file", name="report.pdf", resource_key="k1", locator="m1")
+        asyncio.run(dispatcher.dispatch(adapter, _attach_inbound([att])))
+    finally:
+        ing.ingest_files_to_space = orig
+
+    assert adapter.downloaded == ["k1"]
+    assert rec["space_id"] == space_id
+    assert rec["files"] == [("report.pdf", b"FILEBYTES")]
+    assert len(adapter.sent) == 1
+    assert "已导入 1 个文件" in adapter.sent[-1]["text"]
+    assert "report.pdf" in adapter.sent[-1]["text"]
+    # 附件路径不走 agent
+    assert len(convs.saved) == 0
+
+
+def test_attachment_without_default_space_prompts_user():
+    """未设默认数据空间 → 提示先设置，不下载不入库。"""
+    user_id = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("mock", "u1", user_id, space_id=None)
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = MockChannelAdapter()
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    att = InboundAttachment(kind="image", name="i.jpg", resource_key="k", locator="m")
+    asyncio.run(dispatcher.dispatch(adapter, _attach_inbound([att])))
+
+    assert adapter.downloaded == []
+    assert len(adapter.sent) == 1
+    assert "默认数据空间" in adapter.sent[-1]["text"]
+
+
+def test_attachment_unsupported_channel_prompts_user():
+    """adapter 无 download_attachment → 提示暂不支持。"""
+    class _NoAttachAdapter(MockChannelAdapter):
+        download_attachment = None  # getattr 取到 None → 走「暂不支持」分支
+
+    user_id = uuid.uuid4()
+    space_id = uuid.uuid4()
+    identity = InMemoryIdentityRepo()
+    identity.bind("mock", "u1", user_id, space_id=space_id)
+    convs = InMemoryConversationRepo()
+    _, factory = _make_fake_agent([])
+    adapter = _NoAttachAdapter()
+    dispatcher = _make_dispatcher(identity, convs, factory)
+
+    att = InboundAttachment(kind="file", name="f", resource_key="k", locator="m")
+    asyncio.run(dispatcher.dispatch(adapter, _attach_inbound([att])))
+
+    assert len(adapter.sent) == 1
+    assert "暂不支持" in adapter.sent[-1]["text"]
 
 
 if __name__ == "__main__":

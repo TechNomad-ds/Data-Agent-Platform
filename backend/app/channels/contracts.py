@@ -11,6 +11,16 @@ from typing import Any, Optional, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 
+class InboundAttachment(BaseModel):
+    """入站附件（文件 / 图片）。各平台 adapter 解析出资源定位信息，
+    dispatch 统一通过 adapter.download_attachment() 拉取二进制后入库。"""
+
+    kind: str                          # 'file' | 'image'
+    name: str                          # 文件名（图片可由平台 key 生成）
+    resource_key: str                  # 平台资源 id（飞书 file_key / image_key）
+    locator: str = ""                  # 平台附加定位（飞书：message_id）
+
+
 class InboundMessage(BaseModel):
     """外部渠道进来的一条用户消息（已归一）。"""
 
@@ -19,6 +29,7 @@ class InboundMessage(BaseModel):
     chat_id: str                       # 外部会话/线程 id（用于映射 conversation 去重）
     text: str
     display_name: Optional[str] = None
+    attachments: list[InboundAttachment] = Field(default_factory=list)  # 文件/图片附件
     raw: dict[str, Any] = Field(default_factory=dict)  # 平台原始载荷，备查
 
 
@@ -61,4 +72,9 @@ class ChannelAdapter(Protocol):
 
     async def edit(self, chat_id: str, message_id: str, msg: OutboundMessage) -> None:
         """更新一条已发消息（流式回写）。不支持的平台可空实现。"""
+        ...
+
+    async def download_attachment(self, att: "InboundAttachment") -> bytes:
+        """下载入站附件的二进制内容。不支持附件的渠道可不实现此方法
+        （dispatch 用 getattr 探测，缺失即回告用户「暂不支持文件」）。"""
         ...

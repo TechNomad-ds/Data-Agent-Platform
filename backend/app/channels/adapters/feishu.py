@@ -26,7 +26,7 @@ from typing import Any, Awaitable, Callable, Optional
 import httpx
 import websockets
 
-from app.channels.contracts import InboundMessage, OutboundMessage
+from app.channels.contracts import InboundAttachment, InboundMessage, OutboundMessage
 
 logger = logging.getLogger(__name__)
 
@@ -496,6 +496,26 @@ class FeishuAdapter:
                 f"飞书 edit 失败 code={data.get('code')} msg={data.get('msg')}"
             )
 
+    async def download_attachment(self, att: InboundAttachment) -> bytes:
+        """下载消息里的文件/图片资源二进制。REQUIRES_CREDENTIALS。
+
+        飞书：GET /im/v1/messages/{message_id}/resources/{key}?type=image|file
+        返回原始二进制（非 JSON）。失败 raise RuntimeError。
+        """
+        token = await self._get_token()
+        rtype = "image" if att.kind == "image" else "file"
+        url = (f"{FEISHU_OPEN_API}/im/v1/messages/{att.locator}"
+               f"/resources/{att.resource_key}?type={rtype}")
+        resp = await self._http.get(url, headers={"Authorization": f"Bearer {token}"})
+        resp.raise_for_status()
+        ctype = resp.headers.get("content-type", "")
+        # 飞书拉资源成功返回二进制；若返回 JSON 说明出错（code!=0）
+        if ctype.startswith("application/json"):
+            data = resp.json()
+            raise RuntimeError(
+                f"飞书资源下载失败 code={data.get('code')} msg={data.get('msg')}")
+        return resp.content
+
     # ------------------------------------------------------------------
     # 测连（凭据校验）
     # ------------------------------------------------------------------
@@ -733,14 +753,40 @@ def _parse_message_event(event: dict[str, Any]) -> Optional[InboundMessage]:
 
         message = event.get("message") or {}
         chat_id: str = message.get("chat_id") or ""
+        message_id: str = message.get("message_id") or ""
         message_type: str = message.get("message_type") or ""
         content_raw: str = message.get("content") or "{}"
+
+        content = json.loads(content_raw)
+
+        # 文件 / 图片 → 附件入库（资源需用 message_id + key 二次下载）
+        if message_type in ("image", "file"):
+            if not message_id:
+                logger.warning("飞书附件消息缺少 message_id")
+                return None
+            if message_type == "image":
+                key = content.get("image_key") or ""
+                if not key:
+                    return None
+                att = InboundAttachment(
+                    kind="image", name=f"feishu_image_{key[:12]}.jpg",
+                    resource_key=key, locator=message_id)
+            else:
+                key = content.get("file_key") or ""
+                if not key:
+                    return None
+                att = InboundAttachment(
+                    kind="file", name=content.get("file_name") or f"feishu_file_{key[:12]}",
+                    resource_key=key, locator=message_id)
+            return InboundMessage(
+                channel="feishu", platform_user_id=open_id, chat_id=chat_id,
+                text="", attachments=[att], raw=event,
+            )
 
         if message_type != "text":
             logger.debug("飞书忽略非文本消息类型 %s", message_type)
             return None
 
-        content = json.loads(content_raw)
         text: str = content.get("text") or ""
         if not text:
             return None
