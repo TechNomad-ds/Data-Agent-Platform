@@ -211,6 +211,36 @@ class Dispatcher:
             logger.info("default space updated: user=%s channel=%s space=%s", user_id, channel, new_space_id)
             return
 
+        # ── Step 3c: 飞书云文档链接 → 抓取并入库 ────────────────────────
+        if channel == "feishu":
+            from app.services.feishu_doc import extract_feishu_doc_links
+            if extract_feishu_doc_links(text):
+                if space_id is None:
+                    await adapter.send(chat_id, OutboundMessage(
+                        text="请先在网页端为飞书渠道设置「默认数据空间」，再分享文档。",
+                        is_final=True))
+                    return
+                from app.services.feishu_doc import try_ingest_feishu_doc, FeishuDocError
+                try:
+                    ingested = await try_ingest_feishu_doc(adapter, inbound, user_id, space_id)
+                except FeishuDocError as exc:
+                    await adapter.send(chat_id, OutboundMessage(
+                        text=f"文档拉取失败：{exc}", is_final=True))
+                    return
+                except Exception as exc:
+                    logger.exception("feishu doc ingest failed: %s", exc)
+                    await adapter.send(chat_id, OutboundMessage(
+                        text=f"文档拉取失败：{exc}\n（请确认飞书自建应用已开通云文档读权限，"
+                             f"并已把该文档授权给应用）",
+                        is_final=True))
+                    return
+                names = "、".join(f["filename"] for f in ingested)
+                await adapter.send(chat_id, OutboundMessage(
+                    text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
+                         f"正在解析索引，稍后即可直接提问分析。",
+                    is_final=True))
+                return
+
         # ── Step 3b: 普通消息 → agent 处理 ──────────────────────────────
         conv_id = await self._convs.find_or_create(
             user_id, channel, chat_id, space_id, model_id
