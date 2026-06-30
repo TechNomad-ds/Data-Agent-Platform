@@ -3,9 +3,9 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Button, List, Space, Tag, Spin, Empty, Popconfirm, Typography, Divider,
+  Button, Input, List, Space, Tag, Spin, Empty, Popconfirm, Typography, Divider,
 } from 'antd'
-import { ReloadOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
+import { ReloadOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, LinkOutlined } from '@ant-design/icons'
 import { channelsApi, type ChannelId, type PairingRequest, type AuthorizedUser } from '@/api/channels'
 import { message } from 'antd'
 
@@ -27,6 +27,8 @@ export default function PairingsPanel({ channelId }: Props) {
   const [approvingCode, setApprovingCode] = useState<string | null>(null)
   const [rejectingCode, setRejectingCode] = useState<string | null>(null)
   const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [manualCode, setManualCode] = useState('')
+  const [manualBinding, setManualBinding] = useState(false)
 
   const loadPairings = useCallback(async () => {
     setLoadingPairings(true)
@@ -56,6 +58,24 @@ export default function PairingsPanel({ channelId }: Props) {
     void loadPairings()
     void loadUsers()
   }, [loadPairings, loadUsers])
+
+  // 手动输入配对码绑定（对应 IM 内「请在网页端输入配对码 XXXX 绑定」的提示）。
+  // 走 approve-by-code，凭 Redis 共享码本，跨进程（web / manager 分离部署）有效。
+  const handleManualBind = async () => {
+    const code = manualCode.trim()
+    if (!code) return
+    setManualBinding(true)
+    try {
+      await channelsApi.approvePairing(code)
+      message.success('绑定成功')
+      setManualCode('')
+      await Promise.all([loadPairings(), loadUsers()])
+    } catch (err: any) {
+      message.error(err.response?.data?.detail ?? '绑定失败：配对码无效或已过期')
+    } finally {
+      setManualBinding(false)
+    }
+  }
 
   const handleApprove = async (code: string) => {
     setApprovingCode(code)
@@ -98,6 +118,32 @@ export default function PairingsPanel({ channelId }: Props) {
 
   return (
     <div style={{ marginTop: 24 }}>
+      {/* ── 输入配对码绑定（对应 IM 内提示「请在网页端输入配对码」）── */}
+      <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>输入配对码绑定</Text>
+      <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+        <Input
+          size="small"
+          placeholder="在 IM 收到的配对码，如 123456"
+          value={manualCode}
+          onChange={(e) => setManualCode(e.target.value)}
+          onPressEnter={handleManualBind}
+          allowClear
+        />
+        <Button
+          size="small"
+          type="primary"
+          icon={<LinkOutlined />}
+          loading={manualBinding}
+          disabled={!manualCode.trim()}
+          onClick={handleManualBind}
+        >
+          绑定
+        </Button>
+      </Space.Compact>
+      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 16 }}>
+        在 IM 里给 bot 发消息会收到配对码，在此输入即可把该 IM 账号绑定到当前账号。
+      </Text>
+
       {/* ── Pending pairings ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <Text strong style={{ fontSize: 13 }}>待配对请求</Text>

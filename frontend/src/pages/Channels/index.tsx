@@ -1,6 +1,6 @@
 /**
  * 渠道配置页
- * 菜单入口由主控在 NavRail + MainLayout 挂载（见文件底部 wiring 注释）
+ * 菜单入口由主控在 NavRail + MainLayout 挂载
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Collapse, Switch, Tag, Tooltip, Typography, Spin, message } from 'antd'
@@ -203,25 +203,3 @@ export default function ChannelsPage() {
     </div>
   )
 }
-
-/*
- * ────────────────────────────────────────────────────────────────────
- * 主控集成 wiring（请在这些文件里做以下改动）：
- *
- * 1. frontend/src/components/Layout/MainLayout.tsx
- *    a) 在 MainView 类型里加 'channels':
- *         export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin' | 'channels'
- *    b) 添加 handleOpenChannels 回调:
- *         const handleOpenChannels = useCallback(() => setCurrentView('channels'), [])
- *    c) 在 mainContent switch 里加:
- *         currentView === 'channels' ? <ChannelsPage /> :
- *    d) import ChannelsPage from '@/pages/Channels'
- *    e) 传 onOpenChannels 给 NavRail
- *
- * 2. frontend/src/components/Sidebar/NavRail.tsx
- *    a) Props 加 onOpenChannels: () => void
- *    b) entries 数组加:
- *         { key: 'channels', label: '渠道配置', icon: <ApiOutlined />, onClick: onOpenChannels, show: true }
- *       (需 import { ApiOutlined } from '@ant-design/icons')
- * ────────────────────────────────────────────────────────────────────
- */
