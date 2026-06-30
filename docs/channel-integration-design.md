@@ -16,7 +16,7 @@
 
 ## 1. 可行性结论
 
-**可行，借架构不借代码。** 同类产品 是 Electron + 私有 同类引擎（TS）后端，我们是 FastAPI（Python），代码无法直接移植；但 同类产品 channel 的 4 个核心抽象能干净映射到 FastAPI：
+**可行，借架构/知识，不做运行时复用。** 同类产品 是 Electron 前端，引擎在独立开源仓 `其 Rust 引擎`（Apache-2.0，Rust/Axum，channel 在 `其源码`，17.8K 行）。经源码实证评估（见 §10），**否决"运行时复用 同类引擎 channel"**，采用"读源码当参考 + Python 在 DataMind 内重写薄 channel 层"。同类产品 channel 的 4 个核心抽象能干净映射到 FastAPI：
 
 1. **统一消息契约**（`IUnifiedIncoming/OutgoingMessage`）→ Pydantic `InboundMessage` / `OutboundMessage`，让 agent 层完全不感知平台差异。
 2. **可插拔渠道适配器**（`BasePlugin: start/stop/sendMessage/editMessage/onMessage`）→ Python `Protocol`/ABC `ChannelAdapter`。
@@ -120,3 +120,27 @@ P0/P1 不需要任何外部凭据即可落地并测试；P2/P3 卡在凭据上�
 
 - 同类产品 channel 设计：`.同类产品/FEATURE_CHANNELS.md`、`packages/desktop/src/common/types/channel/channel.ts`、`examples/ext-wecom-bot/`（最完整的扩展渠道示例，含 webhook + 流式状态机）。
 - 本仓库复用点：`agent/loop.py::AgentLoop.run`、`routers/chat.py`（SSE 链路参照）、`services/file_intake.py`、`core/security.py`。
+
+## 10. 同类引擎 运行时复用评估（结论：否决，用反证法）
+
+对 `其 Rust 引擎`（开源 Rust 引擎）做了源码实证，评估"复用 同类引擎 channel + 让 DataMind 的 agent 回答"是否比"Python 重写"更优。结论：**否决运行时复用，Python 重写。**
+
+**前提澄清**：(1) 只需 DataMind 自己的 agent 能连上，不需要 同类引擎 托管 codex 等多 agent；(2) DataMind 的 agent = 自写 ReAct 循环 `AgentLoop`（裸 `anthropic`/`openai` SDK，非 langgraph、非 Claude Agent SDK），本进程内一个 Python 类，`AgentLoop.run()` 本身是 async generator。
+
+**反证法 grid（带 file:line，路径相对 同类引擎 仓）**：
+
+| 方案 / 命题 | 判定 | 实证 |
+|---|---|---|
+| ① fork：改 `IWorkerTaskManager` 桥到 DataMind | ☠️ | `同类产品-app/src/services.rs:167` 唯一实现写死，factory 只 dispatch Acp/其运行时，无 HTTP 分支 → 必 fork+重编 |
+| ② ACP·能否不 fork 注册外部 agent | 可（对②有利） | `同类产品-ai-agent/src/services/custom.rs:56` 运行期写 `agent_type=acp/source=custom/command=任意进程`，即时生效 |
+| ② ACP·双栈状态 | ☠️ | 会话/消息沉淀 同类引擎 SQLite（挂 owner 账号），`assistant_users/sessions` 硬依赖，无委托/无 SSO（`同类产品-auth/.../middleware.rs`，JWT 硬编码 `iss=同类产品`） |
+| ② ACP·飞书跨组织 | ☠️ | `channel/src/plugins/lark/api.rs:75` 用 `/tenant_access_token/internal`（企业自建应用，单组织），无 app_ticket/tenant_key（ISV 缺失） |
+| ② ACP·逆向成本 | ☠️ | ACP 协议无文档，在外部 dep `其运行时 v0.1.37` |
+| ② 单账号破多租户 | ☠️ | `channel/src/state.rs:471` 所有 IM 用户塌进一个 owner（兜底 `system_default_user`） |
+| ③ 重写是否太大 | 推翻→③活 | 17.8K 行，35-40% 为可移植踩坑知识，6-8 人周；直接复用 DataMind 现有 agent/PG/auth/计费 |
+
+**关键判断**：同类引擎 的 channel 解的是"桌面端无公网回调"难题（飞书走 WS 长连接 + protobuf 帧，最复杂的 ~2.7K 行）——DataMind 有公网地址，应直接用**飞书事件订阅 webhook**，根本不需要那段。它最难的代码在解你没有的问题；你最难的问题（跨组织多租户）它没解。
+
+**值得抄的（知识，非运行时）**：飞书 Interactive Card 结构 + "只能发卡片再编辑"的流式二态（`lark/types.rs`）、钉钉 AI Card 三步流式（`dingtalk/types.rs`）、验签/AES/配对状态机设计（`pairing.rs`）。**飞书接入用 webhook，不抄它的 WS 长连接。**
+
+**跨方案都得自做、谁都不白送**：跨组织飞书（ISV: app_ticket→tenant_key→per-tenant token）、IM 身份→DataMind 多租户用户映射。③ 能原生长进多租户模型，复用则要跟 同类引擎 单组织/单账号假设硬掰。
