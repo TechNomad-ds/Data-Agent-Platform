@@ -19,6 +19,7 @@ import json
 import logging
 import ssl
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Optional
 
@@ -367,7 +368,8 @@ class FeishuAdapter:
         self._token_expires_in: float = 0.0
 
         # Event 去重：event_id → seen_at (monotonic)
-        self._dedup: dict[str, float] = {}
+        # 插入即按时间序，过期清理从最旧端弹出（O(k)），避免每条消息全表 O(n) 扫描
+        self._dedup: "OrderedDict[str, float]" = OrderedDict()
         self._dedup_lock = asyncio.Lock()
 
         # 共享 HTTP 客户端
@@ -695,10 +697,13 @@ class FeishuAdapter:
         if event_id:
             async with self._dedup_lock:
                 now = time.monotonic()
-                # 顺带清过期 entry（O(n) 但 map 很小，足够）
-                stale = [k for k, t in self._dedup.items() if now - t > self._dedup_ttl]
-                for k in stale:
-                    del self._dedup[k]
+                # 从最旧端弹出过期 entry（插入即时间序），O(k) 而非每条消息全表 O(n) 扫描
+                while self._dedup:
+                    oldest_id, oldest_t = next(iter(self._dedup.items()))
+                    if now - oldest_t > self._dedup_ttl:
+                        self._dedup.popitem(last=False)
+                    else:
+                        break
                 if event_id in self._dedup:
                     logger.debug("飞书 重复事件 event_id=%s，跳过", event_id)
                     return None

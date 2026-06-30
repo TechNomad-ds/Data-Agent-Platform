@@ -3,7 +3,7 @@
  * 菜单入口由主控在 NavRail + MainLayout 挂载（见文件底部 wiring 注释）
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Collapse, Switch, Tag, Typography, Spin, message } from 'antd'
+import { Collapse, Switch, Tag, Tooltip, Typography, Spin, message } from 'antd'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { channelsApi, type ChannelStatus } from '@/api/channels'
 import { colors } from '@/styles/tokens'
@@ -46,13 +46,21 @@ function ChannelHeader({ channelId, status, enableLoading, onToggle }: HeaderPro
       </div>
       <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {enableLoading && <Spin size="small" />}
-        <Switch
-          size="small"
-          checked={enabled}
-          loading={enableLoading}
-          onChange={onToggle}
-          disabled={!status?.has_credentials && !enabled}
-        />
+        <Tooltip
+          title={
+            status?.has_credentials
+              ? (enabled ? '点击停用该渠道' : '点击启用该渠道')
+              : '尚未配置，点击填写凭据'
+          }
+        >
+          <Switch
+            size="small"
+            checked={enabled}
+            loading={enableLoading}
+            onChange={onToggle}
+            disabled={enableLoading}
+          />
+        </Tooltip>
       </div>
     </div>
   )
@@ -64,6 +72,7 @@ export default function ChannelsPage() {
   const [statuses, setStatuses] = useState<Record<string, ChannelStatus>>({})
   const [loading, setLoading] = useState(true)
   const [toggleLoading, setToggleLoading] = useState<Record<string, boolean>>({})
+  const [activeKeys, setActiveKeys] = useState<string[]>([])
 
   const loadStatuses = useCallback(async () => {
     try {
@@ -85,23 +94,27 @@ export default function ChannelsPage() {
   }, [])
 
   const handleToggle = useCallback(async (channelId: string, enabled: boolean) => {
+    // 未配置凭据却想开启：展开卡片引导填写，而不是直接启用（启用需要凭据）
+    if (enabled && !statuses[channelId]?.has_credentials) {
+      setActiveKeys((prev) => (prev.includes(channelId) ? prev : [...prev, channelId]))
+      message.info('请先填写凭据并测试连接')
+      return
+    }
     setToggleLoading((prev) => ({ ...prev, [channelId]: true }))
     try {
       if (enabled) {
-        // enable requires credentials already saved — form's enable button is the primary path;
-        // this switch acts as a quick re-enable when credentials are present
-        await channelsApi.enable(channelId as any, {})
+        await channelsApi.enable(channelId as any) // 复用已存凭据重新启用
       } else {
         await channelsApi.disable(channelId as any)
       }
       await loadStatuses()
     } catch (err: any) {
-      const detail = err.response?.data?.detail ?? (enabled ? '启用失败，请先填写凭据' : '停用失败')
+      const detail = err.response?.data?.detail ?? (enabled ? '启用失败' : '停用失败')
       message.error(detail)
     } finally {
       setToggleLoading((prev) => ({ ...prev, [channelId]: false }))
     }
-  }, [loadStatuses])
+  }, [loadStatuses, statuses])
 
   const channels: Array<{ id: string; form: React.ReactNode }> = [
     {
@@ -171,6 +184,8 @@ export default function ChannelsPage() {
           <Collapse
             accordion={false}
             bordered={false}
+            activeKey={activeKeys}
+            onChange={(keys) => setActiveKeys(keys as string[])}
             style={{ background: 'transparent', display: 'flex', flexDirection: 'column', gap: 8 }}
             expandIconPosition="end"
             items={collapseItems.map((item) => ({

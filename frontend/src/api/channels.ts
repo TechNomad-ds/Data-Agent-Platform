@@ -38,7 +38,8 @@ export interface ChannelSettings {
 export const channelsApi = {
   list: () => api.get<ChannelStatus[]>('/channels'),
 
-  enable: (ch: ChannelId, credentials: Record<string, string>) =>
+  // 省略 credentials → 用已存凭据重新启用（开关快捷重启）
+  enable: (ch: ChannelId, credentials?: Record<string, string>) =>
     api.post(`/channels/${ch}/enable`, { credentials }),
   disable: (ch: ChannelId) =>
     api.post(`/channels/${ch}/disable`),

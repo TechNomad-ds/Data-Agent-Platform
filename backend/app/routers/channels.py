@@ -128,7 +128,8 @@ class ChannelStatusOut(BaseModel):
 
 
 class EnableChannelBody(BaseModel):
-    credentials: dict[str, str]
+    # 提供凭据 → 保存并启用；省略 / 空 → 用已存凭据重新启用（开关快捷重启，不覆盖凭据）
+    credentials: Optional[dict[str, str]] = None
 
 
 class TestChannelBody(BaseModel):
@@ -141,11 +142,7 @@ class TestChannelResponse(BaseModel):
     error: Optional[str] = None
 
 
-class ApprovePairingBody(BaseModel):
-    code: str
-
-
-class RejectPairingBody(BaseModel):
+class PairingCodeBody(BaseModel):
     code: str
 
 
@@ -209,7 +206,7 @@ async def list_pairings(
 
 @router.post("/pairings/approve", status_code=200)
 async def approve_pairing(
-    body: ApprovePairingBody,
+    body: PairingCodeBody,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -271,7 +268,7 @@ async def approve_pairing(
 
 @router.post("/pairings/reject", status_code=200)
 async def reject_pairing(
-    body: RejectPairingBody,
+    body: PairingCodeBody,
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """拒绝配对码：从 registry 和 pairing service 中消费掉该码。"""
@@ -351,7 +348,7 @@ async def weixin_login_sse(
     done 时自动把凭据存入 store（enabled=True）。
     微信只能扫码登录，无独立 test_connection；扫码成功即凭据有效。
     """
-    from app.channels.adapters.weixin import WeixinAdapter, LoginEventKind
+    from app.channels.adapters.weixin import WeixinAdapter, LoginEventKind, LOGIN_BASE_URL
 
     user_id = current_user.id
 
@@ -375,7 +372,7 @@ async def weixin_login_sse(
                             credentials={
                                 "bot_token": event.bot_token,
                                 "account_id": event.account_id,
-                                "base_url": event.base_url or "https://ilinkai.weixin.qq.com",
+                                "base_url": event.base_url or LOGIN_BASE_URL,
                             },
                             enabled=True,
                         )
@@ -395,14 +392,21 @@ async def enable_channel(
     body: EnableChannelBody,
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """保存凭据并启用渠道（触发连接管理器 start_one）。"""
+    """保存凭据并启用渠道；未提供凭据时用已存凭据重新启用（触发连接管理器 start_one）。"""
     internal = _to_internal(channel)
-    await store.save_config(
-        user_id=current_user.id,
-        channel=internal,
-        credentials=body.credentials,
-        enabled=True,
-    )
+    if body.credentials:
+        await store.save_config(
+            user_id=current_user.id,
+            channel=internal,
+            credentials=body.credentials,
+            enabled=True,
+        )
+    else:
+        # 开关快捷重启用：复用已保存凭据，不覆盖（凭据为空会清空配置，故须先存在）
+        result = await store.get_config(current_user.id, internal)
+        if result is None or not result[0].credentials_encrypted:
+            raise HTTPException(status_code=400, detail="请先填写并保存凭据后再启用")
+        await store.set_enabled(current_user.id, internal, enabled=True)
     if _manager is not None:
         try:
             await _manager.start_one(current_user.id, internal)
@@ -421,11 +425,8 @@ async def disable_channel(
 ) -> dict[str, Any]:
     """停止连接并把 enabled 置 false（保留凭据）。"""
     internal = _to_internal(channel)
-    result = await store.get_config(current_user.id, internal)
-    if result is None:
+    if await store.get_config(current_user.id, internal) is None:
         raise HTTPException(status_code=404, detail="渠道未配置")
-
-    cfg, creds = result
 
     if _manager is not None:
         try:
@@ -433,15 +434,7 @@ async def disable_channel(
         except Exception:
             pass  # 停止失败不阻塞 disable（容错）
 
-    await store.save_config(
-        user_id=current_user.id,
-        channel=internal,
-        credentials=creds,
-        enabled=False,
-        default_data_space_id=cfg.default_data_space_id,
-        default_model=cfg.default_model,
-        bot_info=cfg.bot_info,
-    )
+    await store.set_enabled(current_user.id, internal, enabled=False)
     return {"ok": True}
 
 
@@ -525,10 +518,8 @@ async def update_channel_settings(
 ) -> ChannelSettingsOut:
     """更新渠道的默认数据空间 / 模型设置（渠道须已配置）。"""
     internal = _to_internal(channel)
-    result = await store.get_config(current_user.id, internal)
-    if result is None:
+    if await store.get_config(current_user.id, internal) is None:
         raise HTTPException(status_code=404, detail="渠道未配置，请先启用后再设置")
-    cfg, creds = result
 
     new_space_id: Optional[uuid.UUID] = None
     if body.default_data_space_id:
@@ -539,14 +530,11 @@ async def update_channel_settings(
                 status_code=422, detail="default_data_space_id 格式无效（需为 UUID）"
             )
 
-    await store.save_config(
-        user_id=current_user.id,
-        channel=internal,
-        credentials=creds,
-        enabled=cfg.enabled,
+    await store.set_settings(
+        current_user.id,
+        internal,
         default_data_space_id=new_space_id,
         default_model=body.default_model,
-        bot_info=cfg.bot_info,
     )
     return ChannelSettingsOut(
         default_data_space_id=body.default_data_space_id,

@@ -33,6 +33,10 @@ def _decrypt_creds(encrypted: str) -> dict[str, Any]:
     return json.loads(decrypt_api_key(encrypted))
 
 
+# 公开别名：供 manager 等模块复用同一份解密逻辑，避免各自内联 json.loads(decrypt_api_key(...))。
+decrypt_creds = _decrypt_creds
+
+
 # ---------------------------------------------------------------------------
 # 公开 API
 # ---------------------------------------------------------------------------
@@ -132,6 +136,39 @@ async def set_connected(
         cfg.updated_at = datetime.now(timezone.utc)
         if bot_info is not None:
             cfg.bot_info = bot_info
+        await db.commit()
+
+
+async def set_enabled(user_id: uuid.UUID, channel: str, *, enabled: bool) -> None:
+    """只翻转 enabled，不触碰凭据（避免无谓的解密 + 重加密）。配置不存在 raise。"""
+    async with get_session_factory()() as db:
+        cfg = await _fetch(db, user_id, channel)
+        if cfg is None:
+            raise RuntimeError(
+                f"channel_config not found: user={user_id} channel={channel}"
+            )
+        cfg.enabled = enabled
+        cfg.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+
+
+async def set_settings(
+    user_id: uuid.UUID,
+    channel: str,
+    *,
+    default_data_space_id: Optional[uuid.UUID] = None,
+    default_model: Optional[str] = None,
+) -> None:
+    """更新默认数据空间 / 模型设置，不触碰凭据与 enabled。配置不存在 raise。"""
+    async with get_session_factory()() as db:
+        cfg = await _fetch(db, user_id, channel)
+        if cfg is None:
+            raise RuntimeError(
+                f"channel_config not found: user={user_id} channel={channel}"
+            )
+        cfg.default_data_space_id = default_data_space_id
+        cfg.default_model = default_model
+        cfg.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
 

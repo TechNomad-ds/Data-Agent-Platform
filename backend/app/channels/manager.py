@@ -416,11 +416,10 @@ class _DbConversationRepo:
 
 async def _list_all_enabled_configs() -> list[tuple[Any, dict]]:
     """从 DB 读取所有 enabled=True 的 ChannelConfig，返回 [(cfg, creds_dict)]。"""
-    import json
     from sqlalchemy import select
     from app.core.database import get_session_factory
     from app.models.channel_config import ChannelConfig
-    from app.core.security import decrypt_api_key
+    from app.channels import store
 
     async with get_session_factory()() as db:
         result = await db.execute(
@@ -437,7 +436,7 @@ async def _list_all_enabled_configs() -> list[tuple[Any, dict]]:
             )
             continue
         try:
-            creds = json.loads(decrypt_api_key(cfg.credentials_encrypted))
+            creds = store.decrypt_creds(cfg.credentials_encrypted)
         except Exception as exc:
             logger.error(
                 "failed to decrypt credentials for channel_config %s: %s, skipping",
@@ -551,7 +550,9 @@ class ChannelManager:
         """从 DB 读取所有 enabled 配置并逐一启动 adapter。"""
         configs = await _list_all_enabled_configs()
         logger.info("start_all: found %d enabled channel configs", len(configs))
-        for cfg, creds in configs:
+
+        async def _safe_start(cfg: Any, creds: dict) -> None:
+            # 每条独立 try/except，保留逐渠道的容错隔离与日志上下文。
             try:
                 await self._start(cfg.user_id, cfg.channel, creds)
             except Exception as exc:
@@ -559,6 +560,9 @@ class ChannelManager:
                     "failed to start adapter user=%s channel=%s: %s",
                     cfg.user_id, cfg.channel, exc,
                 )
+
+        # 各渠道启动相互独立（含独立的 set_connected DB 写），并发启动避免逐条串行阻塞。
+        await asyncio.gather(*(_safe_start(cfg, creds) for cfg, creds in configs))
 
     # ------------------------------------------------------------------
     # 单条启动 / 停止（供 REST API 调用）
@@ -569,27 +573,15 @@ class ChannelManager:
 
         若已在运行则先停止再重启（凭据可能已更新）。
         """
-        # 读最新配置
-        import json
-        from app.models.channel_config import ChannelConfig
-        from app.core.database import get_session_factory
-        from app.core.security import decrypt_api_key
-        from sqlalchemy import select
+        # 读最新配置（复用 store 的取配置 + 解密逻辑）
+        from app.channels import store
 
-        async with get_session_factory()() as db:
-            result = await db.execute(
-                select(ChannelConfig).where(
-                    ChannelConfig.user_id == user_id,
-                    ChannelConfig.channel == channel,
-                )
-            )
-            cfg = result.scalar_one_or_none()
-
-        if cfg is None or not cfg.credentials_encrypted:
+        result = await store.get_config(user_id, channel)
+        if result is None or not result[0].credentials_encrypted:
             raise RuntimeError(
                 f"channel_config not found or has no credentials: user={user_id} channel={channel}"
             )
-        creds = json.loads(decrypt_api_key(cfg.credentials_encrypted))
+        _cfg, creds = result
 
         # 若已运行则停掉
         key = _adapter_key(user_id, channel)
