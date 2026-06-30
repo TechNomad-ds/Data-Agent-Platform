@@ -1,146 +1,84 @@
-# Channel 对话渠道接入层 — 设计文档
+# Channel 对话渠道接入 — 复刻 同类产品 设计
 
-> 目标：让用户**不打开网页**，直接在飞书 / 邮箱里跟 DataMind 的 AI agent 对话，
-> 把"邮箱、飞书、AI 工具"收敛成 DataMind 这一个使用入口。
-> 设计参考 同类开源客户端 的 channel 机制（借架构，不搬代码）。
+> 目标：让用户在飞书/钉钉/微信里直接和 DataMind 的 agent 对话。
+> **定位：复刻 同类开源客户端 的 channel 功能**——前端配置页 + 用户自带凭据(BYO) + 出站长连接接入，**整体照搬**，只把"回答的 agent"换成 DataMind 的 `AgentLoop`、身份/存储接到 DataMind 现有体系。
+> 本文为经 grilling 收敛后的复刻规格。同类产品 源码：前端 `同类开源客户端`，引擎 `其 Rust 引擎`(Rust，仅作参考，不运行时复用，见 §8)。
 
-## 0. 与已有 #5/#6 的关系
+## 1. 已锁定决策（grilling 收敛）
 
-| | 已有 `docs/feishu-email-integration.md`（#5/#6） | 本项目（channel 对话层） |
-|---|---|---|
-| 解决什么 | 飞书扫码**登录** + 把飞书云文件/邮件附件**导入**数据空间 | 在飞书/邮箱里**直接和 agent 对话**（多一种使用方式） |
-| 数据方向 | 外部数据 → 平台 | 双向消息流：用户 ↔ agent |
-| 复用 | `file_intake.register_file_to_space` | `agent/loop.py::AgentLoop.run` |
+| # | 决策 |
+|---|---|
+| 方向 | 外部渠道**反向够到** DataMind 的 agent（不是 DataMind 去连外部） |
+| 实现路径 | DataMind 内**同进程**，channel 层直接调 `AgentLoop.run()`（不经 同类引擎） |
+| 复用方式 | **复刻** 同类产品 channel(UI+BYO+出站连接)；同类引擎 当协议参考，不运行 |
+| 产品 | C 端个人；身份跨组织 |
+| P0 渠道 | 飞书 + 钉钉（+ 微信，待定，见 §7 风险） |
+| 凭据模型 | **BYO**：用户自带各平台自建应用凭据（绕开 ISV / 企业主体） |
+| 身份 | 配对绑定到**已有 DataMind 账号**（不自动开户） |
+| 配对流程 | IM 发起出码 → 网页端登录态输码 → 绑到本人账号 |
+| 数据空间 | 配对/配置时定默认空间 + `/space` 命令切换 |
+| 会话 | 一个 IM 私聊 = 一个滚动 conversation + `/new` 重置 |
+| 范围 | **仅私聊**（群聊永不做，身份归属唯一） |
+| 回复 | 只发终态（agent 跑完发一条；不做细粒度流式） |
+| 计费/限流/错误 | 复用现有：按绑定用户 credits 扣、复用 Redis 限流、转发 AgentLoop 错误文案 |
 
-两者**共用同一个飞书自建应用**（同一套 App ID/Secret），互补：扫码登录拿到身份 → 配对绑定 → 之后飞书消息直达 agent。本项目不替代 #5/#6，是在其之上加"对话通道"。
+## 2. 三渠道 BYO 接入 runbook（全部出站连接，免公网回调）
 
-## 1. 可行性结论
+### 飞书 Lark — 出站 WSS（protobuf）
+- 凭据：`app_id` + `app_secret`（可选 `encrypt_key`/`verification_token`，WS 模式不用）。
+- 连接：`POST /auth/v3/tenant_access_token/internal` 拿 token（2h，提前 5min 刷）→ `POST /callback/ws/endpoint`(body `{AppID,AppSecret}`) 拿 wss URL → 连 WSS(**ALPN 强制 http/1.1**)→ protobuf 帧(分片按 `message_id`+`seq`/`sum` 重组)→ ping/pong + 收 event 回 ACK。
+- 用户在开放平台：建**自建应用** + 权限 `im:message`/`im:message:send_as_bot`/`bot:info` + 开机器人 + 订阅 `im.message.receive_v1`；**不填回调 URL**。
+- 入站：`event.sender.sender_id.open_id`(用户) / `event.message.chat_id` / `message_type=text` 时 `content.text`。`event_id` TTL 去重。
+- 回复：`POST /im/v1/messages?receive_id_type=chat_id`(msg_type=interactive，card json)→ 拿 message_id；改：`PATCH /im/v1/messages/{id}`。
+- 测连：`GET /bot/v3/info`。
 
-**可行，借架构/知识，不做运行时复用。** 同类产品 是 Electron 前端，引擎在独立开源仓 `其 Rust 引擎`（Apache-2.0，Rust/Axum，channel 在 `其源码`，17.8K 行）。经源码实证评估（见 §10），**否决"运行时复用 同类引擎 channel"**，采用"读源码当参考 + Python 在 DataMind 内重写薄 channel 层"。同类产品 channel 的 4 个核心抽象能干净映射到 FastAPI：
+### 钉钉 DingTalk — 出站 WS Stream（JSON 帧）
+- 凭据：`client_id` + `client_secret`。
+- 连接：`POST /v1.0/oauth2/accessToken` → `POST /v1.0/gateway/connections/open`(订阅 `/v1.0/im/bot/messages/get` 等) 拿 endpoint+ticket → 连 WS → SYSTEM/ping 回 ACK、CALLBACK 处理消息回 ACK(`{code:200,...}`)。
+- 用户在开放平台：建**企业内部应用** + 开机器人 + 权限 `qyapi_robot_sendmsg`(+群/AI Card 权限按需)；**不填回调 URL**。
+- 入站：`data` 二次 parse → `senderStaffId`(用户) / `conversationType`(1 单聊/2 群) / `text.content`。chat_id 编码 `user:{staffId}` 或 `group:{convId}`。
+- 回复：无按钮→AI Card 三段(`/card/instances` 建 → `/deliver` 投 → `/card/streaming` 写)；有按钮→`/robot/oToMessages/batchSend`。
+- 测连：`POST /v1.0/im/robot/info`。
 
-1. **统一消息契约**（`IUnifiedIncoming/OutgoingMessage`）→ Pydantic `InboundMessage` / `OutboundMessage`，让 agent 层完全不感知平台差异。
-2. **可插拔渠道适配器**（`BasePlugin: start/stop/sendMessage/editMessage/onMessage`）→ Python `Protocol`/ABC `ChannelAdapter`。
-3. **配对绑定安全模型**（PairingService：IM 发码 → 主程序本地批准）→ `external_identities` 表 + 配对码流程。
-4. **流式回写二态**（`sendMessage` 发新消息 / `editMessage` 更新消息）→ 飞书消息卡片"先发后更新"模拟流式。
+### 微信 Weixin — iLink Bot，HTTP 长轮询 ⚠️
+- ⚠️ **企业微信 iLink Bot 体系(`ilinkai.weixin.qq.com`)= 自动化个人微信号，微信 ToS 灰区、有封号风险。非标准公众号/小程序。**
+- 凭据：扫码登录获得 `bot_token` + `account_id`（`get_bot_qrcode` → 2s 轮询 `get_qrcode_status` 到 confirmed）。
+- 连接：长轮询 `POST /ilink/bot/getupdates`(游标 `get_updates_buf`，timeout 40s)。
+- 入站：`from_user_id`(用户) / `context_token`(回复必带，需持久化) / `item_list`(type1 文本/type3 语音转文字)。
+- 回复：`POST /ilink/bot/sendmessage`(带 `context_token`)。**不支持改消息**（发新代替）。
 
-## 2. 核心矛盾：SSE vs Webhook
+## 3. 前端复刻（React + AntD）
 
-现有对话是**浏览器长连接 SSE**（`POST /api/chat/.../messages` → `text/event-stream`）。
-外部渠道是**异步 webhook**：平台推一条事件进来，要求**立即 200 应答**，回复随后异步发回。
-二者协议不兼容 → channel 层的关键职责就是**桥接**：
+照搬 同类产品 「渠道配置」页：
+- 渠道列表：每行 = Collapse(Logo 14px + 名称 + `Coming Soon` Tag? + 启用 Switch)，默认折叠。
+- 展开表单：飞书(App ID + App Secret + "显示可选配置"折叠[Encrypt Key/Verification Token] + **测试并连接**)、钉钉(Client ID + Client Secret + 测试并连接)、微信(扫码登录状态机 idle→loading_qr→showing_qr→scanned→connected，走 SSE)。
+- 公共：**默认数据空间**下拉 + **模型**选择器（替换 同类产品 的"对话Agent/对话模型"）；启用开关(启用前校验已配凭据)。
+- **待配对请求**区：列表(用户名/配对码/过期倒计时 + 批准/拒绝)，WebSocket 实时 prepend。
+- **已授权用户**区：列表(平台/授权时间 + 撤销)；有授权用户时凭据字段锁定。
+- IPC/HTTP 接口对照：`getPluginStatus`/`enablePlugin`/`disablePlugin`/`testPlugin`/`getPendingPairings`/`approvePairing`/`rejectPairing`/`getAuthorizedUsers`/`revokeUser`/`getPlatformSettings`/`setAssistantSetting`/`setDefaultModelSetting` + WS 事件 `pairing-requested`/`plugin-status-changed`/`user-authorized`。
 
-```
-飞书/邮件 → webhook → 立即 200
-              └→ 后台任务：buffer AgentLoop.run() 的 yield → 组装 → 调平台 API 发回
-```
+## 4. 4 处必须适配（DataMind ≠ 同类产品）
 
-复用点：`AgentLoop.run()` 本身就是 async generator，channel 层只是**不把 yield 喂给 SSE，而是聚合后回写渠道**。agent / tools / services 全部零改动。
+1. **agent**：同类产品 `ACP` → DataMind `AgentLoop.run()`（buffer 事件流，done 时发终态）。
+2. **身份**：同类产品 单 owner → 谁登录态配的凭据，bot 绑到谁的账号；消息按 `external_identities` 路由、扣其 credits。
+3. **存储**：同类产品 自带 SQLite → DataMind PG（见 §5）。
+4. **连接**：出站长连接接 DataMind 的**连接管理进程**（见 §7 风险）。
 
-## 3. 架构映射（同类产品 → DataMind）
+## 5. 数据模型（alembic）
 
-```
-飞书/邮箱/…                         IM 平台
-   ↓ webhook / IMAP poll
-ChannelAdapter (feishu.py / email.py)   ← 平台适配，实现统一契约
-   ↓ parse_inbound() → InboundMessage
-ChannelRouter / Dispatcher              ← 鉴权(配对)、找/建会话、路由
-   ↓
-AgentBridge.run_and_reply()             ← buffer AgentLoop.run(), 节流回写
-   ↓ 复用 agent/loop.py::AgentLoop.run （零改动）
-AgentBridge ← OutboundMessage → ChannelAdapter.send/edit_message → 平台 API
-```
+已落 `external_identities`(channel/platform_user_id→user_id+授权时间) + `conversations.channel`/`channel_thread_id`。
+待加：渠道凭据表(per-user per-channel，凭据用 `encrypt_api_key` 加密)、配对码(可用 Redis 带 TTL)、每渠道默认空间/模型设置。
 
-对照 同类产品：`ChannelAdapter`≈Plugin，`ChannelRouter`≈ActionExecutor，`AgentBridge`≈ChannelMessageService，配对≈PairingService。
+## 6. 后端模块（backend/app/channels/，已搭脚手架）
 
-## 4. 关键设计决策
+`contracts.py`(Inbound/OutboundMessage + ChannelAdapter Protocol) · `bridge.py`(AgentBridge：buffer AgentLoop.run → 回写) · `registry.py` · `pairing.py`(出码/校验) · `adapters/{feishu,dingtalk,weixin}.py`(各平台出站连接+收发) · `routers/channels.py`(配置/配对/授权 HTTP API)。连接管理见 §7。
 
-- **鉴权**：webhook 端点**不走 JWT**（外部平台不持 token），改为**验证渠道签名**（飞书 `Encrypt`/`token`/AES、邮件 IMAP 账号）。验签通过后，用 `external_identities` 把平台用户映射到内部 user，再以该 user 身份调 agent。
-- **配对绑定（防劫持）**：陌生平台用户首次发消息 → bot 回 6 位配对码（10min，存 Redis）→ 用户**在网页端登录后输入配对码批准** → 写 `external_identities` 白名单。授权动作**只在已认证的网页端完成**，绝不通过 IM 通道授权（沿用 同类产品 配对安全原则）。
-- **流式回写**：飞书支持更新消息卡片 → 先 `send`（占位/首块）拿 message_id，后续 `update`（节流 ~500ms，与 同类产品 一致），`done` 时落终态。邮件不支持流式 → 仅在 `done` 时一封回信。
-- **会话归属**：`conversations` 加 `channel` + `channel_thread_id`，把外部会话线程映射到内部 conversation，实现"同一飞书会话连续多轮"。
-- **复用而非分叉**：不复制 `chat.py` 的会话创建/保存逻辑——抽出共享函数（`create_conversation` / 消息落库），webhook 和 SSE 两条路都调它。
+## 7. 风险与待决
 
-## 5. 数据模型变更（alembic 迁移）
+- **连接管理/扩展(最大工程代价)**：共享后端下每个已配置 app = 一条常驻出站连接(WS/轮询)。用户多 = N 条常驻连接，需**独立连接管理进程**(不能在 4 个 gunicorn worker 里各起，否则重复连/重复处理)。这是 BYO+长连接复刻 同类产品 的固有代价。
+- **微信合规**：iLink 自动化个人微信，封号风险 → 微信是否进 P0 待定（建议缓，先飞书+钉钉）。
+- **BYO 设置门槛**：用户需有能建自建应用的飞书/钉钉组织（个人版能否建应用待用户确认）；适合技术型用户。
 
-```sql
--- 新表：外部身份映射
-CREATE TABLE external_identities (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  channel TEXT NOT NULL,            -- 'feishu' | 'email'
-  platform_user_id TEXT NOT NULL,   -- 飞书 open_id / 邮箱地址
-  authorized_at TIMESTAMPTZ,
-  UNIQUE (channel, platform_user_id)
-);
+## 8. 不运行时复用 同类引擎（保留结论）
 
--- conversations 增列
-ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'web';
-ALTER TABLE conversations ADD COLUMN channel_thread_id TEXT;  -- 外部线程去重
-```
-
-## 6. 新增模块清单（backend/app/）
-
-```
-channels/
-  __init__.py
-  contracts.py        # InboundMessage / OutboundMessage (Pydantic) + ChannelAdapter (Protocol)
-  registry.py         # 渠道注册表：按 config 启用哪些 adapter
-  router.py           # ChannelRouter：验签 → 鉴权/配对 → 找会话 → 派发
-  bridge.py           # AgentBridge：buffer AgentLoop.run() + 节流回写
-  pairing.py          # 配对码签发/校验（Redis）
-  adapters/
-    feishu.py         # 飞书：验签解密 / parse / send_message / update_message
-    email.py          # 邮件：IMAP 轮询入站 + SMTP 回信（无流式）
-routers/
-  channels.py         # FastAPI 路由：POST /api/channels/feishu/webhook 等 + 管理端点
-```
-
-`main.py` 注册 `channels` 路由；`config.py` 复用已有 `feishu_*` / `email_imap_*`，补 `feishu_encrypt_key` / `feishu_verification_token` / SMTP 字段。
-
-## 7. 分阶段实施计划
-
-- **P0 地基**：alembic 迁移（`external_identities` + conversations 增列）；config 补字段；抽出共享的会话创建/落库函数。*（无外部依赖，可立即做）*
-- **P1 channel 核心**：`contracts.py` + `registry.py` + `router.py` + `bridge.py` + `pairing.py`。用一个 **mock/echo adapter** + pytest 跑通"入站→AgentBridge→出站"全链路（不依赖真实凭据）。
-- **P2 飞书 adapter**：webhook 验签解密、事件解析、配对流程、消息卡片 send/update 流式回写。**需要飞书 App 凭据**。
-- **P3 邮件 adapter**：IMAP 轮询（后台 asyncio task / APScheduler）入站、SMTP 回信。**需要邮箱授权码**。
-- **P4 管理 UI**：网页端"渠道管理"页（启用/配置渠道、审批配对请求、查看授权用户），对标 同类产品 设置页。
-- **P5 扩展位（可选）**：抽象成"渠道插件"声明式注册（参考 同类产品 extension manifest），方便后续接钉钉/企微/Telegram。
-
-P0/P1 不需要任何外部凭据即可落地并测试；P2/P3 卡在凭据上（与 #5/#6 同一阻塞点）。
-
-## 8. 风险与开放问题
-
-- **会话身份**：一个飞书用户对应一个内部 user，多轮如何复用 conversation（按 `channel_thread_id`？按用户单例会话？）—— 建议默认"每飞书会话一个 conversation"。
-- **数据空间选择**：飞书里对话默认绑哪个数据空间？需在配对/绑定时让用户指定默认数据空间（对应 同类产品 的 assistantBinding）。
-- **并发与限额**：channel 入站要复用现有 Redis 并发限流，避免 bot 被刷。
-- **飞书消息卡片流式频率**：飞书 API 有更新频率限制，节流参数需实测。
-- **凭据归属**：邮件授权码按用户加密存（沿用 `encrypt_api_key`），不要进全局 env（#5 文档已强调）。
-
-## 9. 参考
-
-- 同类产品 channel 设计：`.同类产品/FEATURE_CHANNELS.md`、`packages/desktop/src/common/types/channel/channel.ts`、`examples/ext-wecom-bot/`（最完整的扩展渠道示例，含 webhook + 流式状态机）。
-- 本仓库复用点：`agent/loop.py::AgentLoop.run`、`routers/chat.py`（SSE 链路参照）、`services/file_intake.py`、`core/security.py`。
-
-## 10. 同类引擎 运行时复用评估（结论：否决，用反证法）
-
-对 `其 Rust 引擎`（开源 Rust 引擎）做了源码实证，评估"复用 同类引擎 channel + 让 DataMind 的 agent 回答"是否比"Python 重写"更优。结论：**否决运行时复用，Python 重写。**
-
-**前提澄清**：(1) 只需 DataMind 自己的 agent 能连上，不需要 同类引擎 托管 codex 等多 agent；(2) DataMind 的 agent = 自写 ReAct 循环 `AgentLoop`（裸 `anthropic`/`openai` SDK，非 langgraph、非 Claude Agent SDK），本进程内一个 Python 类，`AgentLoop.run()` 本身是 async generator。
-
-**反证法 grid（带 file:line，路径相对 同类引擎 仓）**：
-
-| 方案 / 命题 | 判定 | 实证 |
-|---|---|---|
-| ① fork：改 `IWorkerTaskManager` 桥到 DataMind | ☠️ | `同类产品-app/src/services.rs:167` 唯一实现写死，factory 只 dispatch Acp/其运行时，无 HTTP 分支 → 必 fork+重编 |
-| ② ACP·能否不 fork 注册外部 agent | 可（对②有利） | `同类产品-ai-agent/src/services/custom.rs:56` 运行期写 `agent_type=acp/source=custom/command=任意进程`，即时生效 |
-| ② ACP·双栈状态 | ☠️ | 会话/消息沉淀 同类引擎 SQLite（挂 owner 账号），`assistant_users/sessions` 硬依赖，无委托/无 SSO（`同类产品-auth/.../middleware.rs`，JWT 硬编码 `iss=同类产品`） |
-| ② ACP·飞书跨组织 | ☠️ | `channel/src/plugins/lark/api.rs:75` 用 `/tenant_access_token/internal`（企业自建应用，单组织），无 app_ticket/tenant_key（ISV 缺失） |
-| ② ACP·逆向成本 | ☠️ | ACP 协议无文档，在外部 dep `其运行时 v0.1.37` |
-| ② 单账号破多租户 | ☠️ | `channel/src/state.rs:471` 所有 IM 用户塌进一个 owner（兜底 `system_default_user`） |
-| ③ 重写是否太大 | 推翻→③活 | 17.8K 行，35-40% 为可移植踩坑知识，6-8 人周；直接复用 DataMind 现有 agent/PG/auth/计费 |
-
-**关键判断**：同类引擎 的 channel 解的是"桌面端无公网回调"难题（飞书走 WS 长连接 + protobuf 帧，最复杂的 ~2.7K 行）——DataMind 有公网地址，应直接用**飞书事件订阅 webhook**，根本不需要那段。它最难的代码在解你没有的问题；你最难的问题（跨组织多租户）它没解。
-
-**值得抄的（知识，非运行时）**：飞书 Interactive Card 结构 + "只能发卡片再编辑"的流式二态（`lark/types.rs`）、钉钉 AI Card 三步流式（`dingtalk/types.rs`）、验签/AES/配对状态机设计（`pairing.rs`）。**飞书接入用 webhook，不抄它的 WS 长连接。**
-
-**跨方案都得自做、谁都不白送**：跨组织飞书（ISV: app_ticket→tenant_key→per-tenant token）、IM 身份→DataMind 多租户用户映射。③ 能原生长进多租户模型，复用则要跟 同类引擎 单组织/单账号假设硬掰。
+同类引擎 是 Rust/Axum，channel 与其单账号/单组织/自带 SQLite/自带 JWT 内核焊死，C 端多租户对不上(实证见 git 历史)；其 agent 也非 DataMind 的 AgentLoop。故**不运行 同类引擎**，只读其源码当协议参考(本文 §2 即据此提炼)。
