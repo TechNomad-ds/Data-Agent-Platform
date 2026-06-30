@@ -145,6 +145,26 @@ class Dispatcher:
         self._agent_factory = agent_factory
         self._bridge = bridge or AgentBridge()
 
+    async def _require_space(
+        self, adapter: ChannelAdapter, chat_id: str, space_id: Optional[uuid.UUID]
+    ) -> bool:
+        """无默认数据空间则回告并返回 False；否则 True（附件 / 文档链接入库共用门卫）。"""
+        if space_id is None:
+            await adapter.send(chat_id, OutboundMessage(
+                text="请先在网页端为该渠道设置「默认数据空间」，再发送文件 / 文档链接。",
+                is_final=True))
+            return False
+        return True
+
+    async def _send_ingest_done(
+        self, adapter: ChannelAdapter, chat_id: str, ingested: list[dict]
+    ) -> None:
+        """统一回告入库成功（附件 / 文档链接共用）。"""
+        names = "、".join(f["filename"] for f in ingested)
+        await adapter.send(chat_id, OutboundMessage(
+            text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
+                 f"正在解析索引，稍后即可直接提问分析。", is_final=True))
+
     async def _ingest_attachments(
         self,
         adapter: ChannelAdapter,
@@ -152,34 +172,26 @@ class Dispatcher:
         user_id: uuid.UUID,
         space_id: Optional[uuid.UUID],
     ) -> None:
-        """下载入站附件并入库到默认数据空间，统一回告用户。任意渠道共用。"""
+        """下载入站附件并入库到默认数据空间。任意渠道共用。"""
         chat_id = inbound.chat_id
-        if space_id is None:
-            await adapter.send(chat_id, OutboundMessage(
-                text="请先在网页端为该渠道设置「默认数据空间」，再发送文件/图片。",
-                is_final=True))
+        if not await self._require_space(adapter, chat_id, space_id):
             return
-        download = getattr(adapter, "download_attachment", None)
-        if download is None:
+        if not getattr(adapter, "supports_attachments", False):
             await adapter.send(chat_id, OutboundMessage(
                 text="当前渠道暂不支持接收文件/图片。", is_final=True))
             return
         try:
-            files = [
-                (att.name, await download(att))
-                for att in inbound.attachments
-            ]
+            datas = await asyncio.gather(
+                *(adapter.download_attachment(att) for att in inbound.attachments))
         except Exception as exc:
             logger.exception("attachment download failed: channel=%s: %s", inbound.channel, exc)
             await adapter.send(chat_id, OutboundMessage(
                 text=f"文件下载失败：{exc}", is_final=True))
             return
+        files = [(att.name, data) for att, data in zip(inbound.attachments, datas)]
         from app.services.channel_ingest import ingest_files_to_space
         ingested = await ingest_files_to_space(user_id, space_id, files)
-        names = "、".join(f["filename"] for f in ingested)
-        await adapter.send(chat_id, OutboundMessage(
-            text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
-                 f"正在解析索引，稍后即可直接提问分析。", is_final=True))
+        await self._send_ingest_done(adapter, chat_id, ingested)
 
     async def _ingest_feishu_links(
         self,
@@ -191,17 +203,15 @@ class Dispatcher:
         """抓取消息里的飞书云文档链接并入库。飞书文档需飞书 token，与消息来自哪个渠道无关：
         来自飞书渠道则复用在线 adapter；其他渠道（如微信）则用用户配置的飞书应用凭据临时构造抓取器。"""
         chat_id = inbound.chat_id
-        if space_id is None:
-            await adapter.send(chat_id, OutboundMessage(
-                text="请先在网页端为该渠道设置「默认数据空间」，再分享文档。", is_final=True))
+        if not await self._require_space(adapter, chat_id, space_id):
             return
         from app.services.feishu_doc import try_ingest_feishu_doc, FeishuDocError
 
+        # 选抓取器：飞书渠道复用在线 adapter（自带有效 token）；其他渠道用用户飞书凭据临时构造
         transient = None
         if inbound.channel == "feishu":
-            fetcher: Any = adapter  # 在线飞书 adapter，自带有效 token
+            fetcher: Any = adapter
         else:
-            # 非飞书渠道发飞书链接：用用户自己的飞书应用凭据抓取（同一账号配的飞书 app）
             from app.channels import store
             result = await store.get_config(user_id, "feishu")
             if result is None or not result[0].credentials_encrypted:
@@ -212,12 +222,12 @@ class Dispatcher:
             _cfg, creds = result  # get_config 返回的 creds 已解密
             from app.channels.adapters.feishu import FeishuAdapter
             try:
-                fetcher = FeishuAdapter(app_id=creds["app_id"], app_secret=creds["app_secret"])
+                fetcher = transient = FeishuAdapter(
+                    app_id=creds["app_id"], app_secret=creds["app_secret"])
             except Exception as exc:
                 await adapter.send(chat_id, OutboundMessage(
                     text=f"飞书凭据无效：{exc}", is_final=True))
                 return
-            transient = fetcher
 
         try:
             ingested = await try_ingest_feishu_doc(fetcher, inbound, user_id, space_id)
@@ -237,10 +247,7 @@ class Dispatcher:
                 except Exception:
                     pass
 
-        names = "、".join(f["filename"] for f in ingested)
-        await adapter.send(chat_id, OutboundMessage(
-            text=f"已导入 {len(ingested)} 个文件到数据空间：{names}\n"
-                 f"正在解析索引，稍后即可直接提问分析。", is_final=True))
+        await self._send_ingest_done(adapter, chat_id, ingested)
 
     async def dispatch(self, adapter: ChannelAdapter, inbound: InboundMessage) -> None:
         """分发一条入站消息。遇不可恢复错误 raise（禁 fallback 兜底）。

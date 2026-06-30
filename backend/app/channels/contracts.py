@@ -18,7 +18,7 @@ class InboundAttachment(BaseModel):
     kind: str                          # 'file' | 'image'
     name: str                          # 文件名（图片可由平台 key 生成）
     resource_key: str                  # 平台资源 id（飞书 file_key / image_key）
-    locator: str = ""                  # 平台附加定位（飞书：message_id）
+    locator: str = ""                  # 不透明定位串，下载时回传给对应平台（飞书：message_id）
 
 
 class InboundMessage(BaseModel):
@@ -57,6 +57,9 @@ class ChannelAdapter(Protocol):
     # 平台是否支持「编辑已发消息」做流式更新。False（如微信 iLink 只能发新消息）时，
     # 桥接层只发终态一条，避免把流式中间块发成多条不完整消息。默认 True。
     supports_edit: bool
+    # 平台是否支持接收文件/图片附件（实现了 download_attachment）。dispatch 据此决定
+    # 是否走附件入库，未声明默认按 False 处理。
+    supports_attachments: bool
 
     def verify(self, headers: dict[str, str], body: bytes) -> bool:
         """验证入站请求来自该平台（签名/token/AES）。webhook 不走 JWT，靠这个。"""

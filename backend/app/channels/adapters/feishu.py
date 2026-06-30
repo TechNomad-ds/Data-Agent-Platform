@@ -344,7 +344,8 @@ class FeishuAdapter:
     """
 
     name = "feishu"
-    supports_edit = True  # 飞书可 patch 卡片 → 支持流式编辑
+    supports_edit = True          # 飞书可 patch 卡片 → 支持流式编辑
+    supports_attachments = True   # 支持下载消息里的文件/图片资源
 
     def __init__(
         self,
@@ -761,23 +762,17 @@ def _parse_message_event(event: dict[str, Any]) -> Optional[InboundMessage]:
 
         # 文件 / 图片 → 附件入库（资源需用 message_id + key 二次下载）
         if message_type in ("image", "file"):
-            if not message_id:
-                logger.warning("飞书附件消息缺少 message_id")
+            is_image = message_type == "image"
+            key = content.get("image_key" if is_image else "file_key") or ""
+            if not message_id or not key:
+                if not message_id:
+                    logger.warning("飞书附件消息缺少 message_id")
                 return None
-            if message_type == "image":
-                key = content.get("image_key") or ""
-                if not key:
-                    return None
-                att = InboundAttachment(
-                    kind="image", name=f"feishu_image_{key[:12]}.jpg",
-                    resource_key=key, locator=message_id)
-            else:
-                key = content.get("file_key") or ""
-                if not key:
-                    return None
-                att = InboundAttachment(
-                    kind="file", name=content.get("file_name") or f"feishu_file_{key[:12]}",
-                    resource_key=key, locator=message_id)
+            name = (f"feishu_image_{key[:12]}.jpg" if is_image
+                    else content.get("file_name") or f"feishu_file_{key[:12]}")
+            att = InboundAttachment(
+                kind="image" if is_image else "file",
+                name=name, resource_key=key, locator=message_id)
             return InboundMessage(
                 channel="feishu", platform_user_id=open_id, chat_id=chat_id,
                 text="", attachments=[att], raw=event,

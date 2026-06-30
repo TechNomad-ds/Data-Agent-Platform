@@ -14,6 +14,7 @@ from app.channels.contracts import InboundAttachment, InboundMessage, OutboundMe
 class MockChannelAdapter:
     name = "mock"
     supports_edit = True
+    supports_attachments = True
 
     def __init__(self) -> None:
         self.sent: list[dict[str, Any]] = []  # 记录每次 send/edit

@@ -571,7 +571,7 @@ def test_attachment_without_default_space_prompts_user():
 def test_attachment_unsupported_channel_prompts_user():
     """adapter 无 download_attachment → 提示暂不支持。"""
     class _NoAttachAdapter(MockChannelAdapter):
-        download_attachment = None  # getattr 取到 None → 走「暂不支持」分支
+        supports_attachments = False  # 不支持附件 → 走「暂不支持」分支
 
     user_id = uuid.uuid4()
     space_id = uuid.uuid4()

@@ -11,6 +11,7 @@ file_intake.register_file_to_space 登记 + 触发后台解析索引。之后 ag
 """
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
@@ -170,7 +171,9 @@ async def try_ingest_feishu_doc(
         return []
     from app.services.channel_ingest import ingest_files_to_space
 
-    files: list[tuple[str, bytes]] = []
-    for doc_type, token in links:
-        files.extend(await fetch_feishu_doc(adapter, doc_type, token))
+    # 多链接并发抓取（各自独立网络 I/O），再展平登记
+    results = await asyncio.gather(
+        *(fetch_feishu_doc(adapter, doc_type, token) for doc_type, token in links)
+    )
+    files = [f for group in results for f in group]
     return await ingest_files_to_space(user_id, space_id, files)

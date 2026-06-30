@@ -132,8 +132,7 @@ def parse_raw_message(raw: dict[str, Any]) -> Optional[InboundMessage]:
     if not text:
         # 非文本消息（图片/文件等）：iLink 媒体 item 结构待确认。记录 item 类型与字段名
         # （不打印内容，避免日志膨胀/泄露），确认格式后即可接入统一附件入库路径。
-        item_list = raw.get("item_list") or []
-        if item_list:
+        if item_list := raw.get("item_list"):
             shapes = [{"type": it.get("type"), "keys": sorted(it.keys())} for it in item_list]
             logger.info("weixin 暂不支持的非文本消息 shapes=%s", shapes)
         return None
@@ -267,7 +266,8 @@ class WeixinAdapter:
     """
 
     name: str = "weixin"
-    supports_edit: bool = False  # iLink 只能发新消息，不能编辑 → 桥接层只发终态一条
+    supports_edit: bool = False         # iLink 只能发新消息，不能编辑 → 桥接层只发终态一条
+    supports_attachments: bool = False  # iLink 媒体消息格式待确认，暂不支持附件下载
 
     def __init__(
         self,
