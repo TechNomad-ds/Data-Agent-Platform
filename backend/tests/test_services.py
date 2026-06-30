@@ -189,93 +189,53 @@ def test_extract_title():
     assert len(_extract_title("这是一段非常非常非常非常非常非常非常非常长的用户输入消息")) <= 30
 
 
-def test_system_prompt_contains_pku_study_guidance():
-    """北大课程复习场景依赖这些提示词约束回答格式和范围。
+def test_system_prompt_contains_study_and_format_guidance():
+    """重设计后提示词是单一静态模板（一个通用 agent + 工具自助）。
 
-    课程辅导细节现在归入数据模式段（DATA_MODE_GUIDANCE），只有问题确实依赖上传资料时
-    才注入；公式/Markdown 规范留在通用核心。测试断言整体提示词（核心 + 数据段）。
+    课程辅导的细粒度话术已移除，但读文档/公式/Markdown 等核心质量约束保留。
+    断言这些长期约束仍在提示词里。
     """
-    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE, DATA_MODE_GUIDANCE
-
-    full = SYSTEM_PROMPT_TEMPLATE + DATA_MODE_GUIDANCE
-    for phrase in (
-        "课程学习 / 复习辅导",
-        "课程助教",
-        "当前数据空间",
-        "个性化问题",
-        "核心概念 → 易混点 → 例题/应用 → 复习建议",
-        "公式输出规范",
-        "行内公式用 `$...$`",
-        "独立公式用 `$$...$$`",
-        "Markdown 稳定性",
-        "UTF-8 正常文本",
-    ):
-        assert phrase in full
-
-
-def test_system_prompt_contains_text_analysis_quality_guidance():
-    """报告中暴露的评论情感误判和首版代码报错，需要提示词长期约束。
-
-    这些都属于数据模式段，断言核心 + 数据段的整体提示词。
-    """
-    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE, DATA_MODE_GUIDANCE
-
-    full = SYSTEM_PROMPT_TEMPLATE + DATA_MODE_GUIDANCE
-    for phrase in (
-        "文本 / 评论 / 情感分析要求",
-        "不要只靠关键词打标签",
-        "希望增加更多实战",
-        "改进诉求",
-        "代表性原文短句",
-        "代码执行约束",
-        "确认真实列名",
-        "避免链式赋值",
-        "每次调用都是全新无状态沙箱",
-    ):
-        assert phrase in full
-
-
-def test_agent_data_context_is_intent_gated():
-    """普通设计/提示词/代码讨论问题不应因为选了数据空间就被 schema 上下文带偏。"""
-    from app.agent.loop import AgentLoop
-
-    space_id = uuid.uuid4()
-    # 通用：架构/提示词讨论、代码逻辑、概念、泛化的"总结/分析"动词都应留在通用模式
-    for q in (
-        "我怎么感觉 agent 问什么都关注 json/csv，是提示词里强调了吗？需要调整",
-        "你觉得这个 agent 架构怎么设计更好？",
-        "帮我分析下这段代码的逻辑",
-        "总结一下我们刚讨论的这个思路",
-        "什么是缓存穿透？",
-        "快速排序和归并排序有什么区别",
-    ):
-        assert not AgentLoop._should_include_data_context(q, space_id), q
-
-    # 数据：点名了文件/表/课程资料，或用了数据特有强动词
-    for q in (
-        "帮我统计 sales.csv 里每个区域的收入",
-        "基于课程资料总结一下 cache miss 的考点",
-        "这份文件里有多少条记录",
-        "查询订单表里金额最大的客户",
-        "当前数据空间有什么文件",
-    ):
-        assert AgentLoop._should_include_data_context(q, space_id), q
-
-
-def test_system_prompt_calls_schema_context_preview_not_full_inventory():
-    """schema 预注入是相关文件预览，不能暗示模型已经看完全部文件。
-
-    该指引归入数据模式段（DATA_MODE_GUIDANCE）。
-    """
-    from app.agent.loop import DATA_MODE_GUIDANCE
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
 
     for phrase in (
-        "本轮相关文件预览",
-        "不是完整清单",
-        "不代表你已读取全部",
-        "未展开文件仍属于数据空间",
+        "读文档 / 讲解整篇",
+        "全文已读完",
+        "公式用 LaTeX",
+        "行内 `$...$`",
+        "独立 `$$...$$`",
+        "Markdown 稳定",
     ):
-        assert phrase in DATA_MODE_GUIDANCE
+        assert phrase in SYSTEM_PROMPT_TEMPLATE
+
+
+def test_system_prompt_contains_data_quality_guidance():
+    """取数准确性与沙箱约束等质量要求，重设计后仍保留在单一模板里。"""
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+
+    for phrase in (
+        "表格数据分析",
+        "查全查准",
+        "去重实体数",
+        "收尾前自检",
+        "受限沙箱",
+        "inspect_data",
+        "sqlite_query",
+    ):
+        assert phrase in SYSTEM_PROMPT_TEMPLATE
+
+
+def test_system_prompt_is_single_static_template():
+    """重设计的核心：提示词只剩 file_notice / memory_context 两个动态占位符，
+    不再按关键词分流、不再预加载 schema。守住这条不回退。"""
+    import string
+    from app.agent.loop import SYSTEM_PROMPT_TEMPLATE
+
+    fields = {t[1] for t in string.Formatter().parse(SYSTEM_PROMPT_TEMPLATE) if t[1]}
+    assert fields == {"file_notice", "memory_context"}, fields
+    # 旧的模式分流话术不应再出现
+    for stale in ("先判断问题类型", "本轮相关文件预览", "未挂载任何项目或文件"):
+        assert stale not in SYSTEM_PROMPT_TEMPLATE
+
 
 
 def _load_pku_llm_acceptance_module():

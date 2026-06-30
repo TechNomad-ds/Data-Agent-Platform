@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Table, Tooltip, message as antMessage } from 'antd'
 import { CopyOutlined, CheckOutlined, TableOutlined } from '@ant-design/icons'
+import { copyText } from '@/utils/clipboard'
 import { colors, radius, shadow } from '@/styles/tokens'
 
 interface AnswerCardProps {
@@ -112,12 +113,11 @@ export default function AnswerCard({ raw }: AnswerCardProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(raw)
+    if (await copyText(raw)) {
       setCopied(true)
       antMessage.success('已复制')
       setTimeout(() => setCopied(false), 1800)
-    } catch {
+    } else {
       antMessage.error('复制失败')
     }
   }

@@ -830,6 +830,7 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
                     {files.find(f => f.file_id === selectedFileId)?.filename}
                   </Text>
                   {preview.total_lines && <Tag style={{ marginLeft: 8 }}>{preview.total_lines} 行</Tag>}
+                  {preview.truncated && <Tag color="orange" style={{ marginLeft: 4 }}>内容较长，仅预览前一部分，完整内容请下载</Tag>}
                 </div>
                 <pre style={{
                   padding: 20, fontSize: 13, lineHeight: 1.7,

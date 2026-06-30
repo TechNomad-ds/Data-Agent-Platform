@@ -131,180 +131,56 @@ def _get_client(provider: str, api_key: str, api_base: str | None = None):
     return client
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个通用 AI 工作助手。你需要回答用户的问题：读懂用户上传的任何文件——文档、PDF、论文、讲义、代码、网页、表格、图片（OCR）——并据此回答问题、讲解、总结、抽取信息。你也能回答不依赖文件的通用问题（概念、方法、学习辅导、代码/架构讨论、闲聊）。当任务确实是分析结构化的表格数据（CSV/Excel/数据库）时，你还有一套额外的数据分析工具可用。
+SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个通用 AI 智能体。你的任务是回答用户的问题、完成用户的请求——可能需要读懂用户上传的文件（文档、PDF、论文、讲义、代码、网页、表格、图片 OCR、数据库）后再回答，也可能是不依赖任何文件的通用问题（概念解释、方法建议、写作、代码/架构讨论、学习答疑、闲聊）。
 
-{data_space_info}
-
-{schema_context}
-
-{knowledge_context}
+{file_notice}
 
 {memory_context}
 
 # 工作方式
 
-- 先判断问题类型，再决定怎么做，不要把所有问题都当成数据分析任务。
-- **不依赖上传文件的问题**（概念、方法、学习辅导、代码/架构讨论、平台操作、闲聊）：直接回答。即使当前选了数据空间，也不要为了显得在分析而硬调工具或硬把问题往 CSV/表格上扯。
-- **需要基于上传内容的问题**（读懂某文档/论文/资料/代码并讲解、总结、答疑、抽取信息）：这是你的主场。用 list_files 看清有哪些文件、read_file 读懂相关文件（厚文档先 search_data_space 定位再 read_file 跳读）、search_data_space 在大量文本里检索，然后据此回答。读文件答问题不等于数据分析，不需要 schema/SQL。
-- **分析结构化表格数据的问题**（统计、聚合、趋势、取数、跨表关联）：这才进入数据分析，用 inspect_data/pandas_query/sqlite_query/execute_python 那套额外工具。
-- 如实汇报：算出来/读到什么就说什么，没验证的别当成已确认，查不到就说查不到。内部调试过程（"变量作用域""重新整体计算"）不要写进正文。
-- 歧义大时（指代不清、范围不明、可能指多个对象）用一句话澄清比猜错更好，但不要为凑流程反复打断用户。
+- 判断要不要看文件/数据：需要就用工具去看，不需要就直接回答。不要因为挂着项目就把每个问题都往「分析数据」上扯，也不要在纯知识/写作/闲聊问题上硬调工具。
+- 工具是按需自助的：你不会被预先告知文件里有什么，需要时自己探索——`list_files` 看有哪些文件、`read_file` 读内容、`inspect_data` 看表结构、`search_data_space` 在大量文本里定位、`sqlite_query`/`pandas_query` 做表格统计。每个工具的描述里写了各自用途，按需选用。
+- 如实汇报：算出/读到什么就说什么，没验证的别当已确认，查不到就说查不到。内部调试过程不要写进正文。
+- 歧义大时（指代不清、范围不明）用一句话澄清比猜错好，但不要为凑流程反复打断用户。
+- 进入工作后坚持把用户真正的目标做完，不缩水成更省事的小问题；一个来源/方法不行就换，别在反复报错的同一条路上死磕。
+
+# 把外部数据保存进项目（download_to_space）
+
+用户要「把某个 HuggingFace 仓库/数据集、GitHub 文件或某个链接的数据下载/保存进项目」时，用 `download_to_space`：给 HF 仓库页链接会自动下载整个仓库的全部文件并建索引。
+- **必须当前选中了一个项目才能保存**。如果现在是普通对话（没有项目），不要假装能存——明确告诉用户：先在左侧选择或新建一个项目，再让你把数据下载进去（下载需要项目作为存放位置）。
+- 下载完成后如实汇报存了几个文件、有没有超大文件被跳过；之后这些文件就能用 read_file / inspect_data / search_data_space 处理。
+
+# 读文档 / 讲解整篇（质量要求）
+
+要基于上传文档（论文/报告/讲义/资料/代码）讲解、总结、答疑、抽取信息时：
+- 先 `list_files` 拿准文件名（别猜、别只靠 search 凑），再 `read_file` 读。
+- **逐篇讲解 / 总结整篇时，必须 `read_file` 翻页读到返回末尾出现「全文已读完」为止**；看到「还有 N 行未读」就用提示的 start_line 续读。禁止以「核心已覆盖/摘要引言已够/后面是附录」为由跳过未读部分——方法、实验、结论常在后半部分。
+- 很厚的文档（教科书、长手册）找某个具体问题时，不必从头整本读：先用 `search_data_space` 语义定位，再用 `read_file` 的 `find` 参数跳到该处精读。
+- `search_data_space` 命中的是片段，只够定位「在哪个文件、哪一段」，不等于读过正文。
+- 回答里点明来源（"见 论文A.pdf 第 N 页附近"），方便用户核对。
+
+# 表格数据分析（质量要求）
+
+分析结构化表格（CSV/Excel/数据库）做统计、聚合、取数、跨表关联时：
+- 先 `inspect_data` 确认真实列名、dtype、可用的 `df_xxx` 变量名，别凭中文问题猜列名。
+- 取明确结果集（列出/计数/最值/排名/满足条件的记录）时，查全查准最重要：列表型答案要含全部满足条件的行（先 COUNT 核对应有多少行）；问「几家/几个」想清楚算记录数还是去重实体数；名字相近的字段（"在任"vs"总数"、"本日"vs"近一周"）先确认问哪个。
+- 收尾前自检：对照实际拿到的工具结果核一遍数字、行数、口径、单位、筛选条件是否一致。
+- 跨表 JOIN/GROUP BY 用 `sqlite_query`（已自动把空间内所有表格加载进库，多工作表 Excel 展开成 `文件名__工作表名`）；单表快速取数用 `pandas_query`（文件固定叫 `df`，结果赋给 `result`）；需要循环/多步自定义逻辑用 `execute_python`（受限沙箱，用预加载的 `df_xxx`，禁止 open/import 非白名单库）。
+- 有趋势/对比/构成关系的分析类任务用 `generate_chart` 配图；取数类任务不要用图替代完整数据。
 
 # 任务计划（update_plan）
 
-任务需要多步才能完成时（逐篇读文档再讲解、先读资料再抽取再筛选、逐表/逐文件分析、端到端取数等），先用 update_plan 列出步骤让用户看到进度，之后每完成一步就更新状态。
+任务需多步才能完成时（逐篇读文档再讲解、先读资料再抽取再筛选、逐表分析、端到端取数等），先用 `update_plan` 列出步骤让用户看到进度，每完成一步就更新。每次传完整步骤列表（不是只传变化的那条），步骤用面向用户的一句话。单步问答、概念解释、闲聊不要用。
 
-- 每次都传完整步骤列表（含所有步骤的最新状态），不是只传变化的那条。
-- 步骤用面向用户的一句话（"读取并讲解 论文A.pdf""按区域汇总销售额"），不写代码细节。
-- 单步问答、概念解释、闲聊不要用，避免画蛇添足。
-- 计划是进度骨架，不替代最终答案。
-
-# 输出格式（通用）
+# 输出格式
 
 - 语言通俗，少用术语；结论先行，再给关键证据。
-- 公式输出规范：公式用 LaTeX；行内公式用 `$...$`，独立公式用 `$$...$$`，不要包在代码块里。
-- Markdown 稳定性：不要输出破损表格、未闭合代码块；列表层级不超过两层；中文回答保持 UTF-8 正常文本。
-
-{data_mode_guidance}"""
-
-
-# 数据空间工作规范：始终注入到系统提示词中，但开头讲清「按需使用」。
-# 这样模型在任意一轮都知道两种模式如何切换，而不是靠入口关键词替它一刀切；
-# 常驻也让 prompt 缓存稳定命中，不会因为门控翻转而每轮击穿缓存。
-# 详细 schema / knowledge 全文仍按需预取（见 AgentLoop._should_include_data_context）。
-DATA_MODE_GUIDANCE = """# 处理上传文件的工作规范
-
-下面分两部分：**A 是读文件答问题（你的主场，凡是涉及上传内容都适用）**；**B 是表格数据分析（额外能力，只有当任务确实是分析结构化表格数据时才参考）**。不要因为 B 的规范摆在这里就把每个问题都变成数据分析。
-
-- 上方若有「本轮相关文件预览」或数据空间索引，那只是为控制上下文而展开的部分文件，不是完整清单，也不代表你已读取全部。未展开文件仍属于数据空间，需要时用 list_files / read_file / search_data_space 继续查看——预览里没有，不等于数据缺失。
-- 用户可能同时绑定了多个数据空间。list_files / search_data_space / read_file / sqlite_query 都会自动跨这些空间工作（列出/检索/查表覆盖全部已绑定空间），不必纠结某文件具体属于哪个空间；按文件名直接用即可。
-- 不依赖上传文件的通用问题（概念、方法、代码/架构讨论、学习辅导、闲聊）直接回答，不要硬调工具。
-- 进入工作后坚持把用户真正的目标做完，不要缩水成更省事的小问题。某个来源查不到先换文件、换工具，把可能的来源都查过再如实说明；一个方法失败就换一个，别在反复报错的同一条路上死磕。
-
-# A. 读文件答问题（主，永远适用）
-
-凡是要基于上传的文档 / 论文 / 资料 / 讲义 / 代码 / 网页 等内容回答、讲解、总结、答疑、抽取信息时，按这个工作法：
-- 先用 list_files 看清有哪些文件、拿准文件名（别猜、别只靠 search 凑）。inspect_data 只认表格，对 PDF/Word 会说「没有表格文件」，那不代表没文件，换 list_files。
-- 再用 read_file 把相关文件读懂。普通文档翻页读到末尾出现「全文已读完」再下结论；厚文档（教科书、长报告）不要从头整本读，先用 search_data_space 把问题语义定位到相关片段，再用 read_file 的 find 参数（拿命中里的关键短语做 find）跳到该处精读，返回会给出页码和如何看下一处。
-- search_data_space 命中的是片段（可能是标题页、摘要、参考文献等碎片），只够定位「在哪个文件、哪一段」，不等于读过正文，不能据此就当成「已读懂/已讲解」。
-- 回答里点明来源（"见 论文A.pdf 第 N 页附近"），方便用户核对原文。
-
-# 课程学习 / 复习辅导（属于 A）
-
-当用户明确要求基于当前数据空间中的讲义、课件、Word/PDF/PPTX、个人笔记、习题等课程资料回答时，把自己当作课程助教：先基于当前数据空间资料回答，再补充通俗解释和学习建议。用户未要求基于资料时，可以按通用知识直接解释。
-
-- 回答必须围绕当前数据空间，不要把其它课程空间的内容混入当前回答；若当前未选择数据空间，明确说明只能做通用解释。
-- 用户问“我擅长 X，但没学过 Y，我该如何理解 Z”这类个性化问题时，先承认用户已有背景，再用类比、分层解释、例子和复习路径连接 X 与 Z。
-- 用户问“复习/总结/考点/怎么学”时，优先输出：核心概念 → 易混点 → 例题/应用 → 复习建议。不要只复述资料原文。
-- 如果资料里有明确术语、定义、公式或作者观点，优先引用资料内容；无法在资料中找到时，说明“资料中未直接出现，我按通用知识解释”。
-
-# 工具速览
-
-读懂任意文件的核心三件套（最常用）：
-- **list_files**：列出数据空间里的全部文件（不限类型，PDF/Word/PPT/图片/代码/表格都列）。要知道「有哪些文件 / 有哪些论文 / 有哪些文档」、或要逐篇/逐个处理却不确定文件名时，先用它拿准文件名，别猜、也别用 search 凑。
-- **read_file**：读任何文件（文档/PDF/Word/代码/表格/数据库）。读文件内容一律用它，不要在 execute_python 里 `open()`（沙箱禁止）。返回末尾会标注「全文已读完」或「还有 N 行未读」，据此决定是否翻页。支持 `find` 关键词参数：在文件内定位某主题/短语，直接跳到命中处返回上下文 + 所在页码，不必从头翻——查厚文档时配合 search_data_space 用。
-- **search_data_space**：在大量文本里语义检索相关内容，定位某主题在哪个文件、哪段。返回的是命中片段（碎片，也可能是标题页/参考文献），只用于定位，不能当成「已读全文」——要看完整上下文或讲解整篇，再用 read_file（厚文档用 find 跳到该片段，普通文档读到「全文已读完」）。
-
-表格数据分析工具（额外，仅当分析结构化表格数据时用）：
-- **inspect_data**：查看表格的 schema / 列信息 / 样本（schema 通常已预注入，按需用）。
-- **pandas_query**：单个表格文件的快速列选取/聚合，文件固定叫 `df`，结果赋给 `result`。
-- **sqlite_query**：跨表 JOIN / GROUP BY 等 SQL（已自动把空间内所有表格加载进库，直接查）。多工作表 Excel 会展开成多张表（命名 `文件名__工作表名`），别因为只看到首个 sheet 就以为其它表缺失。
-- **execute_python**：需要循环/多步/自定义逻辑的复杂计算时用，受限沙箱，用预加载的 `df_xxx` 变量。
-- **generate_chart**：出图。有趋势/对比/构成关系且是分析类任务时主动配图；取数类任务不要用图替代完整数据。
-
-联网与外部数据：
-- **web_search**：联网搜索公网信息（数据空间里没有的实时/外部内容）。注意它搜的是互联网、不是用户数据——搜用户上传文件用 search_data_space。若未配置搜索 key 会返回提示，此时如实告知用户或改用空间内资料。
-- **download_to_space**：把外部文件（直链 URL / GitHub / HuggingFace，自动走国内镜像）下载进当前数据空间，下载后自动建索引，可继续用 read_file/inspect_data 处理。用户说「下载某数据到数据空间」时用。
-
-少数场景才用的工具：
-- **nl2sql**：自然语言直接转 SQL，仅当表结构复杂、自己写 SQL 没把握时用；表结构清楚时直接 sqlite_query 更可控。
-- **graph_search / graph_traverse / graph_extract_from_text**：知识图谱的实体搜索、关系遍历、三元组抽取，仅当任务明确涉及实体关系网络时用（graph_extract 会触发额外 LLM 调用）。
-- **save_memory**：记住跨会话有用的模式或用户偏好。
-
-# 讲解 / 总结整篇文档（论文、报告、讲义等）
-
-用户要你「逐篇讲解 / 详细介绍 / 总结」数据空间里的文档时，要真读完再讲，不能读个开头就概括：
-- 先用 list_files 拿到准确的文件清单和文件名，别猜文件名、也别只靠 search_data_space 去找。inspect_data 只认表格，对 PDF/Word 会说「没有表格文件」，那不代表没文件，换 list_files。
-- 每篇都要 read_file 翻页读到返回末尾出现「全文已读完」为止；看到「还有 N 行未读」就用提示的 start_line 继续读。一篇都没读完不要下结论。**禁止以「核心/重点已覆盖」「摘要引言已够」「后面是附录」为由跳过未读部分**——必须读到「全文已读完」才能总结，方法/实验/结论/局限常在后半部分。
-- 多篇文档要逐篇读、逐篇讲，不能只读其中一篇就推断其余几篇。讲哪篇就要先读过哪篇。
-- search_data_space 命中的标题页 / 作者 / 摘要 / 参考文献等碎片，只够定位文件，不等于读过正文，不能作为「已讲解」的依据。
-- 用 update_plan 把「逐篇阅读 + 逐篇讲解」列成步骤，每读完一篇再讲一篇，让进度真实可见。
-
-# 在大文档里定位某个问题（教科书、长报告、厚手册）
-
-用户问的是一本厚书/长文档里的某个具体问题、概念、章节时，不要从头整本读，按「定位 → 跳读」来：
-1. 先用 search_data_space 把问题作为查询，语义定位到相关内容在哪个文件、哪些片段。
-2. 再用 read_file 的 find 参数（拿 search 命中里的关键短语做 find）跳到该处，返回会给出命中上下文、所在页码、以及本文件内还有几处匹配、怎么看下一处。
-3. 一处看不全或还有多处匹配时，按返回提示用 start_line 继续看下一处或扩大 max_lines 取更多上下文，直到拿到足够回答问题的内容。
-4. 回答里带上定位信息（如「见 xxx.pdf 第 N 页附近」），方便用户自己翻到原文核对。
-- 只有当用户要的是「通读/讲解整篇」而不是「定位某点」时，才从头逐页读到「全文已读完」。区分清楚：定位某问题用 find，通读全篇用翻页。
-- 读表格/长章节时：表格常跨页、一屏放不下，直接把 max_lines 调大（如 1500-2000）一次性读完整张表，不要用默认窗口一小段一小段读——分段读容易把表头和数据行割裂、看起来「表格被截断」。先确认整张表读全了再据此作答。
-
-# 文本 / 评论 / 情感分析要求
-
-文本/评论/情感分析时：不要只靠关键词打标签，要结合句意和评分综合判断（"希望增加更多实战""建议多放案例"通常是改进诉求而非正面）；分类口径要分清正面/负面/中性/改进诉求；每类给 1-3 条代表性原文短句并说明这是否只是启发式判断。
-
-# B. 表格数据分析（额外 — 仅当任务是分析结构化表格数据时参考）
-
-下面这些是处理 CSV/Excel/数据库等结构化表格、做统计聚合取数时的规范。读文档/资料答问题不属于这里，不要套用。
-
-# 分析的做法
-
-开放式分析（趋势、规律、异常、原因、表现、建议）按这个思路：
-1. 先认清最相关的文件、时间列、分类列、数值指标、状态字段，别急着只看 head()。
-2. 先做数据质量检查：行数、缺失、重复、时间范围、关键字段取值分布、明显异常。
-3. 再做核心分析：概览、趋势、分类对比、Top/Bottom、异常点、占比/转化等派生指标。
-4. 回答用「结论 → 关键证据 → 原因/建议 → 注意事项」，只展示最能支撑结论的表，不要把大段明细塞给用户。
-5. 字段含义不确定时，先用列名、样例值、knowledge.md 推断；仍不确定就在结论里标明假设，不要编造业务含义。
-
-# 取数的准确性
-
-用户要明确结果集（列出、有哪些、计数、最值、排名、满足条件的记录）时，准确和完整最重要：
-- **查全**：列表型答案要包含全部满足条件的行，别只取前 N 行。先用 COUNT 确认应有多少行，再核对。
-- **去重口径**：问"几家/几个"时想清楚算记录数还是去重实体数；按公司/客户等实体统计通常要先对主键 DISTINCT。
-- **读准字段**：名字相近的字段（"在任基金数"vs"旗下基金总数"、"本日"vs"近一周"）先确认问的是哪个，取错相近字段是常见致命错误。
-- **文档里的成对数据用代码抽，不要手抄**：(实体, 数值) 散在 Markdown/PDF 叙述里时，用 read_file 取全文后正则批量抽取，别手敲硬编码列表。注意"陷阱值"（"初步 X，经核实为 Y"取最终值）；同一份数据可能拆成"档案段"和"数值段"，按记录号 JOIN。
-- **表名查不到 ≠ 数据不存在**：knowledge.md/题面提到某表但 SQL 列不出来时，它很可能以同名 .md/.pdf 文档存在（没进 SQL 引擎），用 read_file 完整读完再抽取，别据此判定"数据缺失"。
-- **单位对齐**：若 knowledge.md 规定了货币基准单位（如万元），而文档用"亿元"等人性化单位写，要换算回基准单位的原始数值再输出，别照抄文档数字。
-- **收尾前自检**：给出取数结论前，对照实际拿到的工具结果核一遍——数字、行数、口径、单位、筛选条件是否一致，有没有该列全/该去重/该换算却漏了的。发现问题就修正再答。
-
-# 数据输出格式
-
-- 数据对比用 Markdown 表格；关键数字加粗。
-- 说明数据来源（"根据 sales.csv"）。
-- 开放式分析最多 5-7 条洞察，每条带关键数字和一句解释，不要套话和长段落。
-
-# 结果卡（可选）
-
-当用户要的是一个确定的数据结果（计数、最值、某条记录、满足条件的列表）时，可以在回答**末尾**附一个 ```answer 块——平台会把它渲染成一张干净的查询结果卡，方便用户查看和复制。这是锦上添花，不是硬性要求：日常分析、解读、概念问答都不需要它。
-
-用的时候格式是 CSV：首行列名，逗号分隔，每行一条记录，只放答案本身（不要汇总行、序号、单位后缀、千分位逗号），数值写原始值（22101086925，不写"约221亿"），并与正文结论一致。
-
-# 文件概览的诚实（A、B 都适用）
-
-用户问"有什么文件/数据"时，基于上方数据空间信息给完整全局概览：先报总数和类型构成（"共 601 个文件：377 个 Python、112 个 Markdown、2 个 CSV…"）。文档、代码、图片、表格都是数据空间平等的一部分，你对它们都有认知，不要只挑表格说、也别只说"有两个 csv"就收尾，那会让用户以为你看不到其余文件。如确有结构化表格可直接做统计分析，可顺带点出来，但不要把文档/代码贬为次要。
-
-# 代码执行约束（execute_python / pandas_query）
-
-- 受限沙箱：可用 pandas/numpy 等白名单库和预加载的 `df_xxx`。禁止 open、import 非白名单模块（含 sqlite3/os/sys）、exec/eval。查库用 sqlite_query，读文件用 read_file，不要在沙箱里绕。
-- 每次调用都是全新无状态沙箱：上一轮的变量、筛选结果、新增列都不保留。多步分析写成一个完整代码块（类型转换 → 派生列 → 过滤 → 聚合 → 排序 → 赋给 result 或 print）。
-- 写代码前先从 schema/inspect_data 确认真实列名和可用 DataFrame 变量，别凭中文问题猜。用 `.copy()` 存筛选后的 DataFrame，避免链式赋值。
-- pandas_query 里文件固定叫 `df`；execute_python 里用 schema 标注的 `df_xxx`。
-- 不要运行只赋值不输出的静默代码；不要把 `df.drop(inplace=True)`、`list.sort()` 这类返回 None 的结果赋给 result。
-- 嵌套 JSON 已自动展平成标准 DataFrame，直接按业务列名取数。"""
-
-
-# 普通对话规范：当前对话既没有项目、也没有聊天上传的临时文件时使用。
-# 此时不存在任何可读的文件/数据空间，模型应作为通用助手回答，绝不假设有文件可看、
-# 不提"数据空间"、不调 list_files / read_file / search_data_space / inspect_data 等
-# 文件与数据工具（它们此刻无文件可操作，调用只会返回空）。
-GENERAL_MODE_GUIDANCE = """# 当前是普通对话（未挂载任何项目或文件）
-
-- 这是一次普通对话：用户没有选择项目，也没有上传文件，因此**当前没有任何文件或数据可供读取分析**。
-- 像一个通用 AI 助手那样直接回答：概念解释、方法建议、写作润色、起草文案、代码/思路讨论、学习答疑、闲聊等。
-- **不要假设存在文件或数据空间**，不要说"让我看看数据空间/项目里有什么"，不要调用 list_files / read_file / search_data_space / inspect_data / pandas_query / sqlite_query 等文件与数据工具——此刻它们没有任何文件可操作。
-- 如果用户的需求确实需要分析他的文件或数据，友好地提示：可以在左侧选择一个项目，或直接把文件拖到输入框上传，然后你就能基于这些内容来帮他。
-- 多步骤的纯思考/写作任务仍可用 update_plan 列计划；但单轮问答、解释、闲聊不必用。"""
+- 数据对比用 Markdown 表格、关键数字加粗、说明来源；开放式分析最多 5-7 条洞察，每条带关键数字和一句解释，不要套话。
+- 公式用 LaTeX：行内 `$...$`，独立 `$$...$$`，不要包在代码块里。
+- Markdown 稳定：不输出破损表格、未闭合代码块；列表层级不超过两层。
+- 当用户要的是一个确定的数据结果（计数/最值/某条记录/满足条件的列表）时，可在回答末尾附一个 ```answer 块（CSV：首行列名，逗号分隔，只放答案本身，数值写原始值），平台会渲染成查询结果卡。这是可选项，日常解读/概念问答不需要。
+- 当用户要「把某个文件发我 / 下载 X / 给我那个文件」，或需要让用户直接拿到数据空间里某个**已存在的文件**时，用 ```file 块单独一行写文件名（如 ```file\nsales.csv``` ），平台会渲染成可下载、可预览的文件卡。只用 list_files 里真实存在的准确文件名，不要臆造；普通提到文件名时不必用。"""
 
 
 
@@ -318,622 +194,51 @@ class AgentLoop:
         self.max_iterations = 40
         self._abort_check = abort_check or (lambda: False)
 
-    _FILE_TYPE_LABELS = {
-        "csv": "表格数据", "tsv": "表格数据", "xlsx": "Excel表格", "xls": "Excel表格",
-        "json": "JSON数据", "jsonl": "JSON数据", "parquet": "列式数据", "feather": "列式数据",
-        "dta": "Stata数据", "sav": "SPSS数据", "sas7bdat": "SAS数据",
-        "sqlite": "SQLite数据库", "db": "SQLite数据库", "sqlite3": "SQLite数据库",
-        "py": "Python代码", "r": "R代码", "sql": "SQL脚本", "ipynb": "Jupyter笔记本",
-        "txt": "文本文件", "md": "Markdown文档", "log": "日志文件",
-        "html": "HTML文件", "xml": "XML文件", "yaml": "配置文件", "yml": "配置文件",
-        "pdf": "PDF文档", "docx": "Word文档", "pptx": "PowerPoint课件", "ppt": "PowerPoint旧版课件",
-        "png": "图片", "jpg": "图片", "jpeg": "图片", "gif": "图片", "bmp": "图片", "webp": "图片",
-    }
+    async def _file_notice(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
+        """一行式文件提示：只告诉模型本轮挂载了几个文件、什么类型，需要时自己用工具探索。
 
-    # 进入数据模式的触发词。原则：靠「点名了数据/文件/课程资料」或「数据特有的强动词」
-    # 来判断，而不是靠 总结/分析/统计/报告/趋势 这类在通用、写作、代码讨论里同样高频的
-    # 泛词——那些泛词是误判主因（"总结一下这个思路""分析下这段代码"会被错判成数据任务）。
-    # 数据问题在本产品里几乎总会点到具体名词：文件名、表/字段、上传内容、或课程资料。
-    _DATA_CONTEXT_TRIGGERS = (
-        # 数据空间 / 文件 / 表结构（强信号）
-        "数据空间", "数据集", "文件", "上传", "工作表", "字段", "列名", "明细", "表格",
-        "有什么数据", "有哪些数据", "有什么文件", "有哪些文件",
-        # 课程资料类名词：指向「上传的资料文件」的才保留为预取信号。
-        # "课程/复习/考点" 是学习意图词，纯概念问答里同样高频（"复习傅里叶变换"），
-        # 留着会过度预取且轻微把模型往找文件方向带，故移除——这类问题命中与否都能
-        # 正确回答，差别仅在是否多预取一层 schema，按「偏向少预取」原则去掉。
-        "资料", "文档", "课件", "讲义", "笔记", "习题", "论文", "报告",
-        # 逐篇/逐个处理上传内容的措辞：「逐篇讲解」「每一篇」「每个文件」几乎总指向
-        # 数据空间里的文档，应进数据模式并预取文件清单。
-        "逐篇", "每一篇", "每篇", "逐个", "每个文件", "每一个文件",
-        # 数据特有的强动词（很少用于抽象对象）
-        "查询", "筛选", "列出", "去重", "取数", "导出", "图表", "排名",
-        # 明确指向上传内容的指代
-        "这份", "这个文件", "这些文件", "该文件", "上述文件",
-        # 文件类型 / 数据术语（英文，强信号）
-        "dataset", "csv", "json", "jsonl", "xlsx", "excel", "sqlite",
-        "schema", "dataframe", "数据库",
-    )
-
-    # 强制走通用模式的覆盖词：即使命中了某个触发词，只要问题明显是概念/方法/代码/架构讨论，
-    # 就不注入数据上下文。命中这里 → 直接通用。
-    _GENERAL_CONTEXT_HINTS = (
-        "怎么设计", "如何设计", "架构", "提示词", "system prompt", "prompt", "codex",
-        "claude code", "agent设计", "为什么感觉", "是否有强调", "需要调整",
-        "什么是", "是什么", "怎么理解", "如何理解", "什么意思", "原理是",
-        "有什么区别", "优缺点", "利弊", "这段代码", "代码逻辑", "怎么实现", "如何实现",
-    )
-
-    @classmethod
-    def _should_include_data_context(cls, user_message: str, data_space_id: uuid.UUID | None) -> bool:
-        """判断本轮是否需要把完整数据空间/schema 注入模型上下文。
-
-        Codex/Claude Code 类 agent 的提示词是「通用核心 + 按需注入项目/工具上下文」。
-        这里也采用同样思路：选了数据空间不等于每个问题都要走数据分析模式。
+        刻意做得很轻：一次 DB 查询拿到文件清单做计数，不加载任何 DataFrame、不读列级
+        schema、不读文件内容。详细信息全部交给按需工具（list_files / inspect_data /
+        read_file），让系统提示词保持静态、prompt 缓存稳定命中。
         """
         if not data_space_id:
-            return False
-        text = (user_message or "").strip().lower()
-        if not text:
-            return False
-        if any(hint in text for hint in cls._GENERAL_CONTEXT_HINTS):
-            return False
-        return any(trigger in text for trigger in cls._DATA_CONTEXT_TRIGGERS)
-
-    async def _get_selected_space_notice(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
-        """给通用模式一份轻量数据空间上下文。
-
-        通用助手应该知道当前数据空间存在以及大致包含什么，但不应该在普通问题里
-        被完整文件清单、schema、样本值和列画像带偏。
-        """
-        if not data_space_id:
-            return "未选择数据空间。用户可以进行通用对话。"
+            return (
+                "【当前对话没有挂载任何文件或数据。】这是一次普通对话——直接回答即可"
+                "（概念、写作、代码、答疑、闲聊都行）。若用户想分析文件，提示他在左侧选择项目"
+                "或把文件拖进输入框上传，之后你就能用 list_files / read_file 等工具处理。"
+            )
         try:
             async with get_session_factory()() as db:
-                result = await db.execute(
-                    select(DataSpace).where(DataSpace.id == data_space_id, DataSpace.user_id == user_id)
+                # 校验空间归属，避免计入非本人空间的文件（与旧 notice 一致的防御）
+                space_ok = await db.execute(
+                    select(DataSpace.id).where(
+                        DataSpace.id == data_space_id, DataSpace.user_id == user_id
+                    )
                 )
-                space = result.scalar_one_or_none()
-                if space:
-                    file_result = await db.execute(
-                        select(File)
-                        .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
-                        .where(DataSpaceFile.data_space_id == data_space_id)
-                    )
-                    files = file_result.scalars().all()
-                    from collections import Counter
-
-                    label_counts: Counter = Counter(
-                        self._FILE_TYPE_LABELS.get(f.file_type, f.file_type) for f in files
-                    )
-                    type_summary = ", ".join(
-                        f"{cnt} 个 {label}" for label, cnt in label_counts.most_common()
-                    ) or "空"
-
-                    # 一行式数据文件索引（只列文件名，几十 token）：让模型即使在通用模式下
-                    # 也知道有哪些可直接分析的结构化数据存在，需要时自己用 inspect_data /
-                    # read_file 拉取详细 schema，而不必把列级细节预注入进来。
-                    DATA_EXTS = {
-                        "csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet",
-                        "feather", "dta", "sav", "sas7bdat", "sqlite", "db", "sqlite3",
-                    }
-                    data_files = [f for f in files if f.file_type in DATA_EXTS]
-                    index_line = ""
-                    if data_files:
-                        names = "、".join(f.filename for f in data_files[:15])
-                        more = f" 等 {len(data_files)} 个" if len(data_files) > 15 else ""
-                        index_line = f"可直接分析的数据文件：{names}{more}。\n"
-
-                    # 文档类文件名（PDF/Word/PPT 等）也列出来：用户常把论文、报告、讲义传进来，
-                    # 让模型即使在通用模式下也知道这些文档叫什么，要讲解时能直接 read_file，
-                    # 不必先猜文件名或用 search 去凑。只列文件名，几十 token。
-                    DOC_EXTS = {"pdf", "docx", "pptx", "ppt", "md", "txt"}
-                    doc_files = [f for f in files if f.file_type in DOC_EXTS]
-                    doc_line = ""
-                    if doc_files:
-                        dnames = "、".join(f.filename for f in doc_files[:15])
-                        dmore = f" 等 {len(doc_files)} 个" if len(doc_files) > 15 else ""
-                        doc_line = f"文档文件：{dnames}{dmore}。\n"
-
-                    # knowledge.md 存在性提示（不注入全文，只标存在）
-                    knowledge_note = ""
-                    if any(f.filename.lower() == "knowledge.md" for f in files):
-                        knowledge_note = "本空间含 knowledge.md（领域知识/口径说明），需要时用 read_file 读取。\n"
-
-                    return (
-                        f"当前已选择数据空间: {space.name}\n"
-                        f"轻量概览: 共 {len(files)} 个文件；按类型构成：{type_summary}。\n"
-                        f"{index_line}"
-                        f"{doc_line}"
-                        f"{knowledge_note}"
-                        "本轮问题看起来不依赖上传内容；你可以知道这些上下文存在，但除非用户明确要求读取或分析该空间，不要展开 schema、调用数据工具或围绕 CSV/JSON/表格改写问题。需要时再用 list_files / inspect_data / read_file / search_data_space 按需拉取。"
-                    )
-        except Exception as e:
-            logger.warning("selected space notice failed: %s", e)
-        return "当前已选择数据空间，但本轮问题看起来不依赖上传内容；知道数据空间存在即可，不要主动展开 schema 或调用数据工具。"
-
-    async def _get_data_space_info(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
-        """获取数据空间的上下文信息"""
-        if not data_space_id:
-            return "未选择数据空间。用户可以进行通用对话。"
-
-        async with get_session_factory()() as db:
-            result = await db.execute(
-                select(DataSpace).where(DataSpace.id == data_space_id, DataSpace.user_id == user_id)
-            )
-            space = result.scalar_one_or_none()
-            if not space:
-                return "数据空间不存在"
-
-            file_result = await db.execute(
-                select(File)
-                .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
-                .where(DataSpaceFile.data_space_id == data_space_id)
-            )
-            files = file_result.scalars().all()
-
-            def _format_size(n: int) -> str:
-                if n > 1024 * 1024:
-                    return f"{n / 1024 / 1024:.1f}MB"
-                return f"{n / 1024:.0f}KB"
-
-            from collections import Counter
-
-            def _summarize_by_label(file_list: list) -> str:
-                """按"显示标签"聚合计数（png/jpg/gif 都算"图片"，yaml/yml 都算"配置文件"），
-                避免出现"36 个 图片, 12 个 图片"这种按扩展名拆开的重复项。"""
-                label_counts: Counter = Counter()
-                for f in file_list:
-                    label_counts[self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)] += 1
-                return ", ".join(f"{cnt} 个 {label}" for label, cnt in label_counts.most_common())
-
-            # 数据型文件（真正可分析的）。csv/excel/数据库等是明确的数据；json/jsonl 比较
-            # 含糊（可能是数据，也可能是 package.json 这类项目配置），所以排在明确数据之后。
-            CORE_DATA_EXTS = {"csv", "tsv", "xlsx", "xls", "parquet", "feather", "dta", "sav", "sas7bdat", "sqlite", "db", "sqlite3"}
-            JSON_EXTS = {"json", "jsonl"}
-            DATA_EXTS = CORE_DATA_EXTS | JSON_EXTS
-            data_files = [f for f in files if f.file_type in DATA_EXTS]
-            other_files = [f for f in files if f.file_type not in DATA_EXTS]
-            # 明确的数据文件排在前，json 类排后
-            data_files.sort(key=lambda f: 0 if f.file_type in CORE_DATA_EXTS else 1)
-
-            # 文件数较少时：直接全量列出（保持原行为）
-            if len(files) <= 30:
-                file_list = "\n".join(
-                    f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
-                    for f in files
+                if space_ok.scalar_one_or_none() is None:
+                    return "【当前项目暂无文件。】若用户要分析数据，提示他先上传文件；其余问题正常回答。"
+                file_result = await db.execute(
+                    select(File)
+                    .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
+                    .where(DataSpaceFile.data_space_id == data_space_id)
                 )
-                return f"""数据空间名称: {space.name}
-描述: {space.description or '无'}
-共 {len(files)} 个文件:
-{file_list or '  (空)'}"""
-
-            # 文件很多（如上传了整个代码仓库）：给出按类型的完整构成 + 重点列出数据文件，
-            # 避免上千行文件名挤爆上下文，也避免 Agent 误以为"只有几个文件"。
-            type_summary = _summarize_by_label(files)
-
-            data_list = "\n".join(
-                f"  - {f.filename} [{self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)}] ({_format_size(f.file_size)})"
-                for f in data_files[:40]
-            ) or "  (无结构化数据文件)"
-            data_more = f"\n  ...（还有 {len(data_files) - 40} 个数据/JSON 文件）" if len(data_files) > 40 else ""
-
-            # 非数据文件只给出按类型计数，必要时 Agent 可用工具进一步查看
-            other_line = _summarize_by_label(other_files)
-
-            return f"""数据空间名称: {space.name}
-描述: {space.description or '无'}
-共 {len(files)} 个文件。按类型构成：{type_summary}
-
-可分析的数据文件（{len(data_files)} 个，CSV/Excel/数据库等在前，JSON 类在后——注意 package.json/tsconfig.json 等多为项目配置而非业务数据）：
-{data_list}{data_more}
-
-其余 {len(other_files)} 个文件（代码/文档/图片/配置等，需要时可用 read_file 查看）：{other_line or '无'}"""
-
-    async def _rank_files_by_relevance(self, user_message: str, data_space_id: uuid.UUID,
-                                       files: list) -> dict[str, float] | None:
-        """按用户问题给文件打相关性分（0~1）。复用已有的混合检索：把块级命中
-        聚合成文件级分数（同一文件取最高分 + 命中数轻微加权），叠加文件名/列名的
-        字面匹配。返回 {file_id: score}；检索不可用或问题为空时返回 None（调用方退回静态策略）。
-        """
-        q = (user_message or "").strip()
-        if not q or not files:
-            return None
-        scores: dict[str, float] = {}
-        # 1) 向量/BM25 混合检索（块级 → 文件级聚合）
-        try:
-            from app.services.retrieval import get_retrieval_service
-            import asyncio as _asyncio
-            svc = get_retrieval_service(str(data_space_id))
-            results = await _asyncio.get_event_loop().run_in_executor(
-                None, lambda: svc.search(q, top_k=30)
-            )
-            hit_counts: dict[str, int] = {}
-            for r in results or []:
-                fid = (r.metadata or {}).get("file_id")
-                if not fid:
-                    continue
-                fid = str(fid)
-                scores[fid] = max(scores.get(fid, 0.0), float(getattr(r, "score", 0.0) or 0.0))
-                hit_counts[fid] = hit_counts.get(fid, 0) + 1
-            # 命中块越多越相关：每多一个块 +0.03，封顶 +0.15
-            for fid, c in hit_counts.items():
-                scores[fid] = min(1.0, scores[fid] + min(0.15, (c - 1) * 0.03))
-        except Exception as e:
-            logger.warning("relevance retrieval failed, falling back to filename match: %s", e)
-
-        # 2) 文件名字面匹配（轻量、零依赖兜底，检索挂了也有效）
-        try:
-            from app.services.retrieval import _tokenize_filtered
-            q_tokens = set(_tokenize_filtered(q))
-            if q_tokens:
-                for f in files:
-                    name_tokens = set(_tokenize_filtered(str(f.filename)))
-                    if name_tokens & q_tokens:
-                        fid = str(f.id)
-                        scores[fid] = min(1.0, scores.get(fid, 0.0) + 0.2)
+                files = file_result.scalars().all()
         except Exception:
-            pass
+            files = []
 
-        return scores or None
+        if not files:
+            return "【当前项目暂无文件。】若用户要分析数据，提示他先上传文件；其余问题正常回答。"
 
-    async def _build_schema_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID,
-                                    user_message: str = "") -> str:
-        """预注入 schema + 质量信息。
-        选文件策略：先按用户问题做相关性排序（检索 + 文件名匹配），相关文件注入详细
-        schema，其余数据文件只给一行「文件名 + 行列数」清单——让模型知道它们存在、
-        需要时自己 inspect_data。问题为空或检索不可用时退回静态「数据文件优先 + 前 N」。
-        合并策略：已有 profile 的文件用 profile 数据，还没处理完的用实时加载兜底。"""
-        if not data_space_id:
-            return ""
+        from collections import Counter
+        type_counts = Counter((f.file_type or "?").lower() for f in files)
+        type_summary = "、".join(f"{cnt} 个 {ext}" for ext, cnt in type_counts.most_common())
+        return (
+            f"【当前项目挂载了 {len(files)} 个文件（{type_summary}）。】需要时自己用工具探索："
+            "list_files 看完整清单和文件名、read_file 读文档/PDF/代码内容、"
+            "inspect_data 看表格结构、search_data_space 在大量文本里定位、"
+            "sqlite_query / pandas_query 做表格统计。不必把所有文件都打开——按问题需要取用。"
+        )
 
-        try:
-            from app.models.data_profile import DataProfile
-            from app.agent.tools import _get_space_files, _load_df, _build_dataframe_preload
-            import pandas as pd
-            import asyncio
-
-            # 获取所有文件
-            all_files = await _get_space_files(user_id, data_space_id)
-            if not all_files:
-                return ""
-            _preload, df_var_by_file_id = _build_dataframe_preload(all_files)
-
-            # 获取已完成的 profiles
-            async with get_session_factory()() as db:
-                result = await db.execute(
-                    select(DataProfile).where(
-                        DataProfile.data_space_id == data_space_id,
-                    )
-                )
-                all_profiles = result.scalars().all()
-
-            profile_map = {}
-            for p in all_profiles:
-                profile_map[str(p.file_id)] = p
-
-
-            all_columns: dict[str, dict[str, set]] = {}
-            MAX_SCHEMA_COLS = 30
-            TABULAR_EXTS = {"csv", "tsv", "xlsx", "xls", "json", "jsonl", "parquet", "feather", "dta", "sav", "sas7bdat"}
-            # 可分析的数据型扩展（含数据库），schema 预注入时优先保证这些文件入选，
-            # 避免代码仓库类空间里几百个 .py/.md 把仅有的几个数据文件挤出前 N。
-            DATA_EXTS = TABULAR_EXTS | {"sqlite", "db", "sqlite3"}
-
-            # 选文件：优先按用户问题的相关性排序；问题为空/检索不可用时退回
-            # 「数据文件优先」的静态排序。相关文件进详细 schema，其余只列清单。
-            relevance = await self._rank_files_by_relevance(user_message, data_space_id, all_files)
-            if relevance:
-                # 相关性优先；同分内数据文件在前；再按相关分降序。无分的排后面。
-                sorted_files = sorted(
-                    all_files,
-                    key=lambda f: (
-                        0 if relevance.get(str(f.id), 0.0) > 0 else 1,
-                        0 if f.file_type in DATA_EXTS else 1,
-                        -relevance.get(str(f.id), 0.0),
-                    ),
-                )
-            else:
-                # 数据文件优先排序：数据型在前、其余在后，再截断。这样 601 文件里的 2 个 csv
-                # 一定会进入 schema 预注入，而不是被前 15 个代码文件占满名额。
-                sorted_files = sorted(
-                    all_files,
-                    key=lambda f: 0 if f.file_type in DATA_EXTS else 1,
-                )
-            MAX_SCHEMA_FILES = 25
-            shown_ids: set[str] = set()
-            preview_files = sorted_files[:MAX_SCHEMA_FILES]
-            lines = [
-                "## 本轮相关文件预览（非完整文件清单）\n",
-                f"以下只展开最多 {MAX_SCHEMA_FILES} 个与本轮问题相关或优先的数据文件，用于快速判断可用上下文。",
-                f"当前数据空间实际共有 {len(all_files)} 个文件；未在本预览展开的文件仍然存在，可按需用 read_file / search_data_space / inspect_data 查看。",
-                "",
-            ]
-
-            # 遍历文件（相关/数据文件优先）
-            for f in preview_files:
-                fid = str(f.id)
-                shown_ids.add(fid)
-                profile = profile_map.get(fid)
-
-                # 有 profile 且已就绪 → 用 profile 的丰富信息
-                if profile and profile.status == "ready" and profile.profile_type == "tabular":
-                    data = profile.profile_data or {}
-
-                    df_var = df_var_by_file_id.get(str(f.id))
-                    py_hint = f"  python变量={df_var}" if df_var else ""
-                    sheet_profiles = data.get("sheets") if data.get("workbook") else None
-                    if sheet_profiles:
-                        lines.append(f"### {f.filename}  Excel工作簿 sheets={data.get('sheet_count', len(sheet_profiles))}{py_hint}")
-                        profiles_to_render = sheet_profiles[:8]
-                    else:
-                        lines.append(f"### {f.filename}  rows={data.get('row_count', '?')}  cols={data.get('column_count', '?')}{py_hint}")
-                        profiles_to_render = [data]
-
-                    for sheet_data in profiles_to_render:
-                        columns = sheet_data.get("columns", [])
-                        sheet_name = sheet_data.get("sheet_name")
-                        indent = "    "
-                        source_label = f"{f.filename}[{sheet_name}]" if sheet_name else f.filename
-                        if sheet_name:
-                            lines.append(f"    - 工作表 {sheet_name}: rows={sheet_data.get('row_count', '?')} cols={sheet_data.get('column_count', '?')}")
-                            indent = "      "
-                        for c in columns[:MAX_SCHEMA_COLS]:
-                            name = c.get("name", "?")
-                            dtype = c.get("dtype", "?")
-                            unique = c.get("unique_count", "?")
-                            null_pct = c.get("null_pct", 0)
-                            samples = c.get("sample_values", [])[:3]
-                            samples_str = ", ".join(str(s)[:20] for s in samples)
-                            extra = ""
-                            if null_pct > 5:
-                                extra += f" null={null_pct}%"
-                            stats = c.get("stats")
-                            if stats and stats.get("mean") is not None:
-                                extra += f" mean={stats['mean']}"
-                            top = c.get("top_values")
-                            if top:
-                                extra += f" top=[{', '.join(f'{k}:{v}' for k,v in list(top.items())[:3])}]"
-                            lines.append(f"{indent}- {name} ({dtype}) unique={unique} ex=[{samples_str}]{extra}")
-                            if name not in all_columns:
-                                all_columns[name] = {}
-                            all_columns[name][source_label] = set(str(s) for s in samples)
-
-                        if len(columns) > MAX_SCHEMA_COLS:
-                            lines.append(f"{indent}...（还有 {len(columns) - MAX_SCHEMA_COLS} 列）")
-
-                        quality = sheet_data.get("quality", {})
-                        qp = []
-                        if quality.get("duplicate_pct", 0) > 1: qp.append(f"重复率{quality['duplicate_pct']}%")
-                        if quality.get("complete_pct", 100) < 95: qp.append(f"完整率{quality['complete_pct']}%")
-                        if quality.get("outlier_columns"): qp.append(f"{len(quality['outlier_columns'])}列有异常值")
-                        if quality.get("type_suggestions"): qp.append(f"{len(quality['type_suggestions'])}列可转类型")
-                        if qp:
-                            lines.append(f"{indent}⚠️ {', '.join(qp)}")
-                    if sheet_profiles and len(sheet_profiles) > 8:
-                        lines.append(f"    ...（还有 {len(sheet_profiles) - 8} 个工作表）")
-                    lines.append("")
-
-                elif profile and profile.status == "ready" and profile.profile_type in ("text", "document"):
-                    data = profile.profile_data or {}
-                    chars = data.get("char_count", 0)
-                    line_count = data.get("line_count", 0)
-                    preview = data.get("preview", "")[:200]
-                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
-                    size_info = f"{chars}字" + (f", {line_count}行" if line_count else "")
-                    lines.append(f"### {f.filename} ({type_label}, {size_info})")
-                    lines.append(f"    内容预览: {preview}")
-                    lines.append("")
-
-                elif profile and profile.status == "ready" and profile.profile_type == "database":
-                    data = profile.profile_data or {}
-                    tables = data.get("tables", [])
-                    lines.append(f"### {f.filename} (数据库, {len(tables)}张表)")
-                    for t in tables[:5]:
-                        cols = ", ".join(c["name"] for c in t.get("columns", [])[:8])
-                        lines.append(f"    - {t['name']} ({t.get('row_count', '?')}行): {cols}")
-                    lines.append("")
-
-                elif profile and profile.status == "ready" and profile.profile_type == "image":
-                    data = profile.profile_data or {}
-                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
-                    lines.append(f"### {f.filename} ({type_label})")
-                    if data.get("ocr_applied") and data.get("preview"):
-                        lines.append(f"    OCR 识别内容预览: {data['preview'][:200]}")
-                    else:
-                        dims = f"{data.get('width', '?')}x{data.get('height', '?')}"
-                        lines.append(f"    尺寸 {dims}，暂无可提取文本（OCR 未配置或处理中）")
-                    lines.append("")
-
-
-                elif profile and profile.status == "ready" and profile.profile_type == "video":
-                    data = profile.profile_data or {}
-                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
-                    lines.append(f"### {f.filename} ({type_label})")
-                    if data.get("ocr_applied") and data.get("ocr_text"):
-                        # 视频是幻灯片型，OCR 文本往往定义了本题的筛选口径/准入线/分组维度。
-                        # 放入前 4000 字；若更长，提示 Agent 用 read_file 读取完整内容。
-                        ocr = data["ocr_text"]
-                        lines.append("    视频逐帧 OCR 文本（定义了本题的筛选条件/统计口径/分组维度，必须据此理解问题，不要说无法提取视频内容）：")
-                        lines.append("    " + ocr[:4000].replace("\n", "\n    "))
-                        if len(ocr) > 4000:
-                            lines.append(f"    （视频文本较长，共 {len(ocr)} 字，如需完整内容用 read_file 读取 {f.filename}）")
-                    elif data.get("preview"):
-                        lines.append(f"    OCR 识别内容预览: {data['preview'][:200]}")
-                    else:
-                        lines.append("    暂无可提取文本（OCR 未配置或处理中）")
-                    lines.append("")
-
-
-                elif f.file_type in TABULAR_EXTS:
-                    # 没有 profile 或正在处理 → 实时加载基础 schema（线程池避免阻塞）
-                    fp = Path(settings.storage_root) / f.storage_path
-                    if fp.exists():
-                        try:
-                            loop = asyncio.get_event_loop()
-                            df = await loop.run_in_executor(None, _load_df, fp, f.file_type)
-                            df_var = df_var_by_file_id.get(str(f.id))
-                            py_hint = f"  python变量={df_var}" if df_var else ""
-                            lines.append(f"### {f.filename}  rows={len(df)}  cols={len(df.columns)}{py_hint}")
-                            for col in list(df.columns)[:MAX_SCHEMA_COLS]:
-                                dtype = str(df[col].dtype)
-                                nn = df[col].dropna()
-                                # list/dict 单元格（LLM 训练数据类 json/jsonl 常见）不可哈希，
-                                # nunique()/unique() 会抛 unhashable type，整块掉进 except 被误
-                                # 标「加载中」。统一字符串化后再统计/取样，保证 schema 正常预注入。
-                                str_vals = nn.map(
-                                    lambda v: json.dumps(v, ensure_ascii=False)
-                                    if isinstance(v, (list, dict)) else str(v)
-                                )
-                                try:
-                                    unique = int(str_vals.nunique())
-                                except Exception:
-                                    unique = "?"
-                                samples = ", ".join(s[:20] for s in str_vals.unique()[:3])
-                                lines.append(f"    - {col} ({dtype}) unique={unique} ex=[{samples}]")
-                                if col not in all_columns:
-                                    all_columns[col] = {}
-                                all_columns[col][f.filename] = set(str_vals.unique()[:50].tolist())
-                            lines.append("")
-                        except Exception:
-                            lines.append(f"### {f.filename} ({f.file_type}, 加载中...)")
-                            lines.append("")
-                else:
-                    # 非表格文件且无 profile — 尽量给出有意义的描述
-                    type_label = self._FILE_TYPE_LABELS.get(f.file_type, f.file_type)
-                    def _fmt_size(n: int) -> str:
-                        return f"{n/1024/1024:.1f}MB" if n > 1024*1024 else f"{n/1024:.0f}KB"
-                    lines.append(f"### {f.filename} ({type_label}, {_fmt_size(f.file_size)})")
-                    # 尝试快速读取文件开头给 Agent 更多上下文
-                    if f.file_type in ("txt", "md", "py", "sql", "r", "html", "xml", "yaml", "yml", "log", "ipynb"):
-                        try:
-                            fp = Path(settings.storage_root) / f.storage_path
-                            if fp.exists():
-                                raw = fp.read_text(encoding="utf-8", errors="ignore")[:300]
-                                lines.append(f"    内容预览: {raw}")
-                        except Exception:
-                            pass
-                    elif f.file_type in ("pdf", "docx", "pptx"):
-                        try:
-                            from app.services.document_text import extract_document_text
-                            fp = Path(settings.storage_root) / f.storage_path
-                            if fp.exists():
-                                raw = extract_document_text(fp, f.file_type)[:300]
-                                if raw:
-                                    lines.append(f"    内容预览: {raw}")
-                        except Exception:
-                            pass
-                    elif f.file_type == "ppt":
-                        lines.append("    旧版 .ppt 暂不支持抽取文本，请转换为 .pptx 后上传")
-                    lines.append("")
-
-            # 其余数据文件清单：没进详细 schema 的数据文件，只给一行「文件名 + 行列数」，
-            # 几乎不耗 token，但让模型知道它们存在、需要时可自己 inspect_data / read_file。
-            remaining = [f for f in all_files
-                         if str(f.id) not in shown_ids and f.file_type in DATA_EXTS]
-            if remaining:
-                lines.append("")
-                lines.append(f"### 其余数据文件（共 {len(remaining)} 个，未展开详细结构；如与问题相关可用 inspect_data 查看）")
-                for f in remaining[:60]:
-                    p = profile_map.get(str(f.id))
-                    dims = ""
-                    if p and p.status == "ready" and isinstance(p.profile_data, dict):
-                        rc = p.profile_data.get("row_count")
-                        cc = p.profile_data.get("column_count")
-                        if rc is not None or cc is not None:
-                            dims = f"  rows={rc or '?'} cols={cc or '?'}"
-                    lines.append(f"- {f.filename}{dims}")
-                if len(remaining) > 60:
-                    lines.append(f"- …（还有 {len(remaining) - 60} 个数据文件）")
-
-            remaining_all = [f for f in all_files if str(f.id) not in shown_ids]
-            if remaining_all:
-                from collections import Counter
-                label_counts: Counter = Counter(
-                    self._FILE_TYPE_LABELS.get(f.file_type, f.file_type) for f in remaining_all
-                )
-                type_summary = ", ".join(
-                    f"{cnt} 个 {label}" for label, cnt in label_counts.most_common()
-                )
-                lines.append("")
-                lines.append("### 未展开文件说明")
-                lines.append(
-                    f"还有 {len(remaining_all)} 个文件未在本轮预览展开；类型构成：{type_summary or '无'}。"
-                )
-                lines.append("这些文件不是缺失，只是未预注入详细内容；如果用户问题涉及它们，继续用文件工具查看。")
-
-            # JOIN 检测
-            joins = self._detect_joins_for_schema(all_columns)
-            if joins:
-                lines.append("### 潜在 JOIN 关系")
-                lines.extend(joins)
-
-            return "\n".join(lines)
-        except Exception as e:
-            logger.warning("schema context build failed, returning empty: %s", e)
-            return ""
-
-    def _detect_joins_for_schema(self, all_columns: dict[str, dict[str, set]]) -> list[str]:
-        """增强的 join 检测（来自 KDD-CUP）"""
-        suggestions = []
-        col_names = list(all_columns.keys())
-
-        for col_name, file_vals in all_columns.items():
-            if len(file_vals) < 2:
-                continue
-            files = list(file_vals.keys())
-            for i in range(len(files)):
-                for j in range(i + 1, len(files)):
-                    vals_a, vals_b = file_vals[files[i]], file_vals[files[j]]
-                    if not vals_a or not vals_b:
-                        continue
-                    intersection = vals_a & vals_b
-                    union = vals_a | vals_b
-                    jaccard = len(intersection) / len(union) if union else 0
-                    if jaccard > 0.05 and len(intersection) > 1:
-                        tags = ["name_match"]
-                        if self._is_id_like(col_name):
-                            tags.append("id_like")
-                        suggestions.append(
-                            f"  {files[i]}:{col_name} <-> {files[j]}:{col_name}  [{', '.join(tags)}]  overlap={jaccard:.2f}"
-                        )
-
-        for col_a in col_names:
-            if not self._is_id_like(col_a):
-                continue
-            base_a = col_a.lower().replace("_id", "").replace("id", "").strip("_")
-            for col_b in col_names:
-                if col_a == col_b:
-                    continue
-                base_b = col_b.lower().replace("_id", "").replace("id", "").strip("_")
-                if base_a and base_a == base_b and col_a in all_columns and col_b in all_columns:
-                    for fa in all_columns[col_a]:
-                        for fb in all_columns[col_b]:
-                            if fa != fb:
-                                suggestions.append(f"  {fa}:{col_a} <-> {fb}:{col_b}  [id_pattern]")
-
-        return suggestions[:15]
-
-    @staticmethod
-    def _is_id_like(name: str) -> bool:
-        n = name.lower()
-        return n.endswith("_id") or n == "id" or (n.endswith("id") and len(n) > 2 and n[-3].isalpha())
-
-    async def _get_knowledge_context(self, data_space_id: uuid.UUID | None, user_id: uuid.UUID) -> str:
-        """如果数据空间中有 knowledge.md，自动注入"""
-        if not data_space_id:
-            return ""
-        try:
-            from app.agent.tools import _get_file_path
-            for name in ("knowledge.md", "Knowledge.md", "KNOWLEDGE.md"):
-                path = await _get_file_path(name, user_id, data_space_id)
-                if path and path.exists():
-                    content = path.read_text(encoding="utf-8", errors="ignore")
-                    if content.strip():
-                        return f"## 领域知识（来自 {name}）\n\n{content[:8000]}"
-        except Exception:
-            pass
-        return ""
 
     async def _get_conversation_history(self, conversation_id: uuid.UUID) -> list[dict]:
         """获取对话历史，重建为 canonical 消息序列（见 context.py）。
@@ -1149,23 +454,11 @@ class AgentLoop:
                 yield {"type": "error", "message": "额度不足。每日免费额度会在次日自动发放，你也可以在「额度中心」查看详情，或在「设置」中配置自己的 API Key 免费使用。"}
                 return
 
-        # 构建系统提示。有项目或聊天上传的临时文件时，注入数据工作规范（DATA_MODE_GUIDANCE）；
-        # 普通对话（_all_spaces 为空：既没项目也没临时文件）则换成通用助手规范，避免模型
-        # 假设存在文件、张口就"看看数据空间里有什么"。判定用本轮活跃空间集合是否为空，
-        # 临时文件已通过 extra_space_ids 计入 _all_spaces。
-        has_any_space = len(_all_spaces) > 0
-        data_mode_guidance = DATA_MODE_GUIDANCE if has_any_space else GENERAL_MODE_GUIDANCE
-        prefetch_data_detail = self._should_include_data_context(user_message, data_space_id)
-        if prefetch_data_detail:
-            data_space_info = await self._get_data_space_info(data_space_id, user_id)
-            schema_context = await self._build_schema_context(data_space_id, user_id, user_message)
-            knowledge_context = await self._get_knowledge_context(data_space_id, user_id)
-        else:
-            # 通用问答：只给轻量数据空间索引（文件总数/类型构成 + 一行式清单），
-            # 不预注入列级 schema、样本值、knowledge 全文——这些留给模型按需用工具拉。
-            data_space_info = await self._get_selected_space_notice(data_space_id, user_id)
-            schema_context = ""
-            knowledge_context = ""
+        # 构建系统提示。提示词本体完全静态（一个通用 agent + 全量工具自助），
+        # 只注入两处动态内容：一行文件提示（本轮挂了几个文件，没有则说明是普通对话）
+        # 和相关记忆。不再做模式分流、不预加载 schema/knowledge——这些交给按需工具，
+        # 也让 prompt 缓存稳定命中（仅文件数变化时 file_notice 才变）。
+        file_notice = await self._file_notice(data_space_id, user_id)
 
         memory_context = ""
         try:
@@ -1178,11 +471,8 @@ class AgentLoop:
             logger.warning("memory recall failed, continuing without memory: %s", e)
 
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            data_space_info=data_space_info,
-            schema_context=schema_context,
-            knowledge_context=knowledge_context,
+            file_notice=file_notice,
             memory_context=memory_context,
-            data_mode_guidance=data_mode_guidance,
         )
 
         # 构建 system 块（支持 prompt caching）

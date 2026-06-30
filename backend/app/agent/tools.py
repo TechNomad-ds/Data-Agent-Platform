@@ -213,12 +213,13 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "download_to_space",
-                "description": "把一个外部文件下载到当前数据空间（下载后自动登记并建立索引，之后可用 read_file/inspect_data/search_data_space 处理）。支持直链 URL、GitHub 文件直链、HuggingFace 数据集/模型文件（自动走国内镜像 hf-mirror.com）。用户说“下载某某数据/文件到数据空间”“把这个链接的数据拿进来”时用。注意：需要的是文件的直接下载链接；HuggingFace 用形如 https://huggingface.co/datasets/<repo>/resolve/main/<file> 的 resolve 链接。Kaggle 需登录认证，暂不支持，遇到时如实告知用户。",
+                "description": "把外部数据下载并保存进【当前项目】（下载后自动登记并建索引，之后可用 read_file/inspect_data/search_data_space 处理）。支持：① HuggingFace 整个仓库（数据集/模型）——直接给仓库页链接如 https://huggingface.co/datasets/<owner>/<name> 或 https://huggingface.co/<owner>/<model>，会自动列出仓库所有文件逐个下载（走国内镜像 hf-mirror.com，超大文件如模型权重会跳过并告知）；② 单个文件直链 / GitHub 文件 / HF 单文件 resolve 链接。用户说“下载某 HF 仓库/数据集到项目”“把这个链接的数据拿进来”时用。注意：必须当前已选中一个项目才能下载（普通对话无项目时会提示用户先进项目）；Kaggle 等需登录的源暂不支持。",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "url": {"type": "string", "description": "文件的直接下载链接（http/https）"},
-                        "filename": {"type": "string", "description": "可选：保存为的文件名，不传则从 URL 推断"},
+                        "url": {"type": "string", "description": "HuggingFace 仓库页链接 / 文件直链 / GitHub 链接（http/https）"},
+                        "filename": {"type": "string", "description": "可选：单文件下载时保存为的文件名，不传则从 URL 推断（整仓下载时忽略）"},
+                        "source_type": {"type": "string", "enum": ["auto", "file", "hf_repo"], "description": "可选：下载类型。auto（默认）自动识别 HF 仓库；hf_repo 强制整仓；file 强制单文件。"},
                     },
                     "required": ["url"],
                 },
@@ -1507,7 +1508,7 @@ async def _tool_web_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.U
     max_results = args.get("max_results", 5)
     from app.services.web_search import web_search, WebSearchNotConfigured
     try:
-        results = await web_search(query, max_results=max_results)
+        data = await web_search(query, max_results=max_results)
     except WebSearchNotConfigured:
         return (
             "联网搜索未配置（管理员需在设置中填入搜索 API Key，如 Tavily/Serper）。"
@@ -1515,29 +1516,75 @@ async def _tool_web_search(args: dict, user_id: uuid.UUID, data_space_id: uuid.U
         )
     except Exception as e:
         return f"联网搜索失败：{str(e)[:150]}"
+    results = data.get("results", [])
+    images = data.get("images", [])
     if not results:
         return f"联网搜索 “{query}” 没有返回结果。可换个关键词再试。"
     lines = [f"联网搜索 “{query}” 的结果（共 {len(results)} 条）："]
     for i, r in enumerate(results, 1):
         lines.append(f"\n{i}. {r['title']}\n   {r['url']}\n   {r['snippet'][:300]}")
-    lines.append("\n\n（以上为公网搜索摘要，引用时请注明来源链接；需要正文细节可据链接进一步核实。）")
+    if images:
+        # 用 markdown 图片语法回传：前端能直接渲染。引导模型在配图有助于回答时
+        # 用 ![描述](url) 插进正文（不要用原始 <img> HTML，前端按 markdown 渲染）。
+        lines.append("\n\n相关配图（如对回答有帮助，可用 markdown 语法 ![](url) 插入正文展示）：")
+        for img_url in images[:5]:
+            lines.append(f"![]({img_url})")
+    lines.append("\n（以上为公网搜索摘要，引用时请注明来源链接；需要正文细节可据链接进一步核实。）")
     return "\n".join(lines)
 
 
 async def _tool_download_to_space(args: dict, user_id: uuid.UUID, data_space_id: uuid.UUID | None) -> str:
-    """下载外部文件到当前数据空间，登记并触发索引。"""
+    """下载外部数据（HuggingFace 整仓 / GitHub / 直链）到当前项目，登记并触发索引。"""
     if not data_space_id:
-        return "未选择数据空间，无法下载。请先绑定一个数据空间。"
+        # 面向用户的友好提示：通用对话没有可保存的落点，引导先进项目
+        return (
+            "现在是普通对话，没有可保存数据的项目。请先在左侧选择或新建一个项目，"
+            "再让我把数据下载进去——下载需要一个项目作为存放位置。"
+        )
     url = (args.get("url") or "").strip()
     if not url:
-        return "请提供文件的下载链接（url）。"
+        return "请提供要下载的链接（url），可以是 HuggingFace 仓库、GitHub 文件或任意直链。"
     override_name = (args.get("filename") or "").strip()
+    source_type = (args.get("source_type") or "auto").strip().lower()
 
-    from app.services.downloader import download_url_to_path
+    from app.services.downloader import (
+        download_url_to_path, download_hf_repo_to_dir, parse_hf_url,
+    )
     from app.services.file_intake import register_file_to_space, user_space_dir
     import uuid as _uuid
 
-    # 先落到一个新的 file_id 目录（与上传路径一致），再登记
+    # ── HuggingFace 整仓下载 ──
+    is_hf_repo = source_type == "hf_repo" or (source_type == "auto" and parse_hf_url(url) is not None)
+    if is_hf_repo:
+        try:
+            repo = await download_hf_repo_to_dir(url, user_space_dir(user_id, _uuid.uuid4()))
+        except ValueError as e:
+            return f"下载 HuggingFace 仓库失败：{e}"
+        except Exception as e:
+            return f"下载 HuggingFace 仓库失败：{e}"
+
+        registered = 0
+        for path, name in repo["files"]:
+            try:
+                await register_file_to_space(
+                    user_id=user_id, data_space_id=data_space_id,
+                    src_path=path, filename=name,
+                )
+                registered += 1
+            except Exception:
+                pass
+        total_mb = repo["total_bytes"] / 1024 / 1024
+        msg = (
+            f"已把 HuggingFace 仓库「{repo['repo_id']}」下载进当前项目："
+            f"共 {registered} 个文件，约 {total_mb:.1f}MB，正在后台建索引。"
+        )
+        if repo["skipped"]:
+            sk = "；".join(f"{n}（{r}）" for n, r in repo["skipped"][:5])
+            more = f" 等 {len(repo['skipped'])} 项" if len(repo["skipped"]) > 5 else ""
+            msg += f"\n以下文件被跳过：{sk}{more}。如确需大文件请单独给出该文件的直链。"
+        return msg
+
+    # ── 单文件下载（直链 / GitHub / HF 单文件 resolve 链接）──
     file_id = _uuid.uuid4()
     dest_dir = user_space_dir(user_id, file_id)
     try:
@@ -1570,7 +1617,7 @@ async def _tool_download_to_space(args: dict, user_id: uuid.UUID, data_space_id:
     size_mb = info["file_size"] / 1024 / 1024
     size_str = f"{size_mb:.1f}MB" if size_mb >= 1 else f"{info['file_size']//1024}KB"
     return (
-        f"已下载并加入数据空间：{final_name}（{info['file_type']}, {size_str}）。"
+        f"已下载并加入项目：{final_name}（{info['file_type']}, {size_str}）。"
         "正在后台建立索引，稍后即可用 read_file / inspect_data / search_data_space 处理。"
     )
 

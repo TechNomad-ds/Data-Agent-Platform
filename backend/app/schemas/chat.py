@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 class ConversationCreate(BaseModel):
     data_space_id: Optional[uuid.UUID] = None
+    # 多项目：创建时即可带上全部绑定空间（含主空间，主空间排第一）
+    data_space_ids: Optional[list[uuid.UUID]] = None
     model_id: str = Field(min_length=1)
     title: Optional[str] = None
 
@@ -15,6 +17,7 @@ class ConversationCreate(BaseModel):
 class ConversationResponse(BaseModel):
     id: uuid.UUID
     data_space_id: Optional[uuid.UUID] = None
+    data_space_ids: Optional[list[uuid.UUID]] = None
     title: Optional[str] = None
     model_id: str
     created_at: datetime

@@ -15,6 +15,7 @@ import { Message } from '@/api/chat'
 import ThinkingBlock from './ThinkingBlock'
 import PlanCard from './PlanCard'
 import MarkdownRenderer from './MarkdownRenderer'
+import { copyText } from '@/utils/clipboard'
 import { colors } from '@/styles/tokens'
 
 const { Text } = Typography
@@ -25,6 +26,7 @@ interface MessageContentProps {
   onRegenerate?: () => void
   onFeedback?: (messageId: string, rating: number) => void
   onEditResend?: (messageId: string, newContent: string) => void
+  conversationId?: string
 }
 
 function formatTime(dateStr: string): string {
@@ -42,12 +44,11 @@ function formatTime(dateStr: string): string {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
+    if (await copyText(text)) {
       setCopied(true)
       antMessage.success('已复制')
       setTimeout(() => setCopied(false), 1800)
-    } catch {
+    } else {
       antMessage.error('复制失败')
     }
   }
@@ -243,12 +244,11 @@ function UserMessage({
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(message.content || '')
+    if (await copyText(message.content || '')) {
       setCopied(true)
       antMessage.success('已复制')
       setTimeout(() => setCopied(false), 1800)
-    } catch {
+    } else {
       antMessage.error('复制失败')
     }
   }
@@ -375,7 +375,7 @@ const iconBtnStyle: React.CSSProperties = {
   alignItems: 'center',
 }
 
-export default function MessageContent({ message, onRegenerate, onFeedback, onEditResend }: MessageContentProps) {
+export default function MessageContent({ message, onRegenerate, onFeedback, onEditResend, conversationId }: MessageContentProps) {
   const isUser = message.role === 'user'
   const segments = hasSegments(message.tool_calls) ? message.tool_calls! : null
   const textContent = segments
@@ -399,7 +399,7 @@ export default function MessageContent({ message, onRegenerate, onFeedback, onEd
             {segments.map((seg: any, i: number) =>
               seg.type === 'text' ? (
                 <div key={i} style={{ marginBottom: 8 }}>
-                  <MarkdownRenderer content={seg.content || ''} />
+                  <MarkdownRenderer content={seg.content || ''} conversationId={conversationId} />
                 </div>
               ) : seg.type === 'thinking' ? (
                 <div key={i} style={{ marginBottom: 8 }}>
@@ -429,7 +429,7 @@ export default function MessageContent({ message, onRegenerate, onFeedback, onEd
             )}
           </div>
         ) : (
-          <MarkdownRenderer content={message.content || ''} />
+          <MarkdownRenderer content={message.content || ''} conversationId={conversationId} />
         )}
         <div
           style={{

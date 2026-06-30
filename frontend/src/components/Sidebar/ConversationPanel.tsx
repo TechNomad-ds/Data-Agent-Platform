@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Input, Button, Typography, Dropdown, Modal, message } from 'antd'
+import { Input, Button, Typography, Dropdown, Modal, message, Checkbox } from 'antd'
 import {
   PlusOutlined,
   SearchOutlined,
@@ -10,6 +10,7 @@ import {
   FolderOutlined,
   DownOutlined,
   AppstoreOutlined,
+  CheckOutlined,
 } from '@ant-design/icons'
 import { chatApi, Conversation } from '@/api/chat'
 import { dataSpacesApi, DataSpace } from '@/api/dataSpaces'
@@ -25,8 +26,12 @@ interface Props {
   onOpenDataManager: () => void
   /** 当前活跃的项目。undefined = 通用，不绑定项目 */
   selectedSpaceId: string | undefined
-  /** 切换活跃项目 */
+  /** 切换活跃项目（单选，保留兼容） */
   onSelectSpace: (id: string | undefined) => void
+  /** 多项目：当前选中的全部项目 id（含主空间）。空数组 = 普通对话 */
+  selectedSpaceIds?: string[]
+  /** 多项目：更新选中的项目集合 */
+  onSelectSpaces?: (ids: string[]) => void
   /** 在移动端抽屉内渲染：填满容器宽高，操作按钮常显（适配触屏） */
   inDrawer?: boolean
 }
@@ -45,6 +50,8 @@ export default function ConversationPanel({
   onOpenDataManager,
   selectedSpaceId,
   onSelectSpace,
+  selectedSpaceIds,
+  onSelectSpaces,
   inDrawer = false,
 }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -167,42 +174,99 @@ export default function ConversationPanel({
   }, [grouped, selectedSpaceId])
   const flatMode = !!selectedSpaceId
 
-  const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
+  // 多项目：归一化当前选中集合。优先用 selectedSpaceIds，回退到单选 selectedSpaceId。
+  const selectedIds: string[] = (selectedSpaceIds && selectedSpaceIds.length)
+    ? selectedSpaceIds
+    : (selectedSpaceId ? [selectedSpaceId] : [])
+  const selectedSet = new Set(selectedIds)
+  const selectedSpaceObjs = selectedIds
+    .map((id) => spaces.find((s) => s.id === id))
+    .filter(Boolean) as DataSpace[]
 
-  // 项目切换器菜单：通用 + 各项目（带文件数）+ 管理入口。
-  // 这是全局唯一切换项目的入口（对话页顶栏只读展示，不再切换）。
-  const workspaceMenuItems = [
-    {
-      key: '__general__',
-      label: (
-        <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.3, padding: '1px 0' }}>
-          <span>普通对话</span>
-          <span style={{ fontSize: 11, color: colors.textMuted }}>不分析你的文件，直接和 AI 聊</span>
-        </span>
-      ),
-      icon: <MessageOutlined />,
-      onClick: () => onSelectSpace(undefined),
-    },
-    ...(spaces.length ? [{ type: 'divider' as const }] : []),
-    ...spaces.map((s) => ({
-      key: s.id,
-      label: (
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12 }}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-          <span style={{ fontSize: 11, color: colors.textMuted, flexShrink: 0 }}>{s.file_count} 个文件</span>
-        </span>
-      ),
-      icon: <FolderOutlined />,
-      onClick: () => onSelectSpace(s.id),
-    })),
-    { type: 'divider' as const },
-    {
-      key: '__manage__',
-      label: '管理项目',
-      icon: <AppstoreOutlined />,
-      onClick: onOpenDataManager,
-    },
-  ]
+  // 勾选/取消某项目：维护选中集合（保持顺序，先选的在前=主空间）。
+  // 选中任意项目即退出「普通对话」；取消到空集合即回到普通对话。
+  const toggleSpace = (id: string) => {
+    const next = selectedSet.has(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id]
+    if (onSelectSpaces) onSelectSpaces(next)
+    else onSelectSpace(next[0])
+  }
+  const selectGeneral = () => {
+    if (onSelectSpaces) onSelectSpaces([])
+    else onSelectSpace(undefined)
+  }
+
+  // 切换器顶部展示文案
+  const switcherLabel = selectedSpaceObjs.length === 0
+    ? '普通对话'
+    : selectedSpaceObjs.length === 1
+      ? selectedSpaceObjs[0].name
+      : `${selectedSpaceObjs.length} 个项目`
+  const switcherSub = selectedSpaceObjs.length === 0
+    ? '不分析文件，直接聊'
+    : selectedSpaceObjs.length === 1
+      ? `项目 · ${selectedSpaceObjs[0].file_count} 个文件`
+      : `共 ${selectedSpaceObjs.reduce((n, s) => n + (s.file_count || 0), 0)} 个文件`
+
+  // 多选下拉面板（用受控 open，避免点 checkbox 即关闭）
+  const switcherPanel = (
+    <div style={{
+      width: 260, maxHeight: 360, overflowY: 'auto', padding: 6,
+      background: '#fff', borderRadius: 10, border: `1px solid ${colors.border}`,
+      boxShadow: '0 6px 24px rgba(15,23,42,0.12)',
+    }}>
+      <div
+        onClick={selectGeneral}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+          borderRadius: 8, cursor: 'pointer',
+          background: selectedSpaceObjs.length === 0 ? colors.bgMuted : 'transparent',
+        }}
+      >
+        <MessageOutlined style={{ color: colors.textMuted }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13 }}>普通对话</div>
+          <div style={{ fontSize: 11, color: colors.textMuted }}>不分析你的文件，直接和 AI 聊</div>
+        </div>
+        {selectedSpaceObjs.length === 0 && <CheckOutlined style={{ color: colors.primary, fontSize: 12 }} />}
+      </div>
+      {spaces.length > 0 && <div style={{ height: 1, background: colors.border, margin: '6px 4px' }} />}
+      {spaces.length > 0 && (
+        <div style={{ fontSize: 11, color: colors.textMuted, padding: '2px 10px 6px' }}>
+          可多选项目，一起对话
+        </div>
+      )}
+      {spaces.map((s) => {
+        const checked = selectedSet.has(s.id)
+        return (
+          <label
+            key={s.id}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+              borderRadius: 8, cursor: 'pointer',
+              background: checked ? colors.bgMuted : 'transparent',
+            }}
+          >
+            <Checkbox checked={checked} onChange={() => toggleSpace(s.id)} />
+            <FolderOutlined style={{ color: checked ? colors.primary : colors.textMuted }} />
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
+              {s.name}
+            </span>
+            <span style={{ fontSize: 11, color: colors.textMuted, flexShrink: 0 }}>{s.file_count} 个文件</span>
+          </label>
+        )
+      })}
+      <div style={{ height: 1, background: colors.border, margin: '6px 4px' }} />
+      <div
+        onClick={onOpenDataManager}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }}
+      >
+        <AppstoreOutlined style={{ color: colors.textMuted }} />
+        <span style={{ fontSize: 13 }}>管理项目</span>
+      </div>
+    </div>
+  )
 
   return (
     <div
@@ -218,25 +282,25 @@ export default function ConversationPanel({
     >
       {/* Header：项目切换器 + 新对话 + 搜索 */}
       <div style={{ padding: inDrawer ? '8px 12px 12px' : '16px 12px 12px' }}>
-        {/* 项目切换器 — 对话页一级上下文，切换后下方历史随之过滤 */}
+        {/* 项目切换器 — 对话页一级上下文，支持多选项目一起对话 */}
         <Dropdown
-          menu={{ items: workspaceMenuItems }}
+          popupRender={() => switcherPanel}
           trigger={['click']}
           placement="bottomLeft"
         >
           <div className="workspace-switcher">
             <span
               className="workspace-switcher-icon"
-              style={{ color: activeSpace ? colors.primary : colors.textMuted }}
+              style={{ color: selectedSpaceObjs.length ? colors.primary : colors.textMuted }}
             >
-              {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
+              {selectedSpaceObjs.length ? <FolderOutlined /> : <MessageOutlined />}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="workspace-switcher-label">
-                {activeSpace ? `项目 · ${activeSpace.file_count} 个文件` : '项目'}
+                {switcherSub}
               </div>
               <div className="workspace-switcher-name">
-                {activeSpace ? activeSpace.name : '普通对话'}
+                {switcherLabel}
               </div>
             </div>
             <DownOutlined style={{ fontSize: 10, color: colors.textMuted }} />

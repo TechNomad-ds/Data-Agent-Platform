@@ -88,12 +88,10 @@ def patched_loop(monkeypatch):
     monkeypatch.setattr(loopmod.AgentLoop, "_resolve_model_config", fake_resolve)
     monkeypatch.setattr(loopmod, "decrypt_api_key", lambda k: "plain")
 
-    # 上下文构建全部置空，避免触达 DB / 向量库
+    # 上下文构建置空，避免触达 DB / 向量库（重设计后只剩 _file_notice 一处）
     async def _empty(self, *a, **k):
         return ""
-    monkeypatch.setattr(loopmod.AgentLoop, "_get_data_space_info", _empty)
-    monkeypatch.setattr(loopmod.AgentLoop, "_build_schema_context", _empty)
-    monkeypatch.setattr(loopmod.AgentLoop, "_get_knowledge_context", _empty)
+    monkeypatch.setattr(loopmod.AgentLoop, "_file_notice", _empty)
 
     async def fake_history(self, conv_id):
         return []

@@ -176,7 +176,7 @@ async def create_conversation(
         if (conv_count.scalar() or 0) >= settings.max_conversations_per_user:
             raise HTTPException(status_code=400, detail=f"对话数量已达上限({settings.max_conversations_per_user}个)，请删除一些旧对话")
 
-    # 验证数据空间归属
+    # 验证数据空间归属（主空间 + 多项目全集）
     if data.data_space_id:
         result = await db.execute(
             select(DataSpace).where(
@@ -186,9 +186,23 @@ async def create_conversation(
         if not result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="数据空间不存在")
 
+    space_ids_json = None
+    if data.data_space_ids:
+        valid = await db.execute(
+            select(DataSpace.id).where(
+                DataSpace.id.in_(data.data_space_ids),
+                DataSpace.user_id == current_user.id,
+            )
+        )
+        valid_ids = [r for r in valid.scalars().all()]
+        ordered = [sid for sid in data.data_space_ids if sid in valid_ids]
+        if ordered:
+            space_ids_json = [str(s) for s in ordered]
+
     conversation = Conversation(
         user_id=current_user.id,
         data_space_id=data.data_space_id,
+        data_space_ids=space_ids_json,
         model_id=data.model_id,
         title=data.title,
     )
@@ -237,7 +251,8 @@ async def get_conversation(
     messages = msg_result.scalars().all()
 
     return ConversationDetailResponse(
-        id=conv.id, data_space_id=conv.data_space_id, title=conv.title,
+        id=conv.id, data_space_id=conv.data_space_id, data_space_ids=conv.data_space_ids,
+        title=conv.title,
         model_id=conv.model_id, created_at=conv.created_at, updated_at=conv.updated_at,
         messages=[MessageResponse.model_validate(m) for m in messages],
     )
@@ -361,6 +376,7 @@ async def send_message(
 
         # #12 多数据空间：若前端传了 data_space_ids 全集，校验归属，取第一个为主空间
         # （持久化到 conv.data_space_id），其余作为本轮额外检索空间。
+        # 同时把整个全集持久化到 conv.data_space_ids，重开对话时可恢复整组项目。
         extra_space_ids: list = []
         if data.data_space_ids:
             valid = await db.execute(
@@ -375,6 +391,10 @@ async def send_message(
             if ordered:
                 conv.data_space_id = ordered[0]
                 extra_space_ids = ordered[1:]
+                conv.data_space_ids = [str(s) for s in ordered]
+        elif data.data_space_id is not None:
+            # 单空间（或对话中切到单空间）：全集就是这一个，保持一致
+            conv.data_space_ids = [str(data.data_space_id)]
 
         await db.commit()
 
@@ -618,65 +638,38 @@ async def persist_conversation_to_space(
 import re as _re
 import jieba
 
-_FILLER_PREFIXES = (
-    "请帮我", "帮我", "请你帮我", "请你", "请",
-    "我想要", "我想", "我要", "我需要", "我希望",
-    "能不能帮我", "能不能", "可不可以", "可以帮我", "可以",
-    "能否帮我", "能否", "麻烦你帮我", "麻烦你", "麻烦",
-    "你能帮我", "你能", "你可以", "帮忙", "希望你", "想请你",
-)
 
-_TRAILING_PARTICLES = {"吗", "呢", "吧", "啊", "呀", "哈", "嘛", "么", "？", "?"}
-
-_DROP_WORDS = {"一下", "一些", "一点", "到底", "究竟", "的话"}
 
 def _extract_title(text: str, max_len: int = 25) -> str:
-    """用 jieba 分词做语句压缩，提取简短标题。"""
-    t = text.strip()
+    """用用户第一句话原文作为对话标题。
+
+    早期版本会删「帮我/请」等口语前缀并做分词压缩，但那会让标题开头几个字莫名消失
+    （用户反馈“前两个字被截掉”）。现在不做压缩，直接取第一句原文，只去掉首尾空白和
+    结尾标点；超长时按标点/词边界截断。所见即所得，符合直觉。
+    """
+    t = (text or "").strip()
     if not t:
         return "新对话"
 
-    # 取第一个句子
+    # 取第一句（按句末标点/换行切），去掉结尾问号等
     first = _re.split(r'[。！\!\n;；]', t, maxsplit=1)[0].strip()
     if not first:
         first = t
-    # 问号单独处理：保留问句内容，只去掉问号本身
-    first = first.rstrip("？?")
-
-    # 去口语前缀（长匹配优先，已按长度排序）
-    for prefix in _FILLER_PREFIXES:
-        if first.startswith(prefix):
-            first = first[len(prefix):].lstrip("，,：: ")
-            break
-
-    # jieba 分词
-    words = list(jieba.cut(first))
-
-    # 去掉尾部语气词
-    while words and words[-1].strip() in _TRAILING_PARTICLES:
-        words.pop()
-
-    # 过滤中间的冗余词（"一下"、"到底"等）
-    words = [w for w in words if w.strip() not in _DROP_WORDS]
-
-    title = "".join(words).strip()
+    title = first.rstrip("？?，,：: ").strip()
     if not title:
-        return text[:max_len] if text else "新对话"
+        return t[:max_len]
 
     if len(title) <= max_len:
         return title
 
-    # 在逗号/顿号处截断
+    # 超长：优先在逗号/顿号处截断，否则按 jieba 词边界，最后硬截
     for sep in ("，", "、", ","):
         idx = title.rfind(sep, 0, max_len)
         if idx > 4:
             return title[:idx]
-
-    # 按分词边界截断
     result = ""
     for w in jieba.cut(title):
         if len(result) + len(w) > max_len:
             break
         result += w
-
     return result or title[:max_len]
