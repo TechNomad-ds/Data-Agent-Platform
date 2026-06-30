@@ -351,6 +351,7 @@ export default function ChatView({
     async (files: File[]) => {
       if (files.length === 0) return
       const convId = await ensureConversation()
+      // ensureConversation 失败时已自行给出提示（未选模型 / 创建失败），这里直接退出即可
       if (!convId) return
       setUploadingFiles(true)
       try {

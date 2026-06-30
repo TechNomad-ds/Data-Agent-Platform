@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Typography, Button, Upload, Table, Tag, message,
   Popconfirm, Spin, Progress, Input, Modal, Tooltip,
@@ -123,6 +123,17 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   const [searchText, setSearchText] = useState('')
   const [spacesLoading, setSpacesLoading] = useState(true)
   const isMobile = useIsMobile()
+  // 轮询定时器句柄 + 挂载标志：组件卸载时停止轮询，避免卸载后 setState 与幽灵请求
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => { loadSpaces() }, [])
   useEffect(() => {
@@ -212,10 +223,13 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
   // 轮询后台处理进度，直到所有文件就绪（或失败）
   const pollProcessing = (spaceId: string) => {
     let tries = 0
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     const tick = async () => {
+      if (!mountedRef.current) return
       tries += 1
       try {
         const { data } = await dataSpacesApi.processingStatus(spaceId)
+        if (!mountedRef.current) return
         if (spaceId !== selectedSpaceId) { setProcessing(null); return }
         setProcessing({ ready: data.ready, total: data.total_files })
         // 结束条件：全部就绪，或已无处理中文件（ready + error 覆盖全部）
@@ -231,11 +245,12 @@ export default function DataManager({ selectedSpaceId, onSpaceChange, onStartCha
           return
         }
       } catch { /* 忽略单次失败，继续轮询 */ }
+      if (!mountedRef.current) return
       // 最多轮询 5 分钟（150 次 * 2s），避免无限轮询
-      if (tries < 150) setTimeout(tick, 2000)
+      if (tries < 150) pollTimerRef.current = setTimeout(tick, 2000)
       else setProcessing(null)
     }
-    setTimeout(tick, 1500)
+    pollTimerRef.current = setTimeout(tick, 1500)
   }
 
   const handleDeleteFile = async (fileId: string) => {

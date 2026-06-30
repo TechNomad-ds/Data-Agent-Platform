@@ -14,14 +14,23 @@ export default function GraphViewer({ spaceId }: Props) {
   const [building, setBuilding] = useState(false)
   const [buildProgress, setBuildProgress] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mountedRef = useRef(true)
 
   const [buildFailed, setBuildFailed] = useState(false)
 
   useEffect(() => {
+    mountedRef.current = true
     if (spaceId) loadGraph()
     else setData(null)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current)
+    }
   }, [spaceId])
+
+  // 卸载时标记，阻止延迟回调里的 setState
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const loadGraph = async () => {
     if (!spaceId) return
@@ -72,7 +81,8 @@ export default function GraphViewer({ spaceId }: Props) {
           if (pollRef.current) clearInterval(pollRef.current)
           if (res.data.nodes.length > 0) {
             setBuildProgress(100)
-            setTimeout(() => {
+            finishTimerRef.current = setTimeout(() => {
+              if (!mountedRef.current) return
               setBuilding(false)
               setData(res.data)
             }, 500)
