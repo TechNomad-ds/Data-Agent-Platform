@@ -50,6 +50,9 @@
 
 ## 3. 前端复刻（React + AntD）
 
+**新增导航模块「远程连接」**（对应 同类产品 左栏的"远程连接"入口）→ 内容即渠道配置页。
+注：同类产品"远程连接"下另有 WebUI tab（桌面端需单开 web 服务）；DataMind 本身即 web，不需要该 tab，故"远程连接" = 渠道配置页。导航挂载/命名由 trunk 集成时做。
+
 照搬 同类产品 「渠道配置」页：
 - 渠道列表：每行 = Collapse(Logo 14px + 名称 + `Coming Soon` Tag? + 启用 Switch)，默认折叠。
 - 展开表单：飞书(App ID + App Secret + "显示可选配置"折叠[Encrypt Key/Verification Token] + **测试并连接**)、钉钉(Client ID + Client Secret + 测试并连接)、微信(扫码登录状态机 idle→loading_qr→showing_qr→scanned→connected，走 SSE)。
