@@ -319,6 +319,7 @@ class DingTalkAdapter:
     """
 
     name = "dingtalk"
+    supports_edit = True  # 钉钉 AI Card 可 PUT streaming 更新 → 支持流式编辑
 
     def __init__(self, client_id: str, client_secret: str) -> None:
         if not client_id:

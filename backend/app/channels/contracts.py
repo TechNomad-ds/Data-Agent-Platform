@@ -43,6 +43,9 @@ class ChannelAdapter(Protocol):
     """
 
     name: str  # 渠道标识，与 InboundMessage.channel 一致
+    # 平台是否支持「编辑已发消息」做流式更新。False（如微信 iLink 只能发新消息）时，
+    # 桥接层只发终态一条，避免把流式中间块发成多条不完整消息。默认 True。
+    supports_edit: bool
 
     def verify(self, headers: dict[str, str], body: bytes) -> bool:
         """验证入站请求来自该平台（签名/token/AES）。webhook 不走 JWT，靠这个。"""

@@ -344,6 +344,7 @@ class FeishuAdapter:
     """
 
     name = "feishu"
+    supports_edit = True  # 飞书可 patch 卡片 → 支持流式编辑
 
     def __init__(
         self,

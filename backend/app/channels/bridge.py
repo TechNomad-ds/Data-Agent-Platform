@@ -36,6 +36,9 @@ class AgentBridge:
         agent_events: AsyncIterator[dict[str, Any]],
     ) -> OutboundMessage:
         """把 agent 事件流聚合并回写到渠道，返回最终发出的消息。"""
+        # 平台是否支持「编辑已发消息」。不支持（如微信 iLink，edit 降级为发新消息）时，
+        # 只在终态发一条，避免把流式中间块发成多条不完整消息。
+        supports_edit = getattr(adapter, "supports_edit", True)
         buf: list[str] = []
         message_id: str | None = None
         last_edit: float = 0.0
@@ -54,10 +57,12 @@ class AgentBridge:
             etype = ev.get("type")
             if etype == "text":
                 buf.append(ev.get("delta", ""))
-                now = self.clock()
-                # 首块立刻发；之后按节流间隔更新
-                if message_id is None or (now - last_edit) >= self.min_edit_interval:
-                    await push(final=False)
+                # 仅支持编辑的平台做流式中间更新（首块立刻发、之后按节流间隔 edit）；
+                # 不支持编辑的平台跳过中间块，只在循环结束后发一条终态。
+                if supports_edit:
+                    now = self.clock()
+                    if message_id is None or (now - last_edit) >= self.min_edit_interval:
+                        await push(final=False)
             elif etype == "error":
                 buf.append(("\n\n" if buf else "") + ev.get("message", "出错了"))
                 await push(final=True)

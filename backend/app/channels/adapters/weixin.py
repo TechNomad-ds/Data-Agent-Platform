@@ -258,6 +258,7 @@ class WeixinAdapter:
     """
 
     name: str = "weixin"
+    supports_edit: bool = False  # iLink 只能发新消息，不能编辑 → 桥接层只发终态一条
 
     def __init__(
         self,

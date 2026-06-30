@@ -17,6 +17,7 @@ class ConversationResponse(BaseModel):
     data_space_id: Optional[uuid.UUID] = None
     title: Optional[str] = None
     model_id: str
+    channel: Optional[str] = None  # 'weixin'/'feishu'/'dingtalk' 来自渠道；'web'/None 为网页
     created_at: datetime
     updated_at: datetime
 
