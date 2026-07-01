@@ -271,7 +271,7 @@ export default function ConversationPanel({
   return (
     <div
       style={{
-        width: inDrawer ? '100%' : 264,
+        width: inDrawer ? '100%' : 'clamp(264px, 18vw, 340px)',
         height: inDrawer ? '100%' : '100vh',
         display: 'flex',
         flexDirection: 'column',

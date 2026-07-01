@@ -117,7 +117,7 @@ export default function NavRail({
   return (
     <div
       style={{
-        width: 72,
+        width: 'clamp(72px, 5vw, 96px)',
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',

@@ -53,7 +53,8 @@ const PROJECT_SUGGESTIONS = [
   '这些资料里有哪些值得关注的重点？',
 ]
 
-const READING_WIDTH = 760
+// 阅读列宽度：小屏保持 760px 下限，大屏随视口增长，上限 1180px 以免行太长影响阅读
+const READING_WIDTH = 'clamp(760px, 60vw, 1180px)'
 
 interface Props {
   selectedSpaceId: string | undefined

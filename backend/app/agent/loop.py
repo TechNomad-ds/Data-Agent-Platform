@@ -185,6 +185,28 @@ SYSTEM_PROMPT_TEMPLATE = """你是 DataMind，一个通用 AI 智能体。你的
 
 
 
+# 「通读/概述/讲解整篇」类意图的关键词。命中则收尾时会强制要求把文件读完再作答。
+# 仅用于「要不要多拦一次续读」这种低风险增益，判错顶多少拦/多拦一次，不影响正确性，
+# 也不改变工具下发或上下文灌注——属提示注入层，不是硬路由。
+_READTHROUGH_KEYWORDS = (
+    "概述", "概括", "总结", "汇总", "讲解", "讲讲", "讲一下", "介绍一下",
+    "逐篇", "逐个", "通读", "整体情况", "整体介绍", "整篇", "全文", "完整",
+    "有哪些重点", "值得关注", "梳理", "解读", "读一下", "看一下这些",
+    "overview", "summary", "summarize", "summarise", "walk me through",
+)
+
+
+def _is_readthrough_intent(user_message: str) -> bool:
+    """判断本轮用户问题是否属于「通读/概述/讲解整篇」类意图。
+
+    命中即要求收尾前把读到一半的文件读完；未命中（如「X 的值是多少」这类
+    精确取数/找具体信息）走略读快通道，不强制读全，避免误伤快问快答。"""
+    if not user_message:
+        return False
+    low = user_message.lower()
+    return any(kw in user_message or kw in low for kw in _READTHROUGH_KEYWORDS)
+
+
 class AgentLoop:
     """支持 Anthropic / OpenAI 双后端的 ReAct Agent 循环"""
 
@@ -547,6 +569,13 @@ class AgentLoop:
         # （读/查/算，排除 update_plan / save_memory 等元工具），以及是否已自检过一次。
         data_tool_used = False
         self_check_done = False
+        # 防「没读完就总结」（代码层兜底，提示词说教扛不住时的硬闸）：
+        # 跟踪哪些文件 read_file 后仍有未读残余；仅当本轮是「通读/概述/讲解整篇」类
+        # 任务时，收尾若发现有文件没读完，强制拦一次让模型续读（只拦一次，之后放行，
+        # 靠 max_iterations 兜底防死循环）。「找某个具体信息」的略读快通道不受影响。
+        files_partially_read: set[str] = set()
+        readthrough_nudged = False
+        is_readthrough_task = _is_readthrough_intent(user_message)
         # 反向判定：除了「元工具」（不产生需核实结果），其余工具都算「数据/信息工具」，
         # 用过就该在收尾前自检。这样新增工具（如 download_to_space / web_search）自动纳入，
         # 不会像写死白名单那样漏掉。
@@ -705,6 +734,30 @@ class AgentLoop:
                 # 没有工具调用 → 模型认为本 turn 完成。基于任务状态判断是否真的结束：
                 # 若存在计划且仍有未完成步骤，注入一次简短提示让它继续；否则正式收尾。
                 if not tool_uses:
+                    # 防「没读完就总结」闸门（只拦一次）：通读/概述/讲解整篇类任务，
+                    # 若还有文件没读完就想收尾，强制注入一次续读提示拦回循环。之后即便
+                    # 仍未读完也放行，靠 max_iterations 兜底防死循环；略读快通道不受影响。
+                    if (is_readthrough_task and files_partially_read
+                            and not readthrough_nudged):
+                        if full_text:
+                            messages.append({"role": "assistant", "content": full_text})
+                            turn_canonical.append({
+                                "role": "assistant", "content": full_text, "tool_calls": [],
+                            })
+                        _names = "、".join(sorted(files_partially_read)[:5])
+                        readthrough_nudge = (
+                            "（系统提示）你打算作答了，但这些文件还没读完："
+                            f"{_names}。用户要的是通读/概述/讲解整篇，必须先把它们读完再综合作答——"
+                            "对每个没读完的文件用 read_file(filename, start_line=上次读到的末尾行) "
+                            "翻页续读，直到返回出现「全文已读完」。不要以「核心已覆盖/摘要引言已够/"
+                            "后面是附录」为由跳过——方法、实验、结论常在后半部分。读完后再给最终答复。"
+                        )
+                        messages.append({"role": "user", "content": readthrough_nudge})
+                        turn_canonical.append({"role": "user", "content": readthrough_nudge})
+                        readthrough_nudged = True
+                        iteration -= 1  # 注入轮不消耗工具调用配额
+                        continue
+
                     plan_incomplete = bool(current_plan) and any(
                         s.get("status") != "completed" for s in current_plan
                     )
@@ -939,6 +992,16 @@ class AgentLoop:
                         consecutive_errors += 1
                     else:
                         consecutive_errors = 0
+
+                    # 记账「读到一半没读完」的文件：read_file 结果末尾的分页信号是唯一可靠依据。
+                    # 「未读完」→ 记上这个文件；「全文已读完」→ 销账。收尾闸门据此判断该不该拦。
+                    if tu["name"] == "read_file" and not is_error:
+                        _fname = tool_args.get("filename") if isinstance(tool_args, dict) else None
+                        if _fname:
+                            if "未读完" in result_str:
+                                files_partially_read.add(_fname)
+                            elif "全文已读完" in result_str:
+                                files_partially_read.discard(_fname)
 
                     # 模型可见的工具结果上限：放宽到 15 万字符，让"读完整篇论文/长文档"
                     # 或"列出全部"这类大结果能完整进入上下文（约数千行），而不是被腰斩——
