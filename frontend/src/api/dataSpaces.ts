@@ -63,4 +63,10 @@ export const dataSpacesApi = {
     api.post(`/data-spaces/conversation/${conversationId}/files/${fileId}/promote`, { data_space_id: dataSpaceId }),
   deleteConversationFile: (conversationId: string, fileId: string) =>
     api.delete(`/data-spaces/conversation/${conversationId}/files/${fileId}`),
+  // 按文件名解析本对话可见的文件（供回答区文件卡用）
+  resolveConversationFile: (conversationId: string, filename: string) =>
+    api.get<{ file_id: string; filename: string; file_type: string; file_size: number; mime_type: string | null }>(
+      `/data-spaces/conversation/${conversationId}/resolve-file`,
+      { params: { filename } }
+    ),
 }

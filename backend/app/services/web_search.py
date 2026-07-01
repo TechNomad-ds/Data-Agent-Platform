@@ -18,8 +18,10 @@ class WebSearchNotConfigured(Exception):
     pass
 
 
-async def web_search(query: str, max_results: int | None = None) -> list[dict]:
-    """返回 [{title, url, snippet}]。未配置 key 抛 WebSearchNotConfigured。"""
+async def web_search(query: str, max_results: int | None = None) -> dict:
+    """返回 {results: [{title, url, snippet}], images: [url, ...]}。
+
+    未配置 key 抛 WebSearchNotConfigured。images 为相关配图（可能为空）。"""
     key = (settings.web_search_api_key or "").strip()
     if not key:
         raise WebSearchNotConfigured()
@@ -31,7 +33,7 @@ async def web_search(query: str, max_results: int | None = None) -> list[dict]:
     return await _tavily(query, key, n)
 
 
-async def _tavily(query: str, key: str, n: int) -> list[dict]:
+async def _tavily(query: str, key: str, n: int) -> dict:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(
             "https://api.tavily.com/search",
@@ -40,21 +42,30 @@ async def _tavily(query: str, key: str, n: int) -> list[dict]:
                 "query": query,
                 "max_results": n,
                 "search_depth": "basic",
+                # 让 Tavily 同时返回相关配图（顶层 images 字段，元素为图片 URL）
+                "include_images": True,
             },
         )
         resp.raise_for_status()
         data = resp.json()
-    out = []
+    results = []
     for r in data.get("results", [])[:n]:
-        out.append({
+        results.append({
             "title": r.get("title", ""),
             "url": r.get("url", ""),
             "snippet": r.get("content", ""),
         })
-    return out
+    # images 可能是 ["url", ...] 或 [{"url": ...}, ...]，统一成 url 列表
+    images = []
+    for img in (data.get("images") or [])[:n]:
+        if isinstance(img, str):
+            images.append(img)
+        elif isinstance(img, dict) and img.get("url"):
+            images.append(img["url"])
+    return {"results": results, "images": images}
 
 
-async def _serper(query: str, key: str, n: int) -> list[dict]:
+async def _serper(query: str, key: str, n: int) -> dict:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(
             "https://google.serper.dev/search",
@@ -63,11 +74,16 @@ async def _serper(query: str, key: str, n: int) -> list[dict]:
         )
         resp.raise_for_status()
         data = resp.json()
-    out = []
+    results = []
     for r in data.get("organic", [])[:n]:
-        out.append({
+        results.append({
             "title": r.get("title", ""),
             "url": r.get("link", ""),
             "snippet": r.get("snippet", ""),
         })
-    return out
+    # Serper 普通搜索的 organic 结果偶尔带 imageUrl；收集可用的
+    images = []
+    for r in data.get("organic", [])[:n]:
+        if r.get("imageUrl"):
+            images.append(r["imageUrl"])
+    return {"results": results, "images": images}

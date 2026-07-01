@@ -57,6 +57,7 @@ const READING_WIDTH = 760
 
 interface Props {
   selectedSpaceId: string | undefined
+  selectedSpaceIds?: string[]
   conversationId: string | undefined
   onConversationCreated: (id: string) => void
   onConversationDeleted?: () => void
@@ -91,6 +92,7 @@ function HeroMark() {
 
 export default function ChatView({
   selectedSpaceId,
+  selectedSpaceIds: selectedSpaceIdsProp,
   conversationId,
   onConversationCreated,
   onConversationDeleted,
@@ -130,8 +132,11 @@ export default function ChatView({
   // 拖拽进入/离开计数：拖过子元素时浏览器会连发 enter/leave，
   // 用计数器判断是否真正离开根容器，避免高亮闪烁。
   const dragDepthRef = useRef(0)
-  // #12 多项目：本轮活跃空间集合（含主空间）。主空间 = selectedSpaceId（与外层同步）。
-  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
+  // #12 多项目：本轮活跃空间集合（含主空间，主空间=第一个）。来自外层 prop；
+  // 回退到单空间 selectedSpaceId，保证旧路径不变。
+  const selectedSpaceIds: string[] = (selectedSpaceIdsProp && selectedSpaceIdsProp.length)
+    ? selectedSpaceIdsProp
+    : (selectedSpaceId ? [selectedSpaceId] : [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   // 输入法（拼音等）组字状态：组字中按回车是确认候选词，不应触发发送
@@ -211,16 +216,6 @@ export default function ChatView({
     } else {
       setSuggestions(GENERAL_SUGGESTIONS)
     }
-  }, [selectedSpaceId])
-
-  // #12：外层主空间变化时，确保它在活跃集合里且排第一（主空间）。
-  // 外层清空时一并清空活跃集合。
-  useEffect(() => {
-    setSelectedSpaceIds((prev) => {
-      if (!selectedSpaceId) return []
-      const rest = prev.filter((id) => id !== selectedSpaceId)
-      return [selectedSpaceId, ...rest]
-    })
   }, [selectedSpaceId])
 
 
@@ -333,6 +328,7 @@ export default function ChatView({
     try {
       const res = await chatApi.createConversation({
         data_space_id: selectedSpaceId,
+        data_space_ids: selectedSpaceIds.length > 1 ? selectedSpaceIds : undefined,
         model_id: selectedModel,
       })
       setCurrentConversation(res.data)
@@ -351,6 +347,7 @@ export default function ChatView({
     async (files: File[]) => {
       if (files.length === 0) return
       const convId = await ensureConversation()
+      // ensureConversation 失败时已自行给出提示（未选模型 / 创建失败），这里直接退出即可
       if (!convId) return
       setUploadingFiles(true)
       try {
@@ -438,6 +435,7 @@ export default function ChatView({
       try {
         const res = await chatApi.createConversation({
           data_space_id: selectedSpaceId,
+          data_space_ids: selectedSpaceIds.length > 1 ? selectedSpaceIds : undefined,
           model_id: selectedModel,
         })
         setCurrentConversation(res.data)
@@ -614,11 +612,22 @@ export default function ChatView({
 
   const showStreaming = isStreaming && streamingConversationId === conversationId
   const showEmpty = messages.length === 0 && !showStreaming
-  const inputDisabled = isStreaming
 
   // 当前主项目对象（用于状态条展示项目名 + 文件数）
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId)
   const activeModel = models.find((m) => m.id === selectedModel)
+  // 多项目：选中的全部项目对象 + 合计文件数（用于状态条/空状态展示）
+  const activeSpaces = selectedSpaceIds
+    .map((id) => spaces.find((s) => s.id === id))
+    .filter(Boolean) as DataSpace[]
+  const isMulti = activeSpaces.length > 1
+  const totalFiles = activeSpaces.reduce((n, s) => n + (s.file_count || 0), 0)
+  // 项目上下文的一句话描述（单/多项目通用）
+  const spaceLabel = activeSpaces.length === 0
+    ? ''
+    : isMulti
+      ? `${activeSpaces.length} 个项目`
+      : activeSpaces[0].name
 
   return (
     <div
@@ -671,16 +680,22 @@ export default function ChatView({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           {/* 项目状态条（只读）：告诉用户这条对话用的是哪个项目的数据。
               切换项目的唯一入口在左侧项目栏，这里不再提供切换，避免双控件混淆。 */}
-          <Tooltip title={activeSpace ? '这条对话基于该项目的文件回答，如需切换项目请在左侧项目栏操作' : '普通对话不分析你的文件，如需分析文件请在左侧选择项目'}>
+          <Tooltip title={
+            activeSpaces.length === 0
+              ? '普通对话不分析你的文件，如需分析文件请在左侧选择项目'
+              : isMulti
+                ? `这条对话同时基于这些项目的文件回答：${activeSpaces.map((s) => s.name).join('、')}。如需增减项目请在左侧项目栏操作`
+                : '这条对话基于该项目的文件回答，如需切换项目请在左侧项目栏操作'
+          }>
             <div className="ctx-pill ctx-pill-readonly">
-              <span className="ctx-pill-icon" style={{ color: activeSpace ? colors.primary : colors.textMuted }}>
-                {activeSpace ? <FolderOutlined /> : <MessageOutlined />}
+              <span className="ctx-pill-icon" style={{ color: activeSpaces.length ? colors.primary : colors.textMuted }}>
+                {activeSpaces.length ? <FolderOutlined /> : <MessageOutlined />}
               </span>
               <span className="ctx-pill-text">
-                {activeSpace ? activeSpace.name : '普通对话'}
+                {activeSpaces.length ? spaceLabel : '普通对话'}
               </span>
-              {activeSpace && (
-                <span className="ctx-pill-sub">{activeSpace.file_count} 个文件</span>
+              {activeSpaces.length > 0 && (
+                <span className="ctx-pill-sub">{totalFiles} 个文件</span>
               )}
             </div>
           </Tooltip>
@@ -756,7 +771,11 @@ export default function ChatView({
                   letterSpacing: -0.4,
                 }}
               >
-                {activeSpace ? `正在「${activeSpace.name}」中对话` : '有什么可以帮你的？'}
+                {activeSpaces.length === 0
+                  ? '有什么可以帮你的？'
+                  : isMulti
+                    ? `正在 ${activeSpaces.length} 个项目中对话`
+                    : `正在「${activeSpaces[0].name}」中对话`}
               </Text>
               <Text
                 style={{
@@ -766,9 +785,11 @@ export default function ChatView({
                   marginBottom: 12,
                 }}
               >
-                {activeSpace
-                  ? `我可以分析这个项目里的 ${activeSpace.file_count} 个文件`
-                  : '普通对话：直接提问、写作、答疑都可以'}
+                {activeSpaces.length === 0
+                  ? '普通对话：直接提问、写作、答疑都可以'
+                  : isMulti
+                    ? `我可以一起分析这些项目里的 ${totalFiles} 个文件：${activeSpaces.map((s) => s.name).join('、')}`
+                    : `我可以分析这个项目里的 ${activeSpaces[0].file_count} 个文件`}
               </Text>
               {/* 上下文提示：明确告诉用户「用哪个项目的数据 + 哪个模型」，并给出切换出口 */}
               <div
@@ -783,11 +804,11 @@ export default function ChatView({
                   color: colors.textMuted,
                 }}
               >
-                {!activeSpace && (
+                {activeSpaces.length === 0 && (
                   <span>
                     想分析文件？在左侧
                     <FolderOutlined style={{ margin: '0 3px', color: colors.primary }} />
-                    选择一个项目
+                    选择一个或多个项目
                   </span>
                 )}
                 {activeModel && (
@@ -857,6 +878,7 @@ export default function ChatView({
                 <div key={msg.id} style={{ marginBottom: 28 }}>
                   <MessageContent
                     message={msg}
+                    conversationId={conversationId}
                     onRegenerate={
                       msg.role === 'assistant' && idx === messages.length - 1 && !isStreaming
                         ? handleRegenerate
@@ -1135,9 +1157,13 @@ export default function ChatView({
               if (e.shiftKey) return
               if (isComposingRef.current || (e.nativeEvent as any).isComposing || (e.nativeEvent as any).keyCode === 229) return
               e.preventDefault()
+              // 生成回复期间允许继续打字/换行，但不允许发送：回车时给个轻提示，内容保留
+              if (isStreaming) {
+                message.info('正在生成回复，请等当前回答结束后再发送')
+                return
+              }
               handleSend()
             }}
-            disabled={inputDisabled}
             variant="borderless"
             style={{
               flex: 1,

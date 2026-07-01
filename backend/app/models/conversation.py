@@ -19,6 +19,9 @@ class Conversation(Base):
     data_space_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("data_spaces.id"), nullable=True
     )
+    # 多项目聊天：本对话绑定的全部数据空间 id（含主空间，主空间排第一）。
+    # data_space_id 仍是「主空间」（兼容旧逻辑/单空间）；data_space_ids 是可恢复的全集。
+    data_space_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     model_id: Mapped[str] = mapped_column(String(100), nullable=False)
     # 渠道接入：来源渠道 + 外部会话线程 id（把外部 IM/邮件会话映射到内部 conversation）

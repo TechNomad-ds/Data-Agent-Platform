@@ -69,6 +69,8 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     login_key = login_id.lower()
 
     # 检查账号是否被锁定（5次失败锁15分钟）
+    # 注意：限流必须 fail-closed —— Redis 不可用时拒绝登录，
+    # 否则一旦 Redis 宕机，失败计数/锁定逻辑全部失效，等于放开无限次密码尝试（暴力破解）。
     from app.core.redis_client import get_redis
     try:
         redis = await get_redis()
@@ -79,7 +81,9 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     except HTTPException:
         raise
     except Exception:
-        redis = None
+        import logging
+        logging.getLogger("security").error("登录限流依赖 Redis 不可用，已拒绝本次登录请求")
+        raise HTTPException(status_code=503, detail="登录服务暂时不可用，请稍后再试")
 
     # 支持邮箱或用户名登录
     from sqlalchemy import or_

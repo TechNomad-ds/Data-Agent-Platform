@@ -81,42 +81,54 @@ export default function AuthBrand() {
 
         {/* Hero text */}
         <h1 style={{
-          fontSize: 44, fontWeight: 700, lineHeight: 1.2,
+          fontSize: 42, fontWeight: 700, lineHeight: 1.25,
           letterSpacing: -1,
           color: '#ffffff',
-          margin: '0 0 32px',
+          margin: '0 0 28px',
         }}>
-          让数据<span style={{
+          你的 AI 智能体<br />
+          <span style={{
             background: 'linear-gradient(135deg, #818cf8, #a78bfa, #60a5fa)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-          }}>自己说话</span>
+          }}>对话即可完成</span>
         </h1>
 
         {/* Subtitle */}
         <p style={{
-          fontSize: 16, lineHeight: 1.8,
-          color: 'rgba(255,255,255,0.45)',
-          margin: '0 auto 64px',
-          maxWidth: 340,
+          fontSize: 15.5, lineHeight: 1.8,
+          color: 'rgba(255,255,255,0.5)',
+          margin: '0 auto 56px',
+          maxWidth: 360,
           fontWeight: 400,
         }}>
-          上传数据，对话分析，可视化洞察
-          <br />
-          AI 驱动，零代码，人人可用
+          从问答、写作到数据分析与可视化，
+          用自然语言交给它，自动给出结果。
         </p>
 
-        {/* Stats */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 48 }}>
-          {[
-            { num: '20+', label: '数据格式' },
-            { num: '14', label: 'AI 工具' },
-            { num: '100%', label: '数据隔离' },
-          ].map(s => (
-            <div key={s.label}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', marginBottom: 4 }}>{s.num}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.5 }}>{s.label}</div>
-            </div>
+        {/* Feature tags —— 用能力描述替代易夸大/过时的数字指标 */}
+        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10 }}>
+          {['对话与写作', '数据分析可视化', '安全数据隔离'].map((label) => (
+            <span
+              key={label}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                borderRadius: 999,
+                fontSize: 13,
+                color: 'rgba(255,255,255,0.7)',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <span style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #818cf8, #60a5fa)',
+              }} />
+              {label}
+            </span>
           ))}
         </div>
       </div>
@@ -124,7 +136,7 @@ export default function AuthBrand() {
       {/* Footer */}
       <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', zIndex: 1 }}>
         <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>
-          © {new Date().getFullYear()} DataMind Analyst
+          © {new Date().getFullYear()} DataMind
         </Text>
       </div>
     </div>

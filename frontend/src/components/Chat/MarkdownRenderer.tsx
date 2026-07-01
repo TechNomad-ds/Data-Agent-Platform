@@ -9,6 +9,8 @@ import { Tooltip, message as antMessage } from 'antd'
 import { CopyOutlined, CheckOutlined } from '@ant-design/icons'
 import ChartMessage from '@/components/Charts/ChartMessage'
 import AnswerCard from './AnswerCard'
+import FileCard from './FileCard'
+import { copyText } from '@/utils/clipboard'
 import { colors } from '@/styles/tokens'
 
 /** 带复制按钮的代码块（浅色主题，悬停显示复制） */
@@ -17,12 +19,11 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const [hover, setHover] = useState(false)
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code)
+    if (await copyText(code)) {
       setCopied(true)
       antMessage.success('已复制')
       setTimeout(() => setCopied(false), 1800)
-    } catch {
+    } else {
       antMessage.error('复制失败')
     }
   }
@@ -89,6 +90,25 @@ function MarkdownRaw({ content }: { content: string }) {
               </div>
             )
           },
+          img({ node, ...props }) {
+            // 标准 markdown 图片 ![](url) 默认就能渲染，这里只补样式与健壮性：
+            // 限制宽度避免撑破气泡、懒加载、加载失败时隐藏（坏链不留裂图占位）。
+            return (
+              <img
+                {...props}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                style={{
+                  maxWidth: '100%',
+                  height: 'auto',
+                  borderRadius: 8,
+                  margin: '8px 0',
+                  border: `1px solid ${colors.border}`,
+                }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              />
+            )
+          },
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '')
             const codeString = String(children).replace(/\n$/, '')
@@ -120,9 +140,9 @@ function MarkdownRaw({ content }: { content: string }) {
   )
 }
 
-export default function MarkdownRenderer({ content }: { content: string }) {
-  const specialBlockRe = /```(chart|answer)\n([\s\S]*?)```/g
-  const parts: { type: 'markdown' | 'chart' | 'answer'; content: string }[] = []
+export default function MarkdownRenderer({ content, conversationId }: { content: string; conversationId?: string }) {
+  const specialBlockRe = /```(chart|answer|file)\n([\s\S]*?)```/g
+  const parts: { type: 'markdown' | 'chart' | 'answer' | 'file'; content: string }[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -130,7 +150,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
     if (match.index > lastIndex) {
       parts.push({ type: 'markdown', content: content.slice(lastIndex, match.index) })
     }
-    parts.push({ type: match[1] as 'chart' | 'answer', content: match[2] })
+    parts.push({ type: match[1] as 'chart' | 'answer' | 'file', content: match[2] })
     lastIndex = match.index + match[0].length
   }
 
@@ -147,6 +167,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           return part.content.trim() ? <MarkdownRaw key={i} content={part.content} /> : null
         }
         if (part.type === 'chart') return <ChartMessage key={i} chartJson={part.content} />
+        if (part.type === 'file') return <FileCard key={i} raw={part.content} conversationId={conversationId} />
         return <AnswerCard key={i} raw={part.content} />
       })}
     </>

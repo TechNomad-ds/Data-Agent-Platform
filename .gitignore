@@ -39,3 +39,6 @@ Thumbs.db
 
 # 评估目录，不上传
 /eval/
+
+# TS incremental build cache (never track)
+*.tsbuildinfo

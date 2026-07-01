@@ -735,15 +735,18 @@ async def preview_file_data(
         from app.services.preprocessing import _detect_encoding
         encoding = _detect_encoding(file_path)
         content = file_path.read_text(encoding=encoding, errors="ignore")
-        lines = content.split("\n")
-        start = (page - 1) * page_size
-        end = start + page_size
+        # 文本/Markdown 预览：一次性返回全文（带安全上限），不再按 page_size 分页——
+        # 否则像「对话沉淀.md」这类长文档预览只会看到前 50 行（看起来像“沉淀断了”）。
+        MAX_PREVIEW_CHARS = 500_000
+        truncated = len(content) > MAX_PREVIEW_CHARS
+        shown = content[:MAX_PREVIEW_CHARS] if truncated else content
         return {
             "type": "text",
-            "content": "\n".join(lines[start:end]),
-            "total_lines": len(lines),
-            "page": page,
-            "page_size": page_size,
+            "content": shown,
+            "total_lines": content.count("\n") + 1,
+            "truncated": truncated,
+            "total_chars": len(content),
+            "filename": file.filename,
         }
     elif ext == "pdf":
         try:
@@ -886,6 +889,67 @@ async def list_conversation_files(
         )
         for f, added_at in file_result.all()
     ]
+
+
+@router.get("/conversation/{conversation_id}/resolve-file")
+async def resolve_conversation_file(
+    conversation_id: uuid.UUID,
+    filename: str = Query(..., description="要解析的文件名"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """按文件名把本对话可见的文件解析成可下载文件（供回答区文件卡用）。
+
+    解析范围 = 本对话的主数据空间 + 临时文件区（与 agent 本轮可见范围一致），
+    并限定属于当前用户，避免越权拿到他人/其它空间的同名文件。返回 file_id 后，
+    前端走 /api/files/{file_id}/download 鉴权下载。
+    """
+    conv_row = await db.execute(
+        select(_Conversation).where(
+            _Conversation.id == conversation_id,
+            _Conversation.user_id == current_user.id,
+        )
+    )
+    conv = conv_row.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    # 本对话可见的空间集合：主空间（conversation.data_space_id）+ 临时区（conversation_id 关联）
+    space_ids: list[uuid.UUID] = []
+    if conv.data_space_id:
+        space_ids.append(conv.data_space_id)
+    temp_row = await db.execute(
+        select(DataSpace.id).where(DataSpace.conversation_id == conversation_id)
+    )
+    temp_id = temp_row.scalar_one_or_none()
+    if temp_id and temp_id not in space_ids:
+        space_ids.append(temp_id)
+
+    fname = (filename or "").strip()
+    if not fname or not space_ids:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    # 同名可能多份，取第一个；限定用户与可见空间
+    result = await db.execute(
+        select(File)
+        .join(DataSpaceFile, DataSpaceFile.file_id == File.id)
+        .where(
+            File.user_id == current_user.id,
+            File.filename == fname,
+            DataSpaceFile.data_space_id.in_(space_ids),
+        )
+    )
+    file = result.scalars().first()
+    if not file:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return {
+        "file_id": str(file.id),
+        "filename": file.filename,
+        "file_type": file.file_type,
+        "file_size": file.file_size,
+        "mime_type": file.mime_type,
+    }
 
 
 # PLACEHOLDER_PROMOTE_DELETE

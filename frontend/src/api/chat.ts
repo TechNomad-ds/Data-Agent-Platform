@@ -4,6 +4,7 @@ import { getValidToken } from './client'
 export interface Conversation {
   id: string
   data_space_id: string | null
+  data_space_ids: string[] | null
   title: string | null
   model_id: string
   channel?: string | null // 'weixin'/'feishu' 来自渠道；'web'/null 为网页
@@ -52,7 +53,7 @@ export interface SSEEvent {
 export const chatApi = {
   listConversations: () => api.get<Conversation[]>('/chat/conversations'),
   getConversation: (id: string) => api.get<ConversationDetail>(`/chat/conversations/${id}`),
-  createConversation: (data: { data_space_id?: string; model_id: string; title?: string }) =>
+  createConversation: (data: { data_space_id?: string; data_space_ids?: string[]; model_id: string; title?: string }) =>
     api.post<Conversation>('/chat/conversations', data),
   deleteConversation: (id: string) => api.delete(`/chat/conversations/${id}`),
   renameConversation: (id: string, title: string) =>

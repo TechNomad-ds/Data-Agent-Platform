@@ -22,6 +22,8 @@ export type MainView = 'chat' | 'data' | 'settings' | 'credits' | 'admin' | 'cha
 export default function MainLayout() {
   const [currentView, setCurrentView] = useState<MainView>('chat')
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | undefined>()
+  // 多项目：当前选中的全部项目 id（含主空间，主空间=第一个）。selectedSpaceId 与它的首元素保持一致。
+  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([])
   const [currentConvId, setCurrentConvId] = useState<string | undefined>()
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [checkingSpaces, setCheckingSpaces] = useState(true)
@@ -48,6 +50,7 @@ export default function MainLayout() {
           setShowOnboarding(true)
         } else {
           setSelectedSpaceId(res.data[0].id)
+          setSelectedSpaceIds([res.data[0].id])
         }
       } catch {}
       setCheckingSpaces(false)
@@ -58,6 +61,7 @@ export default function MainLayout() {
   const handleOnboardingComplete = useCallback((spaceId: string) => {
     setShowOnboarding(false)
     setSelectedSpaceId(spaceId)
+    setSelectedSpaceIds([spaceId])
     setCurrentView('chat')
     if (!localStorage.getItem('guide_seen')) {
       setShowGuide(true)
@@ -75,26 +79,29 @@ export default function MainLayout() {
     setCurrentView('chat')
     try {
       const res = await chatApi.getConversation(id)
-      if (res.data.data_space_id) {
-        setSelectedSpaceId(res.data.data_space_id)
-      } else {
-        setSelectedSpaceId(undefined)
-      }
+      // 优先用对话存的多项目全集恢复；否则回退到单空间；都没有则普通对话
+      const ids = (res.data.data_space_ids && res.data.data_space_ids.length)
+        ? res.data.data_space_ids
+        : (res.data.data_space_id ? [res.data.data_space_id] : [])
+      setSelectedSpaceIds(ids)
+      setSelectedSpaceId(ids[0])
     } catch {
       // 加载失败不阻断
     }
   }, [])
 
-  // 项目切换的唯一入口（左侧项目栏）：切换活跃项目 → 回到聊天视图、开启该项目下的新对话，
-  // 并让中间栏只展示该项目的历史。"先选项目，再进会话"是主路径（项目=文件夹心智）。
-  const handleSelectSpace = useCallback((id: string | undefined) => {
-    setSelectedSpaceId(id)
+  // 项目切换的唯一入口（左侧项目栏）：支持多选。第一个为主空间。
+  // 切换后回到聊天视图、开启新对话，并让中间栏按主空间过滤历史。
+  const handleSelectSpaces = useCallback((ids: string[]) => {
+    setSelectedSpaceIds(ids)
+    setSelectedSpaceId(ids[0])
     setCurrentConvId(undefined)
     setCurrentView('chat')
   }, [])
 
   const handleOpenDataManager = useCallback(() => {
     setSelectedSpaceId(undefined)
+    setSelectedSpaceIds([])
     setCurrentView('data')
   }, [])
 
@@ -154,7 +161,9 @@ export default function MainLayout() {
       onSelectConversation={withDrawerClose(handleSelectConversation)}
       onOpenDataManager={withDrawerClose(handleOpenDataManager)}
       selectedSpaceId={selectedSpaceId}
-      onSelectSpace={withDrawerClose(handleSelectSpace)}
+      onSelectSpace={withDrawerClose((id: string | undefined) => handleSelectSpaces(id ? [id] : []))}
+      selectedSpaceIds={selectedSpaceIds}
+      onSelectSpaces={withDrawerClose(handleSelectSpaces)}
       inDrawer={isMobile}
     />
   )
@@ -163,6 +172,7 @@ export default function MainLayout() {
     currentView === 'chat' ? (
       <ChatView
         selectedSpaceId={selectedSpaceId}
+        selectedSpaceIds={selectedSpaceIds}
         conversationId={currentConvId}
         onConversationCreated={handleConversationCreated}
         onConversationDeleted={handleNewChat}
@@ -170,7 +180,7 @@ export default function MainLayout() {
     ) : currentView === 'data' ? (
       <DataManager
         selectedSpaceId={selectedSpaceId}
-        onSpaceChange={setSelectedSpaceId}
+        onSpaceChange={(id?: string) => { setSelectedSpaceId(id); setSelectedSpaceIds(id ? [id] : []) }}
         onStartChat={handleStartChat}
       />
     ) : currentView === 'credits' ? (
