@@ -715,6 +715,13 @@ class ChannelManager:
             await task
         except (asyncio.CancelledError, Exception):
             pass
+        # 回写 connected=False（与 _start 的 set_connected(True) 对称）：
+        # 停用/进程退出后 DB 不再谎报「已连接」。
+        try:
+            from app.channels.store import set_connected
+            await set_connected(user_id, channel, connected=False)
+        except Exception as exc:
+            logger.warning("set_connected(False) failed for %s: %s", key, exc)
         logger.info("adapter stopped: %s", key)
 
     async def stop_all(self) -> None:

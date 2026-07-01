@@ -693,6 +693,49 @@ def test_feishu_link_on_weixin_with_config_fetches_via_user_feishu_creds():
     assert len(convs.saved) == 0
 
 
+# ---------------------------------------------------------------------------
+# ChannelManager.stop_one：停止即回写 connected=False（与 start 对称）
+# ---------------------------------------------------------------------------
+
+def test_stop_one_marks_disconnected() -> None:
+    """停止 adapter 后必须把 DB 的 connected 置 False，否则停用的渠道 UI 仍显示「已连接」。"""
+    from app.channels.manager import ChannelManager
+    import app.channels.store as store_mod
+
+    async def _run() -> None:
+        mgr = ChannelManager(dispatcher=None)  # type: ignore[arg-type]
+        uid = uuid.uuid4()
+
+        class _Adapter:
+            stopped = False
+
+            async def stop(self) -> None:
+                self.stopped = True
+
+        adapter = _Adapter()
+        task = asyncio.create_task(asyncio.Event().wait())
+        key = f"{uid}:feishu"
+        mgr._adapters[key] = (adapter, task)
+
+        calls: list[tuple] = []
+        orig = store_mod.set_connected
+
+        async def fake_set_connected(user_id, channel, connected) -> None:
+            calls.append((user_id, channel, connected))
+
+        store_mod.set_connected = fake_set_connected
+        try:
+            await mgr.stop_one(uid, "feishu")
+        finally:
+            store_mod.set_connected = orig
+
+        assert adapter.stopped is True          # adapter 真的被停
+        assert key not in mgr._adapters          # 从注册表移除
+        assert calls == [(uid, "feishu", False)] # 回写 connected=False
+
+    asyncio.run(_run())
+
+
 if __name__ == "__main__":
     # 也可直接 python3 tests/test_channel_dispatch.py 运行
     import sys
