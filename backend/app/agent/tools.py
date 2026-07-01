@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.core.database import get_session_factory
 from app.models.file import File
-from app.models.data_space import DataSpaceFile
+from app.models.data_space import DataSpace, DataSpaceFile
 
 # #12 多数据空间：除了工具签名里的主 data_space_id，本轮还可能绑定额外空间。
 # 用 contextvar 注入「本轮活跃空间全集」，避免给 15 个工具逐一加参数。
@@ -213,13 +213,14 @@ def get_tool_definitions() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "download_to_space",
-                "description": "把外部数据下载并保存进【当前项目】（下载后自动登记并建索引，之后可用 read_file/inspect_data/search_data_space 处理）。支持：① HuggingFace 整个仓库（数据集/模型）——直接给仓库页链接如 https://huggingface.co/datasets/<owner>/<name> 或 https://huggingface.co/<owner>/<model>，会自动列出仓库所有文件逐个下载（走国内镜像 hf-mirror.com，超大文件如模型权重会跳过并告知）；② 单个文件直链 / GitHub 文件 / HF 单文件 resolve 链接。用户说“下载某 HF 仓库/数据集到项目”“把这个链接的数据拿进来”时用。注意：必须当前已选中一个项目才能下载（普通对话无项目时会提示用户先进项目）；Kaggle 等需登录的源暂不支持。",
+                "description": "把外部数据下载并保存进【当前项目】（下载后自动登记并建索引，之后可用 read_file/inspect_data/search_data_space 处理）。支持：① HuggingFace 整个仓库（数据集/模型）——直接给仓库页链接如 https://huggingface.co/datasets/<owner>/<name> 或 https://huggingface.co/<owner>/<model>，会自动列出仓库所有文件逐个下载（走国内镜像 hf-mirror.com，超大文件如模型权重会跳过并告知）；② 单个文件直链 / GitHub 文件 / HF 单文件 resolve 链接。用户说“下载某 HF 仓库/数据集到项目”“把这个链接的数据拿进来”时用。注意：必须当前已选中一个项目才能下载（普通对话无项目时会提示用户先进项目）。若当前对话绑定了多个项目，工具会要求你先问用户存到哪个项目，再用 target_project 指定。Kaggle 等需登录的源暂不支持。",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "url": {"type": "string", "description": "HuggingFace 仓库页链接 / 文件直链 / GitHub 链接（http/https）"},
                         "filename": {"type": "string", "description": "可选：单文件下载时保存为的文件名，不传则从 URL 推断（整仓下载时忽略）"},
                         "source_type": {"type": "string", "enum": ["auto", "file", "hf_repo"], "description": "可选：下载类型。auto（默认）自动识别 HF 仓库；hf_repo 强制整仓；file 强制单文件。"},
+                        "target_project": {"type": "string", "description": "可选：当对话绑定了多个项目时，指定把数据存到哪个项目（用项目名）。单项目时不必填。"},
                     },
                     "required": ["url"],
                 },
@@ -1546,6 +1547,37 @@ async def _tool_download_to_space(args: dict, user_id: uuid.UUID, data_space_id:
         return "请提供要下载的链接（url），可以是 HuggingFace 仓库、GitHub 文件或任意直链。"
     override_name = (args.get("filename") or "").strip()
     source_type = (args.get("source_type") or "auto").strip().lower()
+    target_project = (args.get("target_project") or "").strip()
+
+    # ── 多项目落点解析 ──
+    # 本轮可能绑定了多个项目（活跃空间集合）。下载只能存进一个项目：
+    # 单项目→直接用它；多项目→必须由 agent 在问过用户后用 target_project 指定，
+    # 否则不下载、返回候选项目让 agent 先确认，避免默默存进第一个。
+    active = _spaces_for(data_space_id)
+    if len(active) > 1:
+        # 取活跃项目的 (id, name)
+        async with get_session_factory()() as _db:
+            rows = await _db.execute(
+                select(DataSpace.id, DataSpace.name).where(
+                    DataSpace.id.in_(active), DataSpace.user_id == user_id
+                )
+            )
+            id_name = [(str(i), n) for i, n in rows.all()]
+        names = [n for _, n in id_name]
+        if not target_project:
+            return (
+                "当前对话绑定了多个项目，下载的数据需要存到其中一个。请先问用户要存到哪个项目"
+                f"（候选：{('、'.join(names)) or '无'}），拿到答复后用 target_project 参数重新调用本工具。"
+            )
+        # 按名字匹配（精确优先，其次包含）
+        matched = [i for i, n in id_name if n == target_project] or \
+                  [i for i, n in id_name if target_project in n or n in target_project]
+        if not matched:
+            return (
+                f"没找到名为「{target_project}」的项目。当前对话绑定的项目有："
+                f"{('、'.join(names)) or '无'}。请用其中一个的名字作为 target_project。"
+            )
+        data_space_id = uuid.UUID(matched[0])
 
     from app.services.downloader import (
         download_url_to_path, download_hf_repo_to_dir, parse_hf_url,

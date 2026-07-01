@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Input, Button, Select, Typography, Spin, message, Tooltip, Dropdown } from 'antd'
+import { Input, Button, Select, Typography, Spin, message, Tooltip, Dropdown, Modal, Radio } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
 import {
   SendOutlined,
@@ -595,20 +595,55 @@ export default function ChatView({
   )
 
   // #7 把当前对话沉淀为项目里的 Markdown 文件
-  const handlePersistToSpace = useCallback(async () => {
+  const doPersist = useCallback(async (targetSpaceId: string) => {
     if (!conversationId) return
-    if (!selectedSpaceId) {
-      message.warning('请先绑定一个项目，再沉淀对话')
-      return
-    }
     try {
-      const res = await chatApi.persistToSpace(conversationId, { data_space_id: selectedSpaceId })
+      const res = await chatApi.persistToSpace(conversationId, { data_space_id: targetSpaceId })
       message.success(`已沉淀为「${res.data.filename}」，正在建索引`)
       loadSpaces()
     } catch (err: any) {
       message.error(err?.response?.data?.detail || '沉淀失败，请稍后重试')
     }
-  }, [conversationId, selectedSpaceId])
+  }, [conversationId])
+
+  const handlePersistToSpace = useCallback(() => {
+    if (!conversationId) return
+    if (!selectedSpaceId) {
+      message.warning('请先绑定一个项目，再沉淀对话')
+      return
+    }
+    // 单项目：直接沉淀，不打扰。多项目：让用户选存到哪个项目，避免默默存进第一个。
+    const targets = spaces.filter((s) => selectedSpaceIds.includes(s.id))
+    if (targets.length <= 1) {
+      doPersist(selectedSpaceId)
+      return
+    }
+    let picked = targets[0].id
+    Modal.confirm({
+      title: '沉淀到哪个项目？',
+      content: (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 13, color: colors.textMuted, marginBottom: 10 }}>
+            这次对话绑定了多个项目，请选择把沉淀文件存到哪一个：
+          </div>
+          <Radio.Group
+            defaultValue={picked}
+            onChange={(e) => { picked = e.target.value }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+          >
+            {targets.map((s) => (
+              <Radio key={s.id} value={s.id}>
+                {s.name}　<span style={{ color: colors.textMuted, fontSize: 12 }}>{s.file_count} 个文件</span>
+              </Radio>
+            ))}
+          </Radio.Group>
+        </div>
+      ),
+      okText: '沉淀到此项目',
+      cancelText: '取消',
+      onOk: () => doPersist(picked),
+    })
+  }, [conversationId, selectedSpaceId, selectedSpaceIds, spaces, doPersist])
 
   const showStreaming = isStreaming && streamingConversationId === conversationId
   const showEmpty = messages.length === 0 && !showStreaming
